@@ -39,7 +39,9 @@ Hoy el flujo funciona asi:
 8. El backend envia archivo + prompt al modelo Gemini.
 9. Gemini responde en JSON estructurado usando un schema.
 10. El backend devuelve ese JSON al frontend.
-11. El frontend muestra el resultado y luego persiste el batch en la API.
+11. El frontend muestra el progreso item por item localmente.
+12. Cuando termina todo el lote, `App.tsx` agrega metadatos de usuario y agencia.
+13. Despues de eso, el frontend persiste el lote completo en la API.
 
 ## 1.2 Donde vive cada responsabilidad hoy
 
@@ -49,11 +51,13 @@ Hoy el flujo funciona asi:
 - Decide el orden de procesamiento.
 - Hace una llamada por archivo.
 - Controla el progreso visual.
-- Persiste resultados procesados al backend.
+- Al finalizar el lote, agrega metadatos y persiste resultados procesados al backend.
 
-Archivo principal relacionado:
+Archivos principales relacionados:
 
 - `components/BatchProcessor.tsx`
+- `App.tsx`
+- `hooks/index.ts`
 
 ### Backend
 
@@ -143,6 +147,7 @@ Conclusion tecnica:
 - No hay trazabilidad fuerte de que prompt se uso en cada documento procesado.
 - La logica deterministica y la logica generativa estan mezcladas conceptualmente.
 - El sistema no separa bien extraccion, validacion, correccion y scoring.
+- La configuracion tiene `MAX_RETRIES` y `RETRY_DELAY_MS`, pero hoy esa logica no esta implementada realmente en `server/routes/ai.ts`.
 
 ## 3. Como funciona hoy el batch
 
@@ -158,6 +163,8 @@ Eso significa que:
 - Hay una pausa artificial de 500 ms entre archivos.
 
 Esto hoy esta implementado en `components/BatchProcessor.tsx`.
+
+El guardado definitivo del lote y la adicion de metadatos ocurre despues en `App.tsx` y `hooks/index.ts`.
 
 ## 3.2 Que pasa cuando el usuario sube 20 archivos
 
