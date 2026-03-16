@@ -1,0 +1,5 @@
+{
+  "name": "Smart Logistics Extractor (AI) FACTURAS",
+  "description": "AI-powered document processor for Air Waybills using Gemini 2.5 Flash.",
+  "requestFramePermissions": []
+}
