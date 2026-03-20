@@ -145,6 +145,49 @@ batch.put('/:id', async (c) => {
   return c.json(buildBatchItem(result.rows[0]));
 });
 
+// DELETE /api/batch/items — Eliminar uno o varios items específicos
+batch.delete('/items', async (c) => {
+  const authUser = await requireAuth(c);
+  if (authUser instanceof Response) {
+    return authUser;
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const rawIds = Array.isArray(body?.ids) ? body.ids : [];
+  const ids = Array.from(new Set(rawIds.map((id) => String(id)).filter(Boolean)));
+  const db = getDb();
+
+  if (ids.length === 0) {
+    return c.json({ error: 'Se requiere al menos un id para eliminar.' }, 400);
+  }
+
+  const placeholders = ids.map(() => '?').join(',');
+  const existing = await db.execute({
+    sql: `SELECT id, agency_id FROM batch_items WHERE id IN (${placeholders})`,
+    args: ids,
+  });
+
+  if (existing.rows.length === 0) {
+    return c.json({ error: 'No se encontraron items para eliminar.' }, 404);
+  }
+
+  for (const row of existing.rows) {
+    const accessError = ensureAgencyAccess(c, authUser, String(row.agency_id || ''));
+    if (accessError) {
+      return accessError;
+    }
+  }
+
+  const existingIds = existing.rows.map((row) => String(row.id));
+  const existingPlaceholders = existingIds.map(() => '?').join(',');
+  await db.execute({
+    sql: `DELETE FROM batch_items WHERE id IN (${existingPlaceholders})`,
+    args: existingIds,
+  });
+
+  return c.json({ ok: true, count: existingIds.length, deletedIds: existingIds });
+});
+
 // DELETE /api/batch — Limpiar historial completo
 batch.delete('/', async (c) => {
   const authUser = await requireAuth(c);

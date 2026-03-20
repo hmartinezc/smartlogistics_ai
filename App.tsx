@@ -7,6 +7,7 @@ import LoginScreen from './components/LoginScreen';
 import TemplateGallery from './components/TemplateGallery';
 import BatchProcessor from './components/BatchProcessor';
 import ResultsDashboard from './components/ResultsDashboard';
+import ExtractedDataManager from './components/ExtractedDataManager';
 import DashboardHome from './components/DashboardHome';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
@@ -34,8 +35,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const [isDarkMode, toggleDarkMode] = useDarkMode();
   const { currentUser, loginApi, logout, isAuthenticated, sessionReady } = useAuth();
   const { users, setUsers, agencies, setAgencies, plans, loading: dataLoading, refresh: refreshData } = useApiData(isAuthenticated, currentUser);
-  const { batchFiles, batchResults, setBatchFiles, addResults, updateResult, clearResults, loadResults } = useBatchProcessor();
+  const { batchFiles, batchResults, setBatchFiles, addResults, updateResult, removeResults, clearResults, loadResults } = useBatchProcessor();
   const { confirm } = useConfirmDialog();
+  const [isCleaningData, setIsCleaningData] = useState(false);
 
   // Mutable plans array para componentes que esperan SubscriptionPlan[]
   const PLANS = plans;
@@ -217,6 +219,39 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     }
   };
 
+  const handleDeleteBatchItems = async (ids: string[]) => {
+    if (ids.length === 0) {
+      return null;
+    }
+
+    const message = ids.length === 1
+      ? '¿Eliminar este registro extraído de forma permanente?'
+      : `¿Eliminar ${ids.length} registros extraídos de forma permanente?`;
+
+    if (!(await confirm(message))) {
+      return null;
+    }
+
+    setIsCleaningData(true);
+    try {
+      await removeResults(ids);
+      return null;
+    } catch (err) {
+      return err instanceof ApiError ? err.message : 'Error eliminando registros.';
+    } finally {
+      setIsCleaningData(false);
+    }
+  };
+
+  const handleRefreshBatchResults = async () => {
+    setIsCleaningData(true);
+    try {
+      await loadResults(currentAgencyId === 'GLOBAL' ? undefined : currentAgencyId || undefined);
+    } finally {
+      setIsCleaningData(false);
+    }
+  };
+
   const handleNavigate = async (target: AppState) => {
     if (!canAccessAppState(currentUser, target)) {
       return;
@@ -303,6 +338,14 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                         onClearHistory={handleClearHistory} 
                         onUpdateItem={handleUpdateResult} 
                     />
+                )}
+                {appState === AppState.DATA_CLEANUP && (
+                  <ExtractedDataManager
+                    results={batchResults}
+                    isBusy={isCleaningData}
+                    onRefresh={handleRefreshBatchResults}
+                    onDeleteItems={handleDeleteBatchItems}
+                  />
                 )}
                 </div>
             </main>

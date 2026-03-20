@@ -179,6 +179,13 @@ export const api = {
     });
   },
 
+  async deleteBatchItems(ids: string[]): Promise<{ ok: boolean; count: number; deletedIds: string[] }> {
+    return request('/batch/items', {
+      method: 'DELETE',
+      body: JSON.stringify({ ids }),
+    });
+  },
+
   async clearBatchResults(agencyId?: string): Promise<void> {
     const query = agencyId ? `?agencyId=${agencyId}` : '';
     await request(`/batch${query}`, { method: 'DELETE' });
