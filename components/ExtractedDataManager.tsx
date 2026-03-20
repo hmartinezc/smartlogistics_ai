@@ -96,35 +96,59 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6 h-full flex flex-col">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">Registros</p>
-          <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">{results.length}</p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Repositorio filtrable de extracciones persistidas.</p>
+      {/* Stat Cards — compact, consistent with app design */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
+          <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 rounded-lg">
+            <FileText className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Registros</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">{results.length}</p>
+          </div>
         </div>
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">Exitosos</p>
-          <p className="mt-3 text-3xl font-bold text-emerald-600">{successCount}</p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Documentos listos para auditoría, búsqueda o depuración.</p>
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
+          <div className="p-3 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 rounded-lg">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Exitosos</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">{successCount}</p>
+          </div>
         </div>
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">Con error</p>
-          <p className="mt-3 text-3xl font-bold text-rose-500">{errorCount}</p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Registros fallidos o incompletos que conviene depurar primero.</p>
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
+          <div className="p-3 bg-rose-100 dark:bg-rose-900/50 text-rose-600 rounded-lg">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Con error</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">{errorCount}</p>
+          </div>
         </div>
-        <div className="bg-slate-900 dark:bg-slate-800 p-5 rounded-2xl border border-slate-800 dark:border-slate-700 shadow-sm text-white">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">Seleccionados</p>
-          <p className="mt-3 text-3xl font-bold">{selectedIds.length}</p>
-          <p className="mt-2 text-sm text-slate-300">Borrado selectivo y controlado, sin afectar el resto del historial.</p>
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
+          <div className="p-3 bg-slate-800 dark:bg-slate-600 text-white rounded-lg">
+            <Trash2 className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Seleccionados</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedIds.length}</p>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col">
-        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 bg-[linear-gradient(135deg,rgba(79,70,229,0.08),transparent_60%)]">
+      {/* Main Panel */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col">
+        {/* Search & Filter Bar */}
+        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Datos extraídos</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Busca por archivo, invoice, guía, agencia, shipper o usuario y elimina solo lo que realmente quieres limpiar.</p>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                Datos Extraídos
+                <span className="text-xs font-normal text-slate-400 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded-full">
+                  Base de datos
+                </span>
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Busca, revisa y elimina registros procesados.</p>
             </div>
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -133,15 +157,15 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar archivo, invoice, MAWB, HAWB, agencia..."
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Buscar archivo, invoice, MAWB, agencia..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as 'ALL' | BatchItem['status'])}
-                className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="ALL">Todos los estados</option>
                 <option value="SUCCESS">Solo exitosos</option>
@@ -153,7 +177,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
               {hasActiveFilters && (
                 <button
                   onClick={clearFilters}
-                  className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors inline-flex items-center gap-2"
+                  className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors inline-flex items-center gap-2"
                 >
                   <X className="w-4 h-4" />
                   Limpiar filtros
@@ -163,7 +187,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
               <button
                 onClick={() => onRefresh()}
                 disabled={isBusy}
-                className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
               >
                 <RefreshCw className={`w-4 h-4 ${isBusy ? 'animate-spin' : ''}`} />
                 Recargar
@@ -171,9 +195,10 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
             </div>
           </div>
 
+          {/* Action row */}
           <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              Mostrando <span className="font-semibold text-slate-800 dark:text-white">{filteredResults.length}</span> registros.
+              Mostrando <span className="font-semibold text-slate-800 dark:text-white">{filteredResults.length}</span> de {results.length} registros
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -197,135 +222,133 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
           </div>
 
           {errorMessage && (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 px-4 py-3 text-sm">
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 px-4 py-3 text-sm">
               {errorMessage}
             </div>
           )}
         </div>
 
-        <div className="flex-1 overflow-auto">
+        {/* Card List */}
+        <div className="flex-1 overflow-auto p-4 space-y-3">
           {filteredResults.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-6 py-14 text-slate-400">
               <FileText className="w-12 h-12 mb-4 opacity-30" />
-              <p className="text-lg font-semibold text-slate-600 dark:text-slate-300">No hay coincidencias con ese filtro.</p>
-              <p className="text-sm mt-2 max-w-md">Ajusta la búsqueda o cambia el estado para encontrar los registros que quieres revisar o eliminar.</p>
+              <p className="text-lg font-semibold text-slate-600 dark:text-slate-300">Sin resultados</p>
+              <p className="text-sm mt-2 max-w-md">Ajusta la búsqueda o el filtro de estado.</p>
             </div>
           ) : (
-            <table className="w-full min-w-[1080px] text-sm text-left">
-              <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase text-[11px] tracking-[0.18em] border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="px-6 py-4">
+            filteredResults.map((item) => {
+              const confidence = item.result?.confidenceScore;
+              const isSelected = selectedIds.includes(item.id);
+
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-xl border transition-colors ${
+                    isSelected
+                      ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-900/10'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  {/* Row 1: Header — checkbox, file name, status, agency, date, delete */}
+                  <div className="flex items-center gap-4 px-5 py-3 border-b border-slate-100 dark:border-slate-700/50">
                     <input
                       type="checkbox"
-                      checked={filteredResults.length > 0 && selectedVisibleCount === filteredResults.length}
-                      onChange={toggleSelectAllVisible}
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      checked={isSelected}
+                      onChange={() => toggleSelection(item.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 flex-shrink-0"
                     />
-                  </th>
-                  <th className="px-6 py-4">Archivo</th>
-                  <th className="px-6 py-4">Estado</th>
-                  <th className="px-6 py-4">Agencia</th>
-                  <th className="px-6 py-4">Documento</th>
-                  <th className="px-6 py-4">Ruta Logística</th>
-                  <th className="px-6 py-4 text-right">Piezas</th>
-                  <th className="px-6 py-4 text-right">Valor</th>
-                  <th className="px-6 py-4 text-center">Fiabilidad</th>
-                  <th className="px-6 py-4">Usuario</th>
-                  <th className="px-6 py-4">Fecha</th>
-                  <th className="px-6 py-4 text-center">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {filteredResults.map((item) => {
-                  const confidence = item.result?.confidenceScore;
-                  const isSelected = selectedIds.includes(item.id);
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-sm text-slate-900 dark:text-white truncate block">{item.fileName}</span>
+                      {item.error && <span className="text-xs text-rose-500 truncate block mt-0.5">{item.error}</span>}
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {item.status === 'SUCCESS' && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 text-xs font-bold"><CheckCircle className="w-3.5 h-3.5" /> OK</span>}
+                      {item.status === 'ERROR' && <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-700 px-2.5 py-1 text-xs font-bold"><AlertCircle className="w-3.5 h-3.5" /> Error</span>}
+                      {item.status === 'PROCESSING' && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold">Procesando</span>}
+                      {item.status === 'PENDING' && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2.5 py-1 text-xs font-bold">Pendiente</span>}
 
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`transition-colors ${isSelected ? 'bg-indigo-50/70 dark:bg-indigo-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}
-                    >
-                      <td className="px-6 py-4">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelection(item.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-900 dark:text-white">{item.fileName}</div>
-                        {item.error && <div className="text-xs text-rose-500 mt-1 truncate max-w-[220px]">{item.error}</div>}
-                      </td>
-                      <td className="px-6 py-4">
-                        {item.status === 'SUCCESS' && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 text-xs font-bold"><CheckCircle className="w-3.5 h-3.5" /> OK</span>}
-                        {item.status === 'ERROR' && <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-700 px-2.5 py-1 text-xs font-bold"><AlertCircle className="w-3.5 h-3.5" /> ERROR</span>}
-                        {item.status === 'PROCESSING' && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold">PROCESANDO</span>}
-                        {item.status === 'PENDING' && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2.5 py-1 text-xs font-bold">PENDIENTE</span>}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-900 px-2.5 py-1 text-xs font-semibold">
-                          {item.agencyId || 'Sin agencia'}
+                      <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        {item.agencyId || 'Sin agencia'}
+                      </span>
+
+                      <span className="text-xs text-slate-400 hidden sm:inline">
+                        {item.processedAt ? new Date(item.processedAt).toLocaleDateString() : '-'}
+                      </span>
+
+                      <button
+                        onClick={() => handleDelete([item.id])}
+                        disabled={isBusy}
+                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-50"
+                        title="Eliminar registro"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Data fields — horizontal grid, no stacking */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-x-6 gap-y-2 px-5 py-3 text-sm">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Invoice</p>
+                      <p className="font-mono text-slate-700 dark:text-slate-200 mt-0.5">{item.result?.invoiceNumber || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Shipper</p>
+                      <p className="text-slate-600 dark:text-slate-300 mt-0.5 truncate">{item.result?.shipperName || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Consignee</p>
+                      <p className="text-slate-600 dark:text-slate-300 mt-0.5 truncate">{item.result?.consigneeName || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">MAWB</p>
+                      <p className="font-mono text-slate-600 dark:text-slate-300 mt-0.5">{item.result?.mawb || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">HAWB</p>
+                      <p className="font-mono text-slate-600 dark:text-slate-300 mt-0.5">{item.result?.hawb || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Piezas / Valor</p>
+                      <p className="text-slate-700 dark:text-slate-200 mt-0.5">
+                        <span className="font-semibold">{item.result?.totalPieces ?? '-'}</span>
+                        <span className="text-slate-300 dark:text-slate-600 mx-1.5">|</span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">{item.result?.totalValue ? `$${item.result.totalValue}` : '-'}</span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Fiabilidad</p>
+                      {confidence !== undefined ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border mt-0.5 ${getConfidenceColor(confidence)}`}>
+                          <BrainCircuit className="w-3 h-3" />
+                          {confidence}%
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                        <div className="font-mono text-xs">{item.result?.invoiceNumber || '-'}</div>
-                        <div className="text-xs text-slate-400 mt-1">{item.result?.shipperName || 'Sin shipper'}</div>
-                        <div className="text-xs text-slate-400 mt-1">{item.result?.consigneeName || 'Sin consignee'}</div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                        <div className="text-xs">MAWB: <span className="font-mono">{item.result?.mawb || '-'}</span></div>
-                        <div className="text-xs mt-1">HAWB: <span className="font-mono">{item.result?.hawb || '-'}</span></div>
-                      </td>
-                      <td className="px-6 py-4 text-right font-semibold text-slate-700 dark:text-slate-200">
-                        {item.result?.totalPieces ?? '-'}
-                      </td>
-                      <td className="px-6 py-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                        {item.result?.totalValue ? `$${item.result.totalValue}` : '-'}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {confidence !== undefined ? (
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${getConfidenceColor(confidence)}`}>
-                            <BrainCircuit className="w-3 h-3" />
-                            {confidence}% {getConfidenceLabel(confidence)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.user || '-'}</td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {item.processedAt ? new Date(item.processedAt).toLocaleString() : '-'}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => handleDelete([item.id])}
-                          disabled={isBusy}
-                          className="inline-flex items-center justify-center p-2 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-50"
-                          title="Eliminar registro"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      ) : (
+                        <p className="text-slate-300 mt-0.5">-</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 3: Meta — user + full timestamp (compact) */}
+                  <div className="flex items-center gap-4 px-5 py-2 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-400 border-t border-slate-100 dark:border-slate-700/50 rounded-b-xl">
+                    <span>Usuario: <span className="text-slate-600 dark:text-slate-300 font-medium">{item.user || '-'}</span></span>
+                    <span>·</span>
+                    <span>{item.processedAt ? new Date(item.processedAt).toLocaleString() : '-'}</span>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 
+        {/* Sticky bulk-action bar */}
         {selectedIds.length > 0 && (
           <div className="sticky bottom-0 border-t border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 backdrop-blur px-6 py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {selectedIds.length} {selectedIds.length === 1 ? 'registro seleccionado' : 'registros seleccionados'}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Puedes limpiar la selección actual o ejecutar el borrado múltiple desde aquí.
-                </p>
-              </div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                {selectedIds.length} {selectedIds.length === 1 ? 'registro seleccionado' : 'registros seleccionados'}
+              </p>
 
               <div className="flex items-center gap-3">
                 <button
