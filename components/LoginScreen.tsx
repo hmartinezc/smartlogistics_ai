@@ -101,7 +101,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </form>
 
             <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-              Modo local con base libSQL. Usa las cuentas seed configuradas en el backend o tu sesión persistida.
+              Inicia sesión con tus credenciales para acceder al sistema.
             </div>
         </div>
       </div>
