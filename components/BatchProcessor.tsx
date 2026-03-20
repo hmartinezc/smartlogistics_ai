@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { AgentType, BatchItem } from '../types';
+import { AI_CONFIG } from '../config';
 import { api } from '../services/apiClient';
 import { generateId } from '../utils/helpers';
 import { Loader2, CheckCircle, AlertCircle, Zap } from './Icons';
@@ -13,12 +14,14 @@ interface BatchProcessorProps {
 
 const BatchProcessor: React.FC<BatchProcessorProps> = ({ files, format, onComplete }) => {
   const [items, setItems] = useState<BatchItem[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(true);
   const hasStartedRef = useRef(false);
 
   // 1. Inicializar Items
   useEffect(() => {
+    hasStartedRef.current = false;
     const initialItems = files.map(file => ({
       id: generateId(),
       file,
@@ -27,74 +30,71 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({ files, format, onComple
       processedAt: new Date().toISOString()
     }));
     setItems(initialItems);
+    setCompletedCount(0);
+    setActiveCount(0);
+    setIsProcessing(true);
   }, [files]);
 
-  // 2. Lógica de Procesamiento Secuencial (Uno por uno)
+  // 2. Lógica de Procesamiento Paralelo Controlado
   useEffect(() => {
     if (items.length === 0 || hasStartedRef.current) return;
     
     const processQueue = async () => {
       hasStartedRef.current = true;
-      const results: BatchItem[] = [];
-
-      // Iteramos sobre una COPIA de los items para tener control total
-      // y no depender del estado asíncrono de React dentro del loop.
+      const results: BatchItem[] = new Array(items.length);
       const queue = [...items];
+      const parallelLimit = Math.min(queue.length, AI_CONFIG.MAX_PARALLEL_BATCH_REQUESTS);
+      let nextIndex = 0;
 
-      for (let i = 0; i < queue.length; i++) {
-        setCurrentIndex(i);
-        const currentItem = queue[i];
+      const processItem = async () => {
+        while (nextIndex < queue.length) {
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          const currentItem = queue[currentIndex];
 
-        // A. Marcar como procesando
-        setItems(prev => prev.map(item => 
-          item.id === currentItem.id ? { ...item, status: 'PROCESSING' } : item
-        ));
-
-        try {
-          // B. Llamada a la API
-          const data = await api.extractLogisticsData(currentItem.file!, format);
-          
-          // C. Marcar éxito
-          const successItem = { ...currentItem, status: 'SUCCESS' as const, result: data };
-          results.push(successItem);
-          
+          setActiveCount(prev => prev + 1);
           setItems(prev => prev.map(item => 
-            item.id === currentItem.id ? successItem : item
+            item.id === currentItem.id ? { ...item, status: 'PROCESSING' } : item
           ));
 
-        } catch (error: any) {
-          console.error(`Error procesando ${currentItem.fileName}`, error);
-          
-          // D. Marcar error
-          const errorItem = { 
-            ...currentItem, 
-            status: 'ERROR' as const, 
-            error: error.message || 'Error desconocido' 
-          };
-          results.push(errorItem);
+          try {
+            const data = await api.extractLogisticsData(currentItem.file!, format);
+            const successItem = { ...currentItem, status: 'SUCCESS' as const, result: data };
+            results[currentIndex] = successItem;
 
-          setItems(prev => prev.map(item => 
-            item.id === currentItem.id ? errorItem : item
-          ));
+            setItems(prev => prev.map(item => 
+              item.id === currentItem.id ? successItem : item
+            ));
+          } catch (error: any) {
+            console.error(`Error procesando ${currentItem.fileName}`, error);
+            const errorItem = { 
+              ...currentItem, 
+              status: 'ERROR' as const, 
+              error: error.message || 'Error desconocido' 
+            };
+            results[currentIndex] = errorItem;
+
+            setItems(prev => prev.map(item => 
+              item.id === currentItem.id ? errorItem : item
+            ));
+          } finally {
+            setActiveCount(prev => prev - 1);
+            setCompletedCount(prev => prev + 1);
+          }
         }
+      };
 
-        // Pequeña pausa para asegurar UI updates y no saturar
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      await Promise.all(Array.from({ length: parallelLimit }, () => processItem()));
 
       setIsProcessing(false);
-      
-      // Esperar un momento para que el usuario vea el 100% antes de cambiar de pantalla
-      setTimeout(() => {
-        onComplete(results);
-      }, 1000);
+      onComplete(results);
     };
 
     processQueue();
 
-  }, [items.length]); // Solo arranca cuando los items están listos
+  }, [format, items, onComplete]);
 
-  const progressPercentage = Math.round(((currentIndex + (isProcessing ? 0 : 1)) / files.length) * 100);
+  const progressPercentage = files.length === 0 ? 0 : Math.round((completedCount / files.length) * 100);
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 space-y-8 animate-in fade-in duration-500">
@@ -111,7 +111,9 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({ files, format, onComple
             {isProcessing ? 'Analizando Documentos...' : 'Procesamiento Finalizado'}
         </h2>
         <p className="text-slate-500">
-           Procesando archivo {Math.min(currentIndex + 1, files.length)} de {files.length}
+           {isProcessing
+             ? `Procesados ${completedCount} de ${files.length} · ${activeCount} en paralelo`
+             : `Procesados ${files.length} de ${files.length}`}
         </p>
       </div>
 

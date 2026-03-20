@@ -15,7 +15,7 @@ export const AI_CONFIG = {
   MODEL_ID: 'gemini-3-flash-preview',
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  BATCH_DELAY_MS: 500, // Pausa entre items del batch
+  MAX_PARALLEL_BATCH_REQUESTS: 5,
 } as const;
 
 // --------------------------
