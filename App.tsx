@@ -9,6 +9,7 @@ import BatchProcessor from './components/BatchProcessor';
 import ResultsDashboard from './components/ResultsDashboard';
 import ExtractedDataManager from './components/ExtractedDataManager';
 import DashboardHome from './components/DashboardHome';
+import OperatorPanel from './components/OperatorPanel';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
 import AgenciesConfiguration from './components/AgenciesConfiguration';
@@ -103,8 +104,8 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       }
 
       setCurrentAgencyId(agencyId);
-      if (appState !== AppState.DASHBOARD_OPS && appState !== AppState.DASHBOARD_ADMIN) {
-        setAppState(AppState.DASHBOARD_OPS); 
+      if (![AppState.DASHBOARD_OPS, AppState.DASHBOARD_ADMIN, AppState.DASHBOARD_PANEL].includes(appState)) {
+        setAppState(currentUser?.role === 'ADMIN' ? AppState.DASHBOARD_OPS : AppState.DASHBOARD_PANEL);
       }
   };
 
@@ -314,8 +315,11 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 {appState === AppState.DASHBOARD_ADMIN && currentUser?.role === 'ADMIN' && (
                     <AdminDashboard results={batchResults} agencies={agencies} plans={PLANS} />
                 )}
-                {appState === AppState.DASHBOARD_OPS && (
+                {appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
                     <DashboardHome results={batchResults} currentAgencyId={currentAgencyId} currentAgency={currentAgency} currentPlan={contextPlan} />
+                )}
+                {appState === AppState.DASHBOARD_PANEL && currentUser && (
+                  <OperatorPanel results={batchResults} currentAgencyId={currentAgencyId} currentAgency={currentAgency} />
                 )}
                 {appState === AppState.USER_MANAGEMENT && currentUser?.role === 'ADMIN' && (
                     <UserManagement users={users} agencies={agencies} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />

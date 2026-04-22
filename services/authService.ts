@@ -55,7 +55,7 @@ export const resolveDefaultAgencyContext = (user: User, agencies: Agency[]): str
 };
 
 export const resolveLandingState = (user: User): AppState => {
-  return user.role === 'ADMIN' ? AppState.DASHBOARD_ADMIN : AppState.DASHBOARD_OPS;
+  return user.role === 'ADMIN' ? AppState.DASHBOARD_ADMIN : AppState.DASHBOARD_PANEL;
 };
 
 export const canRoleAccessAppState = (role: UserRole, target: AppState): boolean => {
@@ -68,6 +68,7 @@ export const canRoleAccessAppState = (role: UserRole, target: AppState): boolean
   }
 
   return ![
+    AppState.DASHBOARD_OPS,
     AppState.DASHBOARD_ADMIN,
     AppState.AGENCY_CONFIG,
     AppState.USER_MANAGEMENT,

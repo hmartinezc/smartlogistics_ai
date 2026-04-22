@@ -25,14 +25,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentTab, onNavigate, onLogout, isDarkMode, onToggleTheme, userRole, userName,
   availableAgencies, currentAgencyId, onSwitchAgency
 }) => {
+   const isAdmin = canRoleAccessAppState(userRole, AppState.DASHBOARD_ADMIN);
   
   // Base Menu (For everyone)
   const menuItems = [
     { 
-      id: AppState.DASHBOARD_OPS, 
-      label: 'Panel Operativo', 
+         id: AppState.DASHBOARD_PANEL,
+         label: 'Panel', 
       icon: LayoutDashboard,
-      desc: 'Conciliación y Log'
+         desc: 'Facturado por AWB'
     },
     { 
       id: AppState.PROCESS_SELECTION, 
@@ -55,7 +56,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   // Admin Specific Items
-   if (canRoleAccessAppState(userRole, AppState.DASHBOARD_ADMIN)) {
+      if (isAdmin) {
+   menuItems.unshift({
+      id: AppState.DASHBOARD_OPS,
+      label: 'Panel Operativo',
+      icon: LayoutDashboard,
+      desc: 'Conciliación y Log'
+   });
+
     menuItems.unshift({
         id: AppState.DASHBOARD_ADMIN,
         label: 'Admin Metrics',
@@ -106,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold py-2.5 pl-3 pr-8 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow cursor-pointer truncate"
             >
                 {/* Admin Option: View All */}
-               {canRoleAccessAppState(userRole, AppState.DASHBOARD_ADMIN) && (
+                  {isAdmin && (
                     <option value="GLOBAL">🌐 Vista Global (Todas)</option>
                 )}
                 

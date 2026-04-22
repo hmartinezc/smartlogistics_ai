@@ -109,6 +109,13 @@ Detalle completo: `docs/CoolifyDeployment.md`
 - Cliente HTTP centralizado en `services/apiClient.ts`
 - Documentación técnica principal en `docs/DatabaseSchema.md`
 
+## Documentacion clave
+
+- `docs/DatabaseSchema.md`
+- `docs/GuiaReplicacionArquitectura.md`
+- `docs/AIAgentsFutureUpgradePlan.md`
+- `docs/GuiaEvolucionArquitecturaIA.md`
+
 ## Utilidades
 
 - Ejecutar seed manual: `npm run db:seed`

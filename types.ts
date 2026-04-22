@@ -124,7 +124,8 @@ export interface AwbReconciliationRow {
 
 export enum AppState {
   LOGIN = 'LOGIN',
-  DASHBOARD_OPS = 'DASHBOARD_OPS',      // Panel Operativo (Todos)
+  DASHBOARD_OPS = 'DASHBOARD_OPS',      // Panel Operativo (Solo Admin)
+  DASHBOARD_PANEL = 'DASHBOARD_PANEL',  // Panel Facturado (Operación)
   DASHBOARD_ADMIN = 'DASHBOARD_ADMIN',  // Panel Admin (Solo Admin)
   AGENCY_CONFIG = 'AGENCY_CONFIG',      // Configuración Agencias (Solo Admin)
   PROCESS_SELECTION = 'PROCESS_SELECTION',
