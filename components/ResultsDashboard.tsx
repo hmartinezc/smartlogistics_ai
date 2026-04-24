@@ -3,7 +3,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BatchItem } from '../types';
 import { CheckCircle, AlertCircle, FileText, Download, ArrowRight, Eye, Trash2, BrainCircuit, ChevronDown, Hash } from './Icons';
 import ValidationForm from './ValidationForm';
-import { getConfidenceColor, getConfidenceLabel, downloadAsJSON } from '../utils/helpers';
+import { getConfidenceColor, getConfidenceLabel, downloadAsJSON, formatDate } from '../utils/helpers';
+import { enrichBatchItemsForExport } from '../services/productMatchService';
+import { ApiError } from '../services/apiClient';
 
 interface ResultsDashboardProps {
   results: BatchItem[];
@@ -16,6 +18,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
   const [viewingItem, setViewingItem] = useState<BatchItem | null>(null);
   const [selectedAwb, setSelectedAwb] = useState('ALL');
   const [isAwbMenuOpen, setIsAwbMenuOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState<{ tone: 'error' | 'warning' | 'success'; message: string } | null>(null);
   const awbMenuRef = useRef<HTMLDivElement | null>(null);
   const successCount = results.filter(r => r.status === 'SUCCESS').length;
   const errorCount = results.filter(r => r.status === 'ERROR').length;
@@ -81,18 +85,47 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     setIsAwbMenuOpen(false);
   };
 
-  const handleDownloadAll = () => {
-    const cleanData = filteredSuccessResults.map((item) => ({
-      filename: item.fileName,
-      processedAt: item.processedAt,
-      ...item.result,
-    }));
+  const handleDownloadAll = async () => {
+    if (filteredSuccessResults.length === 0) {
+      return;
+    }
 
-    const awbSuffix = selectedAwb === 'ALL'
-      ? 'ALL'
-      : selectedAwb.replace(/[^a-zA-Z0-9_-]+/g, '_');
+    setIsExporting(true);
+    setDownloadNotice(null);
 
-    downloadAsJSON(cleanData, `TCBV_SESSION_EXPORT_${awbSuffix}_${new Date().getTime()}.json`);
+    try {
+      const { items: exportItems, missingMatches } = await enrichBatchItemsForExport(filteredSuccessResults);
+      const cleanData = exportItems.map(({ item, data }) => ({
+        filename: item.fileName,
+        processedAt: item.processedAt,
+        ...data,
+      }));
+
+      const awbSuffix = selectedAwb === 'ALL'
+        ? 'ALL'
+        : selectedAwb.replace(/[^a-zA-Z0-9_-]+/g, '_');
+
+      downloadAsJSON(cleanData, `TCBV_SESSION_EXPORT_${awbSuffix}_${new Date().getTime()}.json`);
+
+      setDownloadNotice(
+        missingMatches > 0
+          ? {
+              tone: 'warning',
+              message: `Se exportó el JSON con ${missingMatches} line item(s) sin equivalencia en el catálogo vigente.`,
+            }
+          : {
+              tone: 'success',
+              message: 'Se exportó el JSON con matches aplicados sobre el catálogo vigente.',
+            }
+      );
+    } catch (error) {
+      setDownloadNotice({
+        tone: 'error',
+        message: error instanceof ApiError ? error.message : 'No fue posible enriquecer el JSON antes de descargar.',
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (viewingItem && viewingItem.result) {
@@ -242,14 +275,23 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
                <ArrowRight className="w-4 h-4" />
             </button>
             <button 
-              onClick={handleDownloadAll}
-              disabled={filteredSuccessResults.length === 0}
+              onClick={() => void handleDownloadAll()}
+              disabled={filteredSuccessResults.length === 0 || isExporting}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Download className="w-4 h-4" /> Exportar JSON
+              <Download className="w-4 h-4" /> {isExporting ? 'Exportando...' : 'Exportar JSON'}
             </button>
          </div>
       </div>
+
+      {downloadNotice && (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${downloadNotice.tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200' : downloadNotice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'}`}>
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{downloadNotice.message}</span>
+          </div>
+        </div>
+      )}
 
       {/* Results Table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex-1 flex flex-col">
@@ -270,7 +312,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
               <tr>
                 <th className="px-6 py-3">Estado</th>
                 <th className="px-6 py-3">Archivo</th>
-               <th className="px-6 py-3">MAWB</th>
+                <th className="px-6 py-3">Fecha</th>
+                <th className="px-6 py-3">MAWB</th>
                 <th className="px-6 py-3">Invoice #</th>
                 <th className="px-6 py-3 text-right">Piezas</th>
                 <th className="px-6 py-3 text-right">Valor Total</th>
@@ -283,6 +326,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
               {filteredResults.map((item) => {
                 const confidence = item.result?.confidenceScore || 0;
                 const isLowConfidence = item.status === 'SUCCESS' && confidence < 75;
+                const addedAt = item.createdAt || item.processedAt;
                 
                 return (
                 <tr key={item.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isLowConfidence ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
@@ -300,6 +344,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                     {item.fileName}
                     {item.error && <div className="text-xs text-red-500 mt-1">{item.error}</div>}
+                  </td>
+                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    {addedAt ? formatDate(addedAt) : '-'}
                   </td>
                   <td className="px-6 py-4 font-mono text-slate-500 dark:text-slate-400">
                     {item.result?.mawb || '-'}

@@ -3,6 +3,8 @@ import { Agency, BatchItem } from '../types';
 import { buildInvoicedAwbRecords, getOperationDateKey } from '../services/operationalService';
 import { downloadAsJSON, formatDateTime, formatNumber } from '../utils/helpers';
 import { AlertCircle, CheckCircle, Download, FileText, Hash, Package, Plane } from './Icons';
+import { enrichBatchItemsForExport } from '../services/productMatchService';
+import { ApiError } from '../services/apiClient';
 
 interface OperatorPanelProps {
   results: BatchItem[];
@@ -16,6 +18,8 @@ const sanitizeFileSegment = (value: string): string => value.replace(/[^a-zA-Z0-
 
 const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId, currentAgency }) => {
   const [operationDate, setOperationDate] = useState<string>(getOperationDateKey());
+  const [exportingMawb, setExportingMawb] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<{ tone: 'error' | 'warning' | 'success'; message: string } | null>(null);
 
   const filteredDayResults = useMemo(() => {
     return results
@@ -86,20 +90,47 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
     });
   }, [awbRows]);
 
-  const handleDownloadAwb = (mawb: string) => {
-    const documents = (awbDocuments.get(mawb) || []).map((item) => ({
-      filename: item.fileName,
-      processedAt: item.processedAt,
-      user: item.user,
-      agencyId: item.agencyId,
-      ...item.result,
-    }));
+  const handleDownloadAwb = async (mawb: string) => {
+    const sourceItems = awbDocuments.get(mawb) || [];
 
-    if (documents.length === 0) {
+    if (sourceItems.length === 0) {
       return;
     }
 
-    downloadAsJSON(documents, `AWB_${sanitizeFileSegment(mawb)}_${operationDate}.json`);
+    setExportingMawb(mawb);
+    setExportNotice(null);
+
+    try {
+      const { items: exportItems, missingMatches } = await enrichBatchItemsForExport(sourceItems);
+      const documents = exportItems.map(({ item, data }) => ({
+        filename: item.fileName,
+        processedAt: item.processedAt,
+        user: item.user,
+        agencyId: item.agencyId,
+        ...data,
+      }));
+
+      downloadAsJSON(documents, `AWB_${sanitizeFileSegment(mawb)}_${operationDate}.json`);
+
+      setExportNotice(
+        missingMatches > 0
+          ? {
+              tone: 'warning',
+              message: `La AWB ${mawb === 'UNKNOWN' ? 'SIN MAWB' : mawb} se exportó con ${missingMatches} line item(s) sin equivalencia.`,
+            }
+          : {
+              tone: 'success',
+              message: `La AWB ${mawb === 'UNKNOWN' ? 'SIN MAWB' : mawb} se exportó con el catálogo vigente aplicado.`,
+            }
+      );
+    } catch (error) {
+      setExportNotice({
+        tone: 'error',
+        message: error instanceof ApiError ? error.message : 'No fue posible enriquecer el JSON antes de descargar esta AWB.',
+      });
+    } finally {
+      setExportingMawb(null);
+    }
   };
 
   return (
@@ -238,6 +269,15 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
         )}
       </div>
 
+      {exportNotice && (
+        <div className={`mb-8 rounded-2xl border px-5 py-4 text-sm ${exportNotice.tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200' : exportNotice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'}`}>
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{exportNotice.message}</span>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800 overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50 px-5 py-4 dark:border-slate-700 dark:bg-slate-900/50">
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
@@ -281,16 +321,17 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
                       <td className="px-6 py-4">
                         <button
                           type="button"
-                          onClick={() => handleDownloadAwb(row.mawb)}
+                          onClick={() => void handleDownloadAwb(row.mawb)}
                           className="group flex items-center gap-3 text-left"
                           title="Descargar JSON de esta AWB"
+                          disabled={exportingMawb === row.mawb}
                         >
                           <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-2 text-indigo-600 transition-colors group-hover:border-indigo-200 group-hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300 dark:group-hover:bg-indigo-500/20">
                             <Download className="w-4 h-4" />
                           </div>
                           <div>
                             <div className="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-300">{displayMawb}</div>
-                            <div className="text-xs text-slate-400">Descargar JSON extraído</div>
+                            <div className="text-xs text-slate-400">{exportingMawb === row.mawb ? 'Exportando...' : 'Descargar JSON extraído'}</div>
                           </div>
                         </button>
                       </td>

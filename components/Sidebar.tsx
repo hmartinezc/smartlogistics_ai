@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { 
-   Package, LayoutDashboard, BrainCircuit, History, LogOut, Moon, Sun, Shield, Users, Building, ChevronDown, CheckCircle, Trash2
+   Package, LayoutDashboard, BrainCircuit, History, LogOut, Moon, Sun, Shield, Users, Building, ChevronDown, Trash2, Search
 } from './Icons';
 import { AppState, UserRole, Agency } from '../types';
 import { canRoleAccessAppState } from '../services/authService';
@@ -47,6 +47,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: History,
       desc: 'Resultados Auditados'
       },
+      {
+         id: AppState.PRODUCT_MATCHES,
+         label: 'Match Productos',
+         icon: Search,
+         desc: 'Catálogo por agencia'
+    },
       {
          id: AppState.DATA_CLEANUP,
          label: 'Datos Extraídos',

@@ -39,6 +39,14 @@ export interface InvoiceData {
   confidenceScore: number; // 0 to 100
 }
 
+export interface ExportInvoiceItem extends InvoiceItem {
+  match: ProductMatchExport;
+}
+
+export interface ExportInvoiceData extends Omit<InvoiceData, 'lineItems'> {
+  lineItems: ExportInvoiceItem[];
+}
+
 export interface BatchItem {
   id: string;
   file?: File;
@@ -46,6 +54,7 @@ export interface BatchItem {
   status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
   result?: InvoiceData;
   error?: string;
+  createdAt?: string; // ISO Date when the record was added
   processedAt?: string; // ISO Date
   user?: string; // User who processed the file
   agencyId?: string; // Agency context where this was processed
@@ -70,6 +79,25 @@ export interface Agency {
   isActive: boolean; // Status (Active / Suspended)
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ProductMatchCatalogItem {
+  id: string;
+  agencyId: string;
+  category: string;
+  product: string;
+  clientProductCode: string;
+  productMatch: string;
+  hts: string;
+  htsMatch: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductMatchExport {
+  clientProductCode: string;
+  clientProductDescription: string;
+  htsMatch: string;
 }
 
 export interface User {
@@ -128,6 +156,7 @@ export enum AppState {
   DASHBOARD_PANEL = 'DASHBOARD_PANEL',  // Panel Facturado (Operación)
   DASHBOARD_ADMIN = 'DASHBOARD_ADMIN',  // Panel Admin (Solo Admin)
   AGENCY_CONFIG = 'AGENCY_CONFIG',      // Configuración Agencias (Solo Admin)
+  PRODUCT_MATCHES = 'PRODUCT_MATCHES',  // Catálogo Match Productos
   PROCESS_SELECTION = 'PROCESS_SELECTION',
   BATCH_RUNNING = 'BATCH_RUNNING',
   HISTORY_RESULTS = 'HISTORY_RESULTS',

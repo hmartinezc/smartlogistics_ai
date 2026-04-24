@@ -13,6 +13,7 @@ import OperatorPanel from './components/OperatorPanel';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
 import AgenciesConfiguration from './components/AgenciesConfiguration';
+import ProductMatchCatalog from './components/ProductMatchCatalog';
 import Sidebar from './components/Sidebar';
 import { X } from './components/Icons';
 import {
@@ -104,7 +105,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       }
 
       setCurrentAgencyId(agencyId);
-      if (![AppState.DASHBOARD_OPS, AppState.DASHBOARD_ADMIN, AppState.DASHBOARD_PANEL].includes(appState)) {
+      if (![AppState.DASHBOARD_OPS, AppState.DASHBOARD_ADMIN, AppState.DASHBOARD_PANEL, AppState.PRODUCT_MATCHES].includes(appState)) {
         setAppState(currentUser?.role === 'ADMIN' ? AppState.DASHBOARD_OPS : AppState.DASHBOARD_PANEL);
       }
   };
@@ -326,6 +327,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 )}
                 {appState === AppState.AGENCY_CONFIG && currentUser?.role === 'ADMIN' && (
                     <AgenciesConfiguration agencies={agencies} plans={PLANS} onAddAgency={handleAddAgency} onUpdateAgency={handleUpdateAgency} onDeleteAgency={handleDeleteAgency} />
+                )}
+                {appState === AppState.PRODUCT_MATCHES && currentUser && (
+                  <ProductMatchCatalog currentAgencyId={currentAgencyId} currentAgency={currentAgency} />
                 )}
                 {appState === AppState.PROCESS_SELECTION && (
                     <TemplateGallery onSelectFiles={handleFilesSelected} />

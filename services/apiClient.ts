@@ -154,6 +154,31 @@ export const api = {
     });
   },
 
+  // ── Product Matches ──
+  async getProductMatches(agencyId: string): Promise<import('../types').ProductMatchCatalogItem[]> {
+    return request(`/product-matches?agencyId=${encodeURIComponent(agencyId)}`);
+  },
+
+  async createProductMatch(item: import('../types').ProductMatchCatalogItem): Promise<import('../types').ProductMatchCatalogItem> {
+    return request('/product-matches', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    });
+  },
+
+  async updateProductMatch(item: import('../types').ProductMatchCatalogItem): Promise<import('../types').ProductMatchCatalogItem> {
+    return request(`/product-matches/${item.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(item),
+    });
+  },
+
+  async deleteProductMatch(id: string): Promise<void> {
+    await request(`/product-matches/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   // ── Plans ──
   async getPlans(): Promise<import('../types').SubscriptionPlan[]> {
     return request('/plans');
