@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Agency, ProductMatchCatalogItem } from '../types';
 import { api, ApiError } from '../services/apiClient';
 import { generateId } from '../utils/helpers';
@@ -35,7 +35,21 @@ const sortMatches = (items: ProductMatchCatalogItem[]) => [...items].sort((left,
   return left.product.localeCompare(right.product, 'es', { sensitivity: 'base' });
 });
 
+const productMatchCatalogCache = new Map<string, ProductMatchCatalogItem[]>();
+const productMatchCatalogRequests = new Map<string, Promise<ProductMatchCatalogItem[]>>();
+
+type LoadCatalogOptions = {
+  force?: boolean;
+};
+
+const cacheProductMatches = (agencyId: string, items: ProductMatchCatalogItem[]): ProductMatchCatalogItem[] => {
+  const sortedItems = sortMatches(items);
+  productMatchCatalogCache.set(agencyId, sortedItems);
+  return sortedItems;
+};
+
 const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgencyId, currentAgency }) => {
+  const activeAgencyRef = useRef(currentAgencyId);
   const [items, setItems] = useState<ProductMatchCatalogItem[]>([]);
   const [draft, setDraft] = useState<ProductMatchDraft>(EMPTY_DRAFT);
   const [query, setQuery] = useState('');
@@ -48,27 +62,58 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
+  activeAgencyRef.current = currentAgencyId;
+
   const resetForm = useCallback(() => {
     setDraft(EMPTY_DRAFT);
     setEditingId(null);
   }, []);
 
-  const loadCatalog = useCallback(async () => {
-    if (!currentAgency || currentAgencyId === 'GLOBAL') {
+  const loadCatalog = useCallback(async ({ force = false }: LoadCatalogOptions = {}) => {
+    const agencyId = currentAgencyId;
+
+    if (!currentAgency || agencyId === 'GLOBAL') {
       setItems([]);
       return;
+    }
+
+    const cachedItems = productMatchCatalogCache.get(agencyId);
+    if (cachedItems && !force) {
+      setItems(cachedItems);
+      setErrorMessage(null);
+      return;
+    }
+
+    if (!cachedItems) {
+      setItems([]);
     }
 
     setIsLoading(true);
     setErrorMessage(null);
 
+    let request = productMatchCatalogRequests.get(agencyId);
+
     try {
-      const result = await api.getProductMatches(currentAgencyId);
-      setItems(sortMatches(result));
+      if (!request || force) {
+        request = api.getProductMatches(agencyId).then((result) => cacheProductMatches(agencyId, result));
+        productMatchCatalogRequests.set(agencyId, request);
+      }
+
+      const result = await request;
+      if (activeAgencyRef.current === agencyId) {
+        setItems(result);
+      }
     } catch (error) {
-      setErrorMessage(error instanceof ApiError ? error.message : 'No fue posible cargar el catálogo.');
+      if (activeAgencyRef.current === agencyId) {
+        setErrorMessage(error instanceof ApiError ? error.message : 'No fue posible cargar el catálogo.');
+      }
     } finally {
-      setIsLoading(false);
+      if (productMatchCatalogRequests.get(agencyId) === request) {
+        productMatchCatalogRequests.delete(agencyId);
+      }
+      if (activeAgencyRef.current === agencyId) {
+        setIsLoading(false);
+      }
     }
   }, [currentAgency, currentAgencyId]);
 
@@ -131,11 +176,6 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
 
   const matchedHtsCount = useMemo(() => items.filter((item) => item.htsMatch.trim()).length, [items]);
   const codedProductsCount = useMemo(() => items.filter((item) => item.clientProductCode.trim()).length, [items]);
-  const completedDraftFields = useMemo(() => {
-    return [draft.product, draft.clientProductCode, draft.productMatch, draft.htsMatch]
-      .filter((value) => value.trim().length > 0)
-      .length;
-  }, [draft]);
 
   const handleDraftChange = (field: keyof ProductMatchDraft) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setDraft((prev) => ({
@@ -188,11 +228,12 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
         : await api.createProductMatch(payload);
 
       setItems((prev) => {
-        if (editingId) {
-          return sortMatches(prev.map((item) => item.id === saved.id ? saved : item));
-        }
+        const nextItems = editingId
+          ? sortMatches(prev.map((item) => item.id === saved.id ? saved : item))
+          : sortMatches([...prev, saved]);
 
-        return sortMatches([...prev, saved]);
+        productMatchCatalogCache.set(currentAgencyId, nextItems);
+        return nextItems;
       });
 
       setInfoMessage(editingId ? 'Match actualizado correctamente.' : 'Match creado correctamente.');
@@ -215,7 +256,11 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
 
     try {
       await api.deleteProductMatch(item.id);
-      setItems((prev) => prev.filter((currentItem) => currentItem.id !== item.id));
+      setItems((prev) => {
+        const nextItems = prev.filter((currentItem) => currentItem.id !== item.id);
+        productMatchCatalogCache.set(currentAgencyId, nextItems);
+        return nextItems;
+      });
       if (editingId === item.id) {
         resetForm();
       }
@@ -246,7 +291,7 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
 
     try {
       const result = await api.bootstrapProductMatches(currentAgencyId);
-      await loadCatalog();
+      await loadCatalog({ force: true });
       resetForm();
 
       const repeatedDescriptions = Math.max(result.masterRowCount - result.insertedCount, 0);
@@ -321,9 +366,9 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Registros con homologación HTS capturada.</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800/60">
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Draft listo</div>
-            <div className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">{completedDraftFields}/4</div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{codedProductsCount} registros ya incluyen código cliente.</p>
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Códigos cliente</div>
+            <div className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">{codedProductsCount}</div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Registros con código producto cliente capturado.</p>
           </div>
         </div>
 
@@ -336,14 +381,24 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Buscar por descripción product, código cliente, descripción cliente o HTS Match"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-600 outline-none transition focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm text-slate-600 outline-none transition focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               />
+              {query.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Limpiar búsqueda"
+                  className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => void loadCatalog()}
+                onClick={() => void loadCatalog({ force: true })}
                 disabled={isLoading || isSaving || isBootstrapping}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
@@ -455,7 +510,7 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
                 </div>
               </div>
 
-              <div className="overflow-hidden">
+              <div className="overflow-visible">
                 <table className="w-full table-fixed divide-y divide-slate-200 dark:divide-slate-700">
                   <colgroup>
                     <col className="w-[18%]" />
@@ -514,8 +569,24 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
 
                         return (
                           <tr key={item.id} className={isEditing ? 'bg-indigo-50/70 dark:bg-indigo-500/10' : 'bg-white dark:bg-transparent'}>
-                            <td className="px-3 py-4 align-top text-sm font-semibold text-slate-900 dark:text-white">
-                              <div className="truncate" title={item.product}>{item.product}</div>
+                            <td className="relative px-3 py-4 align-top text-sm font-semibold text-slate-900 dark:text-white">
+                              <div className="group relative min-w-0">
+                                <span
+                                  tabIndex={0}
+                                  aria-label={`Descripción Product completa: ${item.product}`}
+                                  className="block truncate cursor-help rounded-lg outline-none transition-colors hover:text-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-500/30 dark:hover:text-indigo-200"
+                                >
+                                  {item.product}
+                                </span>
+                                <div
+                                  role="tooltip"
+                                  className="pointer-events-none invisible absolute left-0 top-full z-50 mt-2 w-max max-w-[min(28rem,70vw)] translate-y-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-xs font-medium leading-5 text-slate-700 opacity-0 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5 transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:ring-white/10"
+                                >
+                                  <div className="absolute -top-1.5 left-5 h-3 w-3 rotate-45 border-l border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950" />
+                                  <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Descripción Product</p>
+                                  <p className="whitespace-normal break-words text-sm font-semibold leading-5 text-slate-900 dark:text-white">{item.product}</p>
+                                </div>
+                              </div>
                             </td>
                             <td className="break-words px-3 py-4 align-top text-sm text-slate-600 dark:text-slate-300">{item.clientProductCode || '---'}</td>
                             <td className="break-words px-3 py-4 align-top text-sm text-slate-600 dark:text-slate-300">{item.productMatch || '---'}</td>
