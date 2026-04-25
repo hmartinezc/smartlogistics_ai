@@ -117,6 +117,18 @@ const SCHEMA_STATEMENTS: string[] = [
     UNIQUE(agency_id, product)
   )`,
 
+  // ── Catalogo Maestro de Match Productos ──
+  `CREATE TABLE IF NOT EXISTS product_match_master (
+    id                  TEXT PRIMARY KEY,
+    product             TEXT NOT NULL,
+    client_product_code TEXT NOT NULL DEFAULT '',
+    product_match       TEXT NOT NULL DEFAULT '',
+    hts_match           TEXT NOT NULL DEFAULT '',
+    source_order        INTEGER NOT NULL,
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now'))
+  )`,
+
   // ── Configuración General (key-value) ──
   `CREATE TABLE IF NOT EXISTS app_settings (
     key            TEXT PRIMARY KEY,
@@ -133,6 +145,7 @@ const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_booked_awb_date ON booked_awb_records(operation_date, agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_product_matches_agency ON product_matches(agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_product_matches_agency_product ON product_matches(agency_id, product)`,
+  `CREATE INDEX IF NOT EXISTS idx_product_match_master_product ON product_match_master(product)`,
   `CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)`,
 ];
 

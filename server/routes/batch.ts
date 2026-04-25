@@ -17,6 +17,7 @@ function buildBatchItem(row: Record<string, unknown>) {
     status: String(row.status) as 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'ERROR',
     result: row.result_json ? JSON.parse(String(row.result_json)) : undefined,
     error: row.error ? String(row.error) : undefined,
+    createdAt: row.created_at ? String(row.created_at) : undefined,
     processedAt: row.processed_at ? String(row.processed_at) : undefined,
     user: row.user_email ? String(row.user_email) : undefined,
     agencyId: row.agency_id ? String(row.agency_id) : undefined,
@@ -82,8 +83,8 @@ batch.post('/', async (c) => {
 
   await db.batch(
     items.map((item: Record<string, unknown>) => ({
-      sql: `INSERT INTO batch_items (id, file_name, status, result_json, error, processed_at, user_email, agency_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO batch_items (id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
       args: [
         item.id,
         item.fileName,
@@ -93,6 +94,7 @@ batch.post('/', async (c) => {
         item.processedAt || null,
         item.user || null,
         item.agencyId || null,
+        item.createdAt || null,
       ] as InValue[],
     }))
   );
@@ -153,8 +155,8 @@ batch.delete('/items', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null);
-  const rawIds = Array.isArray(body?.ids) ? body.ids : [];
-  const ids = Array.from(new Set(rawIds.map((id) => String(id)).filter(Boolean)));
+  const rawIds: unknown[] = Array.isArray(body?.ids) ? body.ids : [];
+  const ids: string[] = Array.from(new Set(rawIds.map((id: unknown) => String(id)).filter(Boolean)));
   const db = getDb();
 
   if (ids.length === 0) {
@@ -178,7 +180,7 @@ batch.delete('/items', async (c) => {
     }
   }
 
-  const existingIds = existing.rows.map((row) => String(row.id));
+  const existingIds: string[] = existing.rows.map((row) => String(row.id));
   const existingPlaceholders = existingIds.map(() => '?').join(',');
   await db.execute({
     sql: `DELETE FROM batch_items WHERE id IN (${existingPlaceholders})`,

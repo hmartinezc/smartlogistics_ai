@@ -199,7 +199,11 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
   }, []);
 
   const addResults = useCallback((results: BatchItem[]) => {
-    const serializableItems = results.map(({ file, ...rest }) => rest);
+    const createdAt = new Date().toISOString();
+    const serializableItems = results.map(({ file, ...rest }) => ({
+      ...rest,
+      createdAt: rest.createdAt || createdAt,
+    }));
     // Guardar en API en background
     api.saveBatchResults(serializableItems).catch(err =>
       console.error('Error guardando batch:', err)
@@ -283,21 +287,24 @@ export function useConfirmDialog(): UseConfirmDialogReturn {
 // --------------------------
 // useDarkMode - Tema oscuro/claro (localStorage - no necesita API)
 // --------------------------
+const DARK_MODE_STORAGE_KEY = 'smart-invoice-ai.darkMode';
+
 export function useDarkMode(): [boolean, () => void] {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('smart-invoice-ai.darkMode') || 'false');
+      return JSON.parse(localStorage.getItem(DARK_MODE_STORAGE_KEY) || 'false');
     } catch {
       return false;
     }
   });
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+    localStorage.setItem(DARK_MODE_STORAGE_KEY, JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
+
   const toggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev: boolean) => {
-      const next = !prev;
-      localStorage.setItem('smart-invoice-ai.darkMode', JSON.stringify(next));
-      return next;
-    });
+    setIsDarkMode((prev: boolean) => !prev);
   }, []);
 
   return [isDarkMode, toggleDarkMode];

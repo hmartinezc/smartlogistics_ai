@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Agency, BatchItem } from '../types';
-import { buildInvoicedAwbRecords, getOperationDateKey } from '../services/operationalService';
+import { buildInvoicedAwbRecords, getBatchItemOperationDate, getOperationDateKey } from '../services/operationalService';
 import { downloadAsJSON, formatDateTime, formatNumber } from '../utils/helpers';
 import { AlertCircle, CheckCircle, Download, FileText, Hash, Package, Plane } from './Icons';
 import { enrichBatchItemsForExport } from '../services/productMatchService';
@@ -24,7 +24,7 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
   const filteredDayResults = useMemo(() => {
     return results
       .filter((item) => currentAgencyId === 'GLOBAL' || item.agencyId === currentAgencyId)
-      .filter((item) => getOperationDateKey(item.processedAt) === operationDate);
+      .filter((item) => getBatchItemOperationDate(item) === operationDate);
   }, [currentAgencyId, operationDate, results]);
 
   const filteredSuccessResults = useMemo(() => {

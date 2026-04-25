@@ -179,6 +179,13 @@ export const api = {
     });
   },
 
+  async bootstrapProductMatches(agencyId: string): Promise<import('../types').ProductMatchBootstrapResult> {
+    return request('/product-matches/bootstrap', {
+      method: 'POST',
+      body: JSON.stringify({ agencyId }),
+    });
+  },
+
   // ── Plans ──
   async getPlans(): Promise<import('../types').SubscriptionPlan[]> {
     return request('/plans');

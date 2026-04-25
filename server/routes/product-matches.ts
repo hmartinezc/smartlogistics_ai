@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { randomUUID } from 'node:crypto';
+
 import { getDb } from '../db.js';
 import { ensureAgencyAccess, requireAuth } from '../security.js';
 
@@ -20,6 +22,26 @@ function buildProductMatch(row: Record<string, unknown>) {
     htsMatch: String(row.hts_match || ''),
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : undefined,
+  };
+}
+
+type MasterBootstrapCandidate = {
+  product: string;
+  clientProductCode: string;
+  productMatch: string;
+  htsMatch: string;
+};
+
+function normalizeProductKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function buildMasterCandidate(row: Record<string, unknown>): MasterBootstrapCandidate {
+  return {
+    product: asText(row.product),
+    clientProductCode: asText(row.client_product_code),
+    productMatch: asText(row.product_match),
+    htsMatch: asText(row.hts_match),
   };
 }
 
@@ -84,6 +106,101 @@ productMatches.get('/', async (c) => {
   });
 
   return c.json(result.rows.map((row) => buildProductMatch(row as Record<string, unknown>)));
+});
+
+// POST /api/product-matches/bootstrap
+productMatches.post('/bootstrap', async (c) => {
+  const authUser = await requireAuth(c);
+  if (authUser instanceof Response) {
+    return authUser;
+  }
+
+  const body = await c.req.json();
+  const agencyId = asText(body.agencyId);
+
+  if (!agencyId || agencyId === 'GLOBAL') {
+    return c.json({ error: 'Se requiere una agencia valida.' }, 400);
+  }
+
+  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  if (accessError) {
+    return accessError;
+  }
+
+  if (!(await ensureAgencyExists(agencyId))) {
+    return c.json({ error: 'Agencia no encontrada.' }, 404);
+  }
+
+  const db = getDb();
+  const existingCatalogResult = await db.execute({
+    sql: 'SELECT COUNT(*) as count FROM product_matches WHERE agency_id = ?',
+    args: [agencyId],
+  });
+  const existingCatalogCount = Number(existingCatalogResult.rows[0]?.count ?? 0);
+
+  if (existingCatalogCount > 0) {
+    return c.json({
+      error: 'La agencia ya tiene registros en Match Productos. La carga inicial solo aplica cuando el catalogo esta vacio.',
+    }, 400);
+  }
+
+  const masterResult = await db.execute({
+    sql: `SELECT product, client_product_code, product_match, hts_match
+          FROM product_match_master
+          ORDER BY source_order ASC`,
+  });
+
+  if (masterResult.rows.length === 0) {
+    return c.json({ error: 'No existe un catalogo maestro disponible para cargar.' }, 404);
+  }
+
+  const resolvedCandidates = new Map<string, MasterBootstrapCandidate>();
+
+  for (const rawRow of masterResult.rows) {
+    const candidate = buildMasterCandidate(rawRow as Record<string, unknown>);
+    if (!candidate.product) {
+      continue;
+    }
+
+    resolvedCandidates.set(normalizeProductKey(candidate.product), candidate);
+  }
+
+  const acceptedCandidates = [...resolvedCandidates.values()];
+
+  if (acceptedCandidates.length === 0) {
+    return c.json({
+      error: 'La matriz base no tiene filas utilizables para copiar a la agencia.',
+    }, 409);
+  }
+
+  const now = new Date().toISOString();
+  await db.batch(
+    acceptedCandidates.map((candidate) => ({
+      sql: `INSERT INTO product_matches (
+              id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        randomUUID(),
+        agencyId,
+        candidate.product,
+        candidate.product,
+        candidate.clientProductCode,
+        candidate.productMatch,
+        '',
+        candidate.htsMatch,
+        now,
+        now,
+      ],
+    })),
+    'write',
+  );
+
+  return c.json({
+    ok: true,
+    insertedCount: acceptedCandidates.length,
+    masterRowCount: masterResult.rows.length,
+  }, 201);
 });
 
 // POST /api/product-matches

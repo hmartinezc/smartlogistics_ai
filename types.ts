@@ -100,6 +100,12 @@ export interface ProductMatchExport {
   htsMatch: string;
 }
 
+export interface ProductMatchBootstrapResult {
+  ok: boolean;
+  insertedCount: number;
+  masterRowCount: number;
+}
+
 export interface User {
   id: string;
   email: string;

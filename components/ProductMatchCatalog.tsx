@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Agency, ProductMatchCatalogItem } from '../types';
 import { api, ApiError } from '../services/apiClient';
 import { generateId } from '../utils/helpers';
-import { AlertCircle, AlertTriangle, Building, CheckCircle, Package, Pencil, Plus, RefreshCw, Save, Search, Trash2, X } from './Icons';
+import { AlertCircle, AlertTriangle, Building, CheckCircle, Package, Pencil, RefreshCw, Save, Search, Trash2, X } from './Icons';
 
 interface ProductMatchCatalogProps {
   currentAgencyId: string;
@@ -40,6 +40,7 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
@@ -195,6 +196,41 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
     }
   };
 
+  const handleBootstrapFromMaster = async () => {
+    if (!currentAgency || currentAgencyId === 'GLOBAL') {
+      return;
+    }
+
+    const shouldBootstrap = window.confirm(
+      `Se cargará el catálogo base para ${currentAgency.name}. Las filas idénticas repetidas no se duplicarán y, si una misma Descripción Product aparece varias veces, se conservará la última equivalencia definida para esa descripción. Esta acción solo aplica cuando la grilla está vacía. ¿Deseas continuar?`,
+    );
+
+    if (!shouldBootstrap) {
+      return;
+    }
+
+    setIsBootstrapping(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const result = await api.bootstrapProductMatches(currentAgencyId);
+      await loadCatalog();
+      resetForm();
+
+      const repeatedDescriptions = Math.max(result.masterRowCount - result.insertedCount, 0);
+      const repeatedSuffix = repeatedDescriptions > 0
+        ? ` Se consolidaron ${repeatedDescriptions} repeticiones sobre la misma Descripción Product para dejar una sola equivalencia final por descripción.`
+        : '';
+
+      setInfoMessage(`Se cargaron ${result.insertedCount} equivalencias base desde la matriz maestra. Las filas idénticas repetidas no se duplican.${repeatedSuffix}`);
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'No fue posible cargar el catálogo base.');
+    } finally {
+      setIsBootstrapping(false);
+    }
+  };
+
   if (currentAgencyId === 'GLOBAL') {
     return (
       <div className="p-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -204,7 +240,7 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Selecciona una agencia para gestionar su catálogo</h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-            El catálogo Match Productos es específico por agencia. En contexto GLOBAL solo se muestra este estado guiado para evitar CRUD ambiguo.
+            El catálogo Match Productos es específico por agencia. En contexto GLOBAL solo se muestra este estado guiado para evitar cambios fuera de una agencia concreta.
           </p>
         </div>
       </div>
@@ -277,20 +313,23 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
               <button
                 type="button"
                 onClick={() => void loadCatalog()}
-                disabled={isLoading || isSaving}
+                disabled={isLoading || isSaving || isBootstrapping}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refrescar catálogo
               </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-transform hover:-translate-y-0.5"
-              >
-                <Plus className="h-4 w-4" />
-                {editingId ? 'Nuevo registro' : 'Nueva equivalencia'}
-              </button>
+              {items.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => void handleBootstrapFromMaster()}
+                  disabled={isLoading || isSaving || isBootstrapping}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  {isBootstrapping ? 'Cargando base...' : 'Cargar catálogo base'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -410,8 +449,24 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
                             <Package className="mx-auto h-10 w-10 opacity-40" />
                             <p className="mt-4 text-base font-semibold text-slate-700 dark:text-slate-200">No hay equivalencias para mostrar</p>
                             <p className="mt-2 text-sm leading-6">
-                              {items.length === 0 ? 'Crea el primer match para esta agencia desde el formulario lateral.' : 'Ajusta la búsqueda o limpia el filtro actual para ver más resultados.'}
+                              {items.length === 0 ? 'Puedes crear el primer match manualmente o cargar una base inicial desde la tabla maestra del sistema.' : 'Ajusta la búsqueda o limpia el filtro actual para ver más resultados.'}
                             </p>
+                            {items.length === 0 && (
+                              <div className="mt-6 space-y-3">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleBootstrapFromMaster()}
+                                  disabled={isBootstrapping || isSaving || isLoading}
+                                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                  {isBootstrapping ? 'Cargando catálogo base...' : 'Cargar catálogo base'}
+                                </button>
+                                <p className="text-xs leading-5 text-slate-400 dark:text-slate-500">
+                                  La importación inicial usa la tabla maestra ya depurada. Si una descripción aparece más de una vez, se conserva una sola equivalencia final para evitar duplicados en la agencia.
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>

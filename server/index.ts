@@ -11,6 +11,7 @@ import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { getDb, closeDb } from './db.js';
+import { ensureProductMatchMasterSeed } from './productMatchMasterSeed.js';
 import { runMigrations } from './schema.js';
 import { runSeed } from './seed.js';
 
@@ -77,6 +78,7 @@ async function start() {
   const db = getDb();
   await runMigrations(db);
   await runSeed(db);
+  await ensureProductMatchMasterSeed(db);
 
   const port = Number(process.env.PORT) || 3001;
 

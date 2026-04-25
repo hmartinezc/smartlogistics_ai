@@ -14,6 +14,10 @@ const buildHash = (value: string): number => {
 
 export const getOperationDateKey = (dateValue?: string): string => toDateKey(dateValue);
 
+export const getBatchItemOperationDate = (item: BatchItem): string => (
+  getOperationDateKey(item.createdAt || item.processedAt)
+);
+
 export const buildInvoicedAwbRecords = (
   results: BatchItem[],
   params: OperationalQueryParams
@@ -23,7 +27,7 @@ export const buildInvoicedAwbRecords = (
   results
     .filter((item) => item.status === 'SUCCESS' && item.result)
     .filter((item) => params.agencyId === 'GLOBAL' || item.agencyId === params.agencyId)
-    .filter((item) => toDateKey(item.processedAt) === params.operationDate)
+    .filter((item) => getBatchItemOperationDate(item) === params.operationDate)
     .forEach((item) => {
       const mawb = item.result?.mawb || 'UNKNOWN';
       const current = summary.get(mawb) || {
