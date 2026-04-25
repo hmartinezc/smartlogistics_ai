@@ -31,7 +31,7 @@ interface AppProps {
 
 function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const [appState, setAppState] = useState<AppState>(AppState.LOGIN);
-  const [selectedFormat, setSelectedFormat] = useState<AgentType>('AGENT_TCBV');
+  const [selectedFormat, setSelectedFormat] = useState<AgentType>('AGENT_GENERIC_A');
   
   // Hooks — datos cargados desde API (libSQL/Turso)
   const [isDarkMode, toggleDarkMode] = useDarkMode();

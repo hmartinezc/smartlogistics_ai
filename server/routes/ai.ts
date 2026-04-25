@@ -29,7 +29,7 @@ ai.post('/extract', async (c) => {
   }
 
   const file = formData.get('file');
-  const format = String(formData.get('format') || 'AGENT_TCBV');
+  const format = String(formData.get('format') || 'AGENT_GENERIC_A');
 
   if (!(file instanceof File)) {
     return c.json({ error: 'Archivo requerido.' }, 400);
