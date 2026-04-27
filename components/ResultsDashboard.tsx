@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BatchItem } from '../types';
-import { CheckCircle, AlertCircle, FileText, Download, ArrowRight, Eye, Trash2, BrainCircuit, ChevronDown, Hash } from './Icons';
+import { CheckCircle, AlertCircle, FileText, Download, ArrowRight, Eye, Trash2, BrainCircuit, ChevronDown, Hash, Search } from './Icons';
 import ValidationForm from './ValidationForm';
 import { getConfidenceColor, getConfidenceLabel, downloadAsJSON, formatDate } from '../utils/helpers';
 import { enrichBatchItemsForExport } from '../services/productMatchService';
@@ -14,13 +14,43 @@ interface ResultsDashboardProps {
   onUpdateItem?: (item: BatchItem) => void; // Call back to update parent
 }
 
+type SortKey = 'processedAt' | 'invoiceDate' | 'mawb';
+type SortDirection = 'asc' | 'desc';
+
+const toSortableDate = (dateValue?: string): number => {
+  if (!dateValue) return 0;
+
+  const dateOnlyMatch = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    return Number(`${dateOnlyMatch[1]}${dateOnlyMatch[2]}${dateOnlyMatch[3]}`);
+  }
+
+  const timestamp = new Date(dateValue).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const getSortValue = (item: BatchItem, key: SortKey): string | number => {
+  if (key === 'processedAt') {
+    return toSortableDate(item.processedAt || item.createdAt);
+  }
+
+  if (key === 'invoiceDate') {
+    return toSortableDate(item.result?.date?.trim());
+  }
+
+  return item.result?.mawb?.trim().toLowerCase() || '';
+};
+
 const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, onClearHistory, onUpdateItem }) => {
   const [viewingItem, setViewingItem] = useState<BatchItem | null>(null);
   const [selectedAwb, setSelectedAwb] = useState('ALL');
+  const [awbSearch, setAwbSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
   const [isAwbMenuOpen, setIsAwbMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [downloadNotice, setDownloadNotice] = useState<{ tone: 'error' | 'warning' | 'success'; message: string } | null>(null);
   const awbMenuRef = useRef<HTMLDivElement | null>(null);
+  const awbSearchInputRef = useRef<HTMLInputElement | null>(null);
   const successCount = results.filter(r => r.status === 'SUCCESS').length;
   const errorCount = results.filter(r => r.status === 'ERROR').length;
 
@@ -43,6 +73,20 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     return Array.from(awbCounts.keys()).sort((left, right) => left.localeCompare(right));
   }, [awbCounts]);
 
+  const filteredAwbOptions = useMemo(() => {
+    const normalizedSearch = awbSearch.trim().toLowerCase();
+    const compactSearch = normalizedSearch.replace(/[^a-z0-9]/g, '');
+    if (!normalizedSearch) {
+      return awbOptions;
+    }
+
+    return awbOptions.filter((awb) => {
+      const normalizedAwb = awb.toLowerCase();
+      const compactAwb = normalizedAwb.replace(/[^a-z0-9]/g, '');
+      return normalizedAwb.includes(normalizedSearch) || Boolean(compactSearch && compactAwb.includes(compactSearch));
+    });
+  }, [awbOptions, awbSearch]);
+
   const filteredResults = useMemo(() => {
     if (selectedAwb === 'ALL') {
       return results;
@@ -51,8 +95,26 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     return results.filter((item) => item.result?.mawb?.trim() === selectedAwb);
   }, [results, selectedAwb]);
 
+  const sortedResults = useMemo(() => {
+    if (!sortConfig) {
+      return filteredResults;
+    }
+
+    return [...filteredResults].sort((left, right) => {
+      const leftValue = getSortValue(left, sortConfig.key);
+      const rightValue = getSortValue(right, sortConfig.key);
+
+      const comparison = typeof leftValue === 'number' && typeof rightValue === 'number'
+        ? leftValue - rightValue
+        : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true });
+
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredResults, sortConfig]);
+
   const filteredSuccessResults = filteredResults.filter((item) => item.status === 'SUCCESS' && item.result);
   const selectedAwbLabel = selectedAwb === 'ALL' ? 'Todas las AWB' : selectedAwb;
+  const isSearchingAwb = awbSearch.trim().length > 0;
 
   useEffect(() => {
     if (selectedAwb !== 'ALL' && !awbCounts.has(selectedAwb)) {
@@ -62,8 +124,11 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
 
   useEffect(() => {
     if (!isAwbMenuOpen) {
+      setAwbSearch('');
       return;
     }
+
+    window.setTimeout(() => awbSearchInputRef.current?.focus(), 0);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (!awbMenuRef.current) {
@@ -82,11 +147,40 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
 
   const handleSelectAwb = (awb: string) => {
     setSelectedAwb(awb);
+    setAwbSearch('');
     setIsAwbMenuOpen(false);
   };
 
+  const toggleSort = (key: SortKey) => {
+    setSortConfig((current) => {
+      if (!current || current.key !== key) {
+        return { key, direction: key === 'mawb' ? 'asc' : 'desc' };
+      }
+
+      return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+    });
+  };
+
+  const sortableHeader = (key: SortKey, label: string, className: string) => {
+    const isActive = sortConfig?.key === key;
+    const direction = isActive ? sortConfig.direction : undefined;
+
+    return (
+      <th className={className} aria-sort={isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors ${isActive ? 'text-indigo-600 dark:text-indigo-300' : 'hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}
+        >
+          {label}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isActive ? 'opacity-100' : 'opacity-35'} ${direction === 'asc' ? 'rotate-180' : ''}`} />
+        </button>
+      </th>
+    );
+  };
+
   const handleDownloadAll = async () => {
-    if (filteredSuccessResults.length === 0) {
+    if (selectedAwb === 'ALL' || filteredSuccessResults.length === 0) {
       return;
     }
 
@@ -101,9 +195,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
         ...data,
       }));
 
-      const awbSuffix = selectedAwb === 'ALL'
-        ? 'ALL'
-        : selectedAwb.replace(/[^a-zA-Z0-9_-]+/g, '_');
+      const awbSuffix = selectedAwb.replace(/[^a-zA-Z0-9_-]+/g, '_');
 
       downloadAsJSON(cleanData, `TCBV_SESSION_EXPORT_${awbSuffix}_${new Date().getTime()}.json`);
 
@@ -186,12 +278,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
 
       {/* Action Bar */}
       <div className="flex flex-col gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 xl:flex-row xl:items-center xl:justify-between">
-         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            Historial de Sesión
-            <span className="text-xs font-normal text-slate-400 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded-full">
-               En memoria
-            </span>
-         </h2>
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          Historial
+        </h2>
          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap sm:justify-end">
             <div className="relative" ref={awbMenuRef}>
               <button
@@ -221,23 +310,40 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
               {isAwbMenuOpen && (
                 <div className="absolute right-0 z-20 mt-2 w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
                   <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Descarga Segmentada</p>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Selecciona una AWB específica o mantén toda la sesión.</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Filtro AWB</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Selecciona una AWB para exportar una guía a la vez.</p>
+                    <div className="relative mt-3">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        ref={awbSearchInputRef}
+                        value={awbSearch}
+                        onChange={(event) => setAwbSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && filteredAwbOptions.length === 1) {
+                            handleSelectAwb(filteredAwbOptions[0]);
+                          }
+                        }}
+                        placeholder="Buscar AWB..."
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      />
+                    </div>
                   </div>
 
                   <div className="max-h-72 space-y-1 overflow-auto p-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAwb('ALL')}
-                      className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left transition-colors ${selectedAwb === 'ALL' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
-                    >
-                      <div>
-                        <p className="text-sm font-semibold">Todas las AWB</p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500">Exporta y visualiza la sesión completa</p>
-                      </div>
-                    </button>
+                    {!isSearchingAwb && (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAwb('ALL')}
+                        className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left transition-colors ${selectedAwb === 'ALL' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold">Todas las AWB</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">Solo visualiza la sesión completa</p>
+                        </div>
+                      </button>
+                    )}
 
-                    {awbOptions.map((awb) => {
+                    {filteredAwbOptions.map((awb) => {
                       const isSelected = selectedAwb === awb;
 
                       return (
@@ -254,6 +360,12 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
                         </button>
                       );
                     })}
+
+                    {filteredAwbOptions.length === 0 && (
+                      <div className="px-3 py-6 text-center text-sm text-slate-400 dark:text-slate-500">
+                        No hay AWB que coincidan.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -276,10 +388,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
             </button>
             <button 
               onClick={() => void handleDownloadAll()}
-              disabled={filteredSuccessResults.length === 0 || isExporting}
+              disabled={selectedAwb === 'ALL' || filteredSuccessResults.length === 0 || isExporting}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Download className="w-4 h-4" /> {isExporting ? 'Exportando...' : 'Exportar JSON'}
+              <Download className="w-4 h-4" /> {isExporting ? 'Exportando...' : selectedAwb === 'ALL' ? 'Selecciona AWB' : 'Exportar AWB'}
             </button>
          </div>
       </div>
@@ -311,22 +423,25 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
             <thead className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 uppercase border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3">Estado</th>
+                {sortableHeader('processedAt', 'Proc.', 'px-4 py-2')}
                 <th className="px-6 py-3">Archivo</th>
-                <th className="px-6 py-3">Fecha</th>
-                <th className="px-6 py-3">MAWB</th>
+                {sortableHeader('invoiceDate', 'Fact.', 'px-4 py-2')}
+                {sortableHeader('mawb', 'MAWB', 'px-6 py-2')}
                 <th className="px-6 py-3">Invoice #</th>
                 <th className="px-6 py-3 text-right">Piezas</th>
-                <th className="px-6 py-3 text-right">Valor Total</th>
+                <th className="px-6 py-3 text-right">Valor</th>
                 {/* CONFIDENCE COLUMN */}
                 <th className="px-6 py-3 text-center">Fiabilidad</th> 
                 <th className="px-6 py-3 text-center">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {filteredResults.map((item) => {
+              {sortedResults.map((item) => {
                 const confidence = item.result?.confidenceScore || 0;
                 const isLowConfidence = item.status === 'SUCCESS' && confidence < 75;
-                const addedAt = item.createdAt || item.processedAt;
+                const processedAt = item.processedAt || item.createdAt;
+                const invoiceDate = item.result?.date?.trim();
+                const invoiceDateLabel = invoiceDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? invoiceDate : invoiceDate ? formatDate(invoiceDate) : '-';
                 
                 return (
                 <tr key={item.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isLowConfidence ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
@@ -341,12 +456,15 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-4 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    {processedAt ? formatDate(processedAt) : '-'}
+                  </td>
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                     {item.fileName}
                     {item.error && <div className="text-xs text-red-500 mt-1">{item.error}</div>}
                   </td>
-                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    {addedAt ? formatDate(addedAt) : '-'}
+                  <td className="px-4 py-4 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    {invoiceDateLabel}
                   </td>
                   <td className="px-6 py-4 font-mono text-slate-500 dark:text-slate-400">
                     {item.result?.mawb || '-'}

@@ -72,6 +72,16 @@ body {
   background: transparent;
 }
 
+.sidebar-menu-scroll--collapsed {
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+}
+
+.sidebar-menu-scroll--collapsed::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 /* ===== Login Futuristic Animations ===== */
 
 @keyframes orbit {

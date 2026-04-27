@@ -1,7 +1,40 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BatchItem } from '../types';
-import { AlertCircle, BrainCircuit, CheckCircle, FileText, RefreshCw, Search, Trash2, X } from './Icons';
-import { getConfidenceColor, getConfidenceLabel } from '../utils/helpers';
+import { AlertCircle, BrainCircuit, Calendar, CheckCircle, ChevronDown, FileText, RefreshCw, Search, Trash2, X } from './Icons';
+import { getConfidenceColor } from '../utils/helpers';
+
+type StatusFilter = 'ALL' | BatchItem['status'];
+
+const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string; description: string }> = [
+  { value: 'ALL', label: 'Todos los estados', description: 'Ver todos los registros' },
+  { value: 'SUCCESS', label: 'Exitosos', description: 'Extracciones completadas' },
+  { value: 'ERROR', label: 'Con error', description: 'Registros que requieren revisión' },
+  { value: 'PROCESSING', label: 'Procesando', description: 'Trabajos en curso' },
+  { value: 'PENDING', label: 'Pendientes', description: 'Aún no procesados' },
+];
+
+const formatDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toDateKey = (dateValue?: string): string => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return formatDateKey(date);
+};
+
+const getRelativeDateKey = (daysAgo: number): string => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - daysAgo);
+  return formatDateKey(date);
+};
+
+const getRecordDateKey = (item: BatchItem): string => toDateKey(item.processedAt || item.createdAt);
 
 interface ExtractedDataManagerProps {
   results: BatchItem[];
@@ -17,14 +50,29 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   onDeleteItems,
 }) => {
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | BatchItem['status']>('ALL');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const statusMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const filteredResults = results.filter((item) => {
+  const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+
+  const filteredResults = dateRangeInvalid ? [] : results.filter((item) => {
     const normalizedQuery = query.trim().toLowerCase();
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
+    const itemDate = getRecordDateKey(item);
+    const matchesDate = (!dateFrom && !dateTo) || (
+      Boolean(itemDate) && (!dateFrom || itemDate >= dateFrom) && (!dateTo || itemDate <= dateTo)
+    );
+
     if (!matchesStatus) {
+      return false;
+    }
+
+    if (!matchesDate) {
       return false;
     }
 
@@ -49,14 +97,47 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     return haystack.includes(normalizedQuery);
   });
 
+  const filteredIds = filteredResults.map((item) => item.id);
   const selectedVisibleCount = filteredResults.filter((item) => selectedIds.includes(item.id)).length;
   const successCount = results.filter((item) => item.status === 'SUCCESS').length;
   const errorCount = results.filter((item) => item.status === 'ERROR').length;
-  const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'ALL';
+  const processingCount = results.filter((item) => item.status === 'PROCESSING').length;
+  const pendingCount = results.filter((item) => item.status === 'PENDING').length;
+  const selectedStatusOption = STATUS_OPTIONS.find((option) => option.value === statusFilter) || STATUS_OPTIONS[0];
+  const hasDateFilter = dateFrom.length > 0 || dateTo.length > 0;
+  const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'ALL' || hasDateFilter;
+
+  const getStatusCount = (status: StatusFilter) => {
+    if (status === 'ALL') return results.length;
+    if (status === 'SUCCESS') return successCount;
+    if (status === 'ERROR') return errorCount;
+    if (status === 'PROCESSING') return processingCount;
+    return pendingCount;
+  };
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => results.some((item) => item.id === id)));
   }, [results]);
+
+  useEffect(() => {
+    if (!isStatusMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!statusMenuRef.current) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && !statusMenuRef.current.contains(target)) {
+        setIsStatusMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isStatusMenuOpen]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]);
@@ -89,9 +170,16 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
   };
 
+  const applyDateWindow = (days: number) => {
+    setDateFrom(getRelativeDateKey(days - 1));
+    setDateTo(getRelativeDateKey(0));
+  };
+
   const clearFilters = () => {
     setQuery('');
     setStatusFilter('ALL');
+    setDateFrom('');
+    setDateTo('');
   };
 
   return (
@@ -162,17 +250,71 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 />
               </div>
 
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'ALL' | BatchItem['status'])}
-                className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="ALL">Todos los estados</option>
-                <option value="SUCCESS">Solo exitosos</option>
-                <option value="ERROR">Solo errores</option>
-                <option value="PROCESSING">Procesando</option>
-                <option value="PENDING">Pendientes</option>
-              </select>
+              <div className="relative" ref={statusMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsStatusMenuOpen((current) => !current)}
+                  className="group flex h-[42px] min-w-[250px] items-center gap-2.5 rounded-lg border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 px-3 text-left shadow-sm transition-all hover:border-indigo-200 hover:shadow-md dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:hover:border-indigo-500/50"
+                  aria-haspopup="listbox"
+                  aria-expanded={isStatusMenuOpen}
+                >
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                    {statusFilter === 'ERROR' ? <AlertCircle className="h-4 w-4" /> : statusFilter === 'SUCCESS' ? <CheckCircle className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-slate-400 dark:text-slate-500">
+                      Filtro Estado
+                    </p>
+                    <p className="truncate text-sm font-semibold leading-tight text-slate-800 dark:text-white">
+                      {selectedStatusOption.label}
+                    </p>
+                  </div>
+                  <div className="rounded-full bg-slate-200/70 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                    {getStatusCount(statusFilter)}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${isStatusMenuOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
+                </button>
+
+                {isStatusMenuOpen && (
+                  <div className="absolute right-0 z-20 mt-2 w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
+                    <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Estado de proceso</p>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Filtra la lista antes de seleccionar o eliminar registros.</p>
+                    </div>
+
+                    <div className="max-h-72 space-y-1 overflow-auto p-2" role="listbox">
+                      {STATUS_OPTIONS.map((option) => {
+                        const isSelected = statusFilter === option.value;
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                              setStatusFilter(option.value);
+                              setIsStatusMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                            role="option"
+                            aria-selected={isSelected}
+                          >
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isSelected ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                              {option.value === 'ERROR' ? <AlertCircle className="h-4 w-4" /> : option.value === 'SUCCESS' ? <CheckCircle className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold">{option.label}</p>
+                              <p className="text-xs text-slate-400 dark:text-slate-500">{option.description}</p>
+                            </div>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                              {getStatusCount(option.value)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {hasActiveFilters && (
                 <button
@@ -195,6 +337,73 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
             </div>
           </div>
 
+          <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 px-4 py-3">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-lg border ${hasDateFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-600 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white border-slate-200 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'}`}>
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-white">Fecha procesada</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{hasDateFilter ? `${filteredResults.length} registros en el rango` : 'Todos los días'}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Desde
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="mt-1 block w-full min-w-[150px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Hasta
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="mt-1 block w-full min-w-[150px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyDateWindow(1)}
+                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyDateWindow(7)}
+                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                  >
+                    7 días
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyDateWindow(30)}
+                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                  >
+                    30 días
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {dateRangeInvalid && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300">
+                La fecha inicial no puede ser mayor que la fecha final.
+              </div>
+            )}
+          </div>
+
           {/* Action row */}
           <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -208,6 +417,15 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-900 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
               >
                 {selectedVisibleCount === filteredResults.length && filteredResults.length > 0 ? 'Quitar visibles' : 'Seleccionar visibles'}
+              </button>
+
+              <button
+                onClick={() => handleDelete(filteredIds)}
+                disabled={!hasActiveFilters || filteredResults.length === 0 || isBusy || dateRangeInvalid}
+                className="px-4 py-2 rounded-lg border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700 hover:bg-rose-100 hover:border-rose-300 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Eliminar filtrados ({filteredResults.length})
               </button>
 
               <button
@@ -240,6 +458,9 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
             filteredResults.map((item) => {
               const confidence = item.result?.confidenceScore;
               const isSelected = selectedIds.includes(item.id);
+              const recordDate = item.processedAt || item.createdAt;
+              const recordDateLabel = recordDate ? new Date(recordDate).toLocaleDateString() : '-';
+              const recordDateTimeLabel = recordDate ? new Date(recordDate).toLocaleString() : '-';
 
               return (
                 <div
@@ -273,7 +494,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                       </span>
 
                       <span className="text-xs text-slate-400 hidden sm:inline">
-                        {item.processedAt ? new Date(item.processedAt).toLocaleDateString() : '-'}
+                        {recordDateLabel}
                       </span>
 
                       <button
@@ -334,7 +555,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                   <div className="flex items-center gap-4 px-5 py-2 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-400 border-t border-slate-100 dark:border-slate-700/50 rounded-b-xl">
                     <span>Usuario: <span className="text-slate-600 dark:text-slate-300 font-medium">{item.user || '-'}</span></span>
                     <span>·</span>
-                    <span>{item.processedAt ? new Date(item.processedAt).toLocaleString() : '-'}</span>
+                    <span>{recordDateTimeLabel}</span>
                   </div>
                 </div>
               );

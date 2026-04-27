@@ -32,7 +32,11 @@ export const formatPercentage = (value: number): string => {
 // --------------------------
 export const formatDate = (dateString: string): string => {
   try {
-    const date = new Date(dateString);
+    const dateOnlyMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const date = dateOnlyMatch
+      ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+      : new Date(dateString);
+
     return new Intl.DateTimeFormat('es-ES', {
       year: 'numeric',
       month: 'short',
