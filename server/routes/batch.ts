@@ -84,7 +84,8 @@ batch.post('/', async (c) => {
   await db.batch(
     items.map((item: Record<string, unknown>) => ({
       sql: `INSERT INTO batch_items (id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+        ON CONFLICT(id) DO NOTHING`,
       args: [
         item.id,
         item.fileName,

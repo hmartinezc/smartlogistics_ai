@@ -176,7 +176,7 @@ interface UseBatchProcessorReturn {
   batchFiles: File[];
   batchResults: BatchItem[];
   setBatchFiles: (files: File[]) => void;
-  addResults: (results: BatchItem[]) => void;
+  addResults: (results: BatchItem[]) => Promise<void>;
   updateResult: (updatedItem: BatchItem) => void;
   removeResults: (ids: string[]) => Promise<void>;
   clearResults: (localOnly?: boolean) => void;
@@ -198,18 +198,21 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
     }
   }, []);
 
-  const addResults = useCallback((results: BatchItem[]) => {
+  const addResults = useCallback(async (results: BatchItem[]) => {
     const createdAt = new Date().toISOString();
     const serializableItems = results.map(({ file, ...rest }) => ({
       ...rest,
       createdAt: rest.createdAt || createdAt,
     }));
-    // Guardar en API en background
-    api.saveBatchResults(serializableItems).catch(err =>
-      console.error('Error guardando batch:', err)
-    );
-    // Actualizar estado local inmediatamente
-    setBatchResults(prev => [...prev, ...serializableItems]);
+
+    await api.saveBatchResults(serializableItems);
+
+    setBatchResults(prev => {
+      const existingIds = new Set(prev.map(item => item.id));
+      const newItems = serializableItems.filter(item => !existingIds.has(item.id));
+
+      return newItems.length > 0 ? [...prev, ...newItems] : prev;
+    });
   }, []);
 
   const updateResult = useCallback((updatedItem: BatchItem) => {

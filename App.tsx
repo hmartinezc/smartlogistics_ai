@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AgentType, AppState, BatchItem, User, Agency } from './types';
 import { useAuth, useAgencyContext, useBatchProcessor, useDarkMode, useConfirmDialog, useApiData } from './hooks';
 import { api, ApiError } from './services/apiClient';
@@ -22,6 +22,7 @@ import {
   resolveDefaultAgencyContext,
   resolveLandingState,
 } from './services/authService';
+import { generateId } from './utils/helpers';
 
 interface AppProps {
   isWidgetMode?: boolean;
@@ -40,6 +41,8 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const { batchFiles, batchResults, setBatchFiles, addResults, updateResult, removeResults, clearResults, loadResults } = useBatchProcessor();
   const { confirm } = useConfirmDialog();
   const [isCleaningData, setIsCleaningData] = useState(false);
+  const [currentBatchId, setCurrentBatchId] = useState('');
+  const completedBatchIdsRef = useRef<Set<string>>(new Set());
 
   // Mutable plans array para componentes que esperan SubscriptionPlan[]
   const PLANS = plans;
@@ -181,6 +184,12 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   };
 
   const handleFilesSelected = (files: File[], format: AgentType) => {
+    if (!currentAgencyId || currentAgencyId === 'GLOBAL') {
+      alert('Selecciona una agencia especifica antes de procesar facturas. La vista global es solo para consulta.');
+      return;
+    }
+
+    setCurrentBatchId(generateId('batch'));
     setBatchFiles(files);
     setSelectedFormat(format);
     setAppState(AppState.BATCH_RUNNING);
@@ -191,29 +200,44 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       updateResult(updatedItem);
   };
 
-  const handleBatchComplete = async (newResults: BatchItem[]) => {
-    const processedCount = newResults.filter(r => r.status === 'SUCCESS' || r.status === 'ERROR').length;
-    let targetAgencyId = currentAgencyId;
-    if (targetAgencyId === 'GLOBAL') {
-        targetAgencyId = currentUser?.agencyIds[0] || agencies[0]?.id;
+  const handleBatchComplete = async (batchId: string, newResults: BatchItem[]) => {
+    if (completedBatchIdsRef.current.has(batchId)) {
+      return;
     }
+
+    completedBatchIdsRef.current.add(batchId);
+
+    const processedCount = newResults.filter(r => r.status === 'SUCCESS' || r.status === 'ERROR').length;
+    const targetAgencyId = currentAgencyId;
+    if (!targetAgencyId || targetAgencyId === 'GLOBAL') {
+      alert('No se guardo el lote porque no hay una agencia especifica seleccionada. Selecciona una agencia y vuelve a procesar.');
+      setAppState(AppState.PROCESS_SELECTION);
+      return;
+    }
+
     const resultsWithMeta = newResults.map(item => ({
         ...item,
         user: currentUser?.name || 'Unknown',
         agencyId: targetAgencyId 
     }));
     
-    if (processedCount > 0 && targetAgencyId) {
-      try {
-        const updated = await api.bumpAgencyUsage(targetAgencyId, processedCount);
-        setAgencies(prev => prev.map(a => a.id === updated.id ? updated : a));
-      } catch (err) {
-        console.error('Error actualizando uso de agencia:', err);
+    try {
+      await addResults(resultsWithMeta);
+
+      if (processedCount > 0) {
+        try {
+          const updated = await api.bumpAgencyUsage(targetAgencyId, processedCount);
+          setAgencies(prev => prev.map(a => a.id === updated.id ? updated : a));
+        } catch (err) {
+          console.error('Error actualizando uso de agencia:', err);
+        }
       }
+
+      setAppState(AppState.HISTORY_RESULTS);
+    } catch (err) {
+      console.error('Error guardando resultados del lote:', err);
+      alert('No se pudieron guardar los resultados del lote. Intenta nuevamente antes de continuar.');
     }
-    
-    addResults(resultsWithMeta);
-    setAppState(AppState.HISTORY_RESULTS);
   };
   
   const handleClearHistory = async () => {
@@ -337,7 +361,12 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 )}
                 {appState === AppState.BATCH_RUNNING && (
                     <div className="h-full flex flex-col justify-center">
-                        <BatchProcessor files={batchFiles} format={selectedFormat} onComplete={handleBatchComplete} />
+                        <BatchProcessor
+                            files={batchFiles}
+                            format={selectedFormat}
+                            batchId={currentBatchId}
+                            onComplete={(results) => handleBatchComplete(currentBatchId, results)}
+                        />
                     </div>
                 )}
                 {appState === AppState.HISTORY_RESULTS && (
