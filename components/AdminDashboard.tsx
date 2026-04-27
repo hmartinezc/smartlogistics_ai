@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { BarChart3, BrainCircuit, FileText, TrendingUp, Users, Shield, Package, Mail, Eye, X, CheckCircle } from './Icons';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { BarChart3, BrainCircuit, FileText, TrendingUp, Users, Shield, Package, Mail, Eye, X, CheckCircle, Calendar, ChevronDown, ChevronLeft, ChevronRight } from './Icons';
 import { Agency, SubscriptionPlan, BatchItem } from '../types';
 
 interface AdminDashboardProps {
@@ -9,21 +9,98 @@ interface AdminDashboardProps {
   plans: SubscriptionPlan[];
 }
 
+const getCurrentMonthValue = () => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${now.getFullYear()}-${month}`;
+};
+
+const getBatchItemMonth = (item: BatchItem): string | null => {
+    const dateValue = item.processedAt || item.createdAt;
+    const match = dateValue?.match(/^(\d{4})-(\d{2})/);
+    return match ? `${match[1]}-${match[2]}` : null;
+};
+
+const isFinishedProcessing = (item: BatchItem) => item.status === 'SUCCESS' || item.status === 'ERROR';
+
+const formatMonthLabel = (monthValue: string) => {
+    const [year, month] = monthValue.split('-').map(Number);
+    if (!year || !month) {
+        return monthValue;
+    }
+
+    return new Date(year, month - 1, 1).toLocaleDateString('es-EC', {
+        month: 'long',
+        year: 'numeric',
+    });
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plans }) => {
-  const totalPagesProcessedGlobal = results.length;
+    const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue);
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
+    const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
+    const monthInputRef = useRef<HTMLInputElement>(null);
+    const pickerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isPickerOpen) return;
+        const handleOutside = (e: MouseEvent) => {
+            if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+                setIsPickerOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, [isPickerOpen]);
+
+    const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    const handleMonthSelect = (monthIndex: number) => {
+        const m = String(monthIndex + 1).padStart(2, '0');
+        setSelectedMonth(`${pickerYear}-${m}`);
+        setIsPickerOpen(false);
+    };
+
+    const goToCurrentMonth = () => {
+        const now = new Date();
+        setPickerYear(now.getFullYear());
+        setSelectedMonth(getCurrentMonthValue());
+        setIsPickerOpen(false);
+    };
   const [invoicePreview, setInvoicePreview] = useState<Agency | null>(null);
   const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
 
-  const getPlan = (planId: string) => plans.find(p => p.id === planId);
+    const selectedMonthLabel = formatMonthLabel(selectedMonth);
+    const monthlyUsageByAgency = useMemo(() => {
+        const usage = new Map<string, number>();
 
-  const calculateInvoiceDetails = (agency: Agency) => {
+        results.forEach((item) => {
+            if (!item.agencyId || !isFinishedProcessing(item) || getBatchItemMonth(item) !== selectedMonth) {
+                return;
+            }
+
+            usage.set(item.agencyId, (usage.get(item.agencyId) || 0) + 1);
+        });
+
+        return usage;
+    }, [results, selectedMonth]);
+
+    const totalProcessedForMonth = useMemo(
+        () => Array.from(monthlyUsageByAgency.values()).reduce((total, agencyUsage) => total + agencyUsage, 0),
+        [monthlyUsageByAgency]
+    );
+
+  const getPlan = (planId: string) => plans.find(p => p.id === planId);
+    const getMonthlyUsage = (agencyId: string) => monthlyUsageByAgency.get(agencyId) || 0;
+
+    const calculateInvoiceDetails = (agency: Agency, usageCount: number) => {
     const plan = getPlan(agency.planId);
     if (!plan) return { base: 0, extra: 0, total: 0, limit: 0, extraPages: 0 };
     
     let extraCost = 0;
     let extraPages = 0;
-    if (agency.currentUsage > plan.limit) {
-      extraPages = agency.currentUsage - plan.limit;
+        if (usageCount > plan.limit) {
+            extraPages = usageCount - plan.limit;
       extraCost = extraPages * plan.extraPageCost;
     }
     
@@ -59,8 +136,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
             </p>
           </div>
           <div className="text-right">
-             <div className="text-4xl font-bold text-indigo-600">{totalPagesProcessedGlobal}</div>
-             <div className="text-xs text-slate-400 uppercase font-bold">Total Páginas Sistema</div>
+                 <div className="text-4xl font-bold text-indigo-600">{totalProcessedForMonth}</div>
+                 <div className="text-xs text-slate-400 uppercase font-bold">Procesamientos {selectedMonthLabel}</div>
           </div>
       </div>
 
@@ -77,7 +154,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                     Hasta <b>{plan.limit.toLocaleString()}</b> documentos
                 </div>
                 <div className="text-xs text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-700">
-                    Excedente: <b>${plan.extraPageCost}</b> / pág
+                    Excedente: <b>${plan.extraPageCost}</b> / procesamiento
                 </div>
             </div>
          ))}
@@ -85,11 +162,107 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
 
       {/* Agency Management Table */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-         <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col gap-4 bg-slate-50 dark:bg-slate-900/50 md:flex-row md:items-center md:justify-between">
             <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                <Users className="w-5 h-5 text-indigo-500" />
                Estado de Cuentas por Agencia
             </h3>
+                <div ref={pickerRef} className="relative w-full md:w-64">
+                    {/* Trigger button */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (!isPickerOpen) {
+                                const [y] = selectedMonth.split('-').map(Number);
+                                setPickerYear(y || new Date().getFullYear());
+                            }
+                            setIsPickerOpen((v) => !v);
+                        }}
+                        className="group flex h-[52px] w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 px-3 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md active:scale-[0.98] dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 dark:hover:border-indigo-500/60"
+                        aria-label="Seleccionar mes de consumo"
+                    >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 transition-colors group-hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:group-hover:bg-indigo-500/30">
+                            <Calendar className="h-4 w-4" />
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col items-start">
+                            <span className="text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-slate-400 dark:text-slate-500">Periodo</span>
+                            <span className="mt-0.5 truncate text-sm font-semibold capitalize text-slate-800 dark:text-white">{selectedMonthLabel}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                            <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-300">Mes</span>
+                            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isPickerOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-indigo-500'}`} />
+                        </div>
+                    </button>
+
+                    {/* Custom month picker dropdown */}
+                    {isPickerOpen && (
+                        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-700 dark:bg-slate-800 dark:ring-white/10">
+                            {/* Year navigation */}
+                            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                                <button
+                                    type="button"
+                                    onClick={() => setPickerYear((y) => y - 1)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <span className="text-base font-bold text-slate-800 dark:text-white">{pickerYear}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPickerYear((y) => y + 1)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+
+                            {/* Month grid */}
+                            <div className="grid grid-cols-4 gap-1.5 p-3">
+                                {MONTHS_SHORT.map((name, idx) => {
+                                    const val = `${pickerYear}-${String(idx + 1).padStart(2, '0')}`;
+                                    const isSelected = val === selectedMonth;
+                                    const isCurrent = val === getCurrentMonthValue();
+                                    return (
+                                        <button
+                                            key={name}
+                                            type="button"
+                                            onClick={() => handleMonthSelect(idx)}
+                                            className={`relative flex h-10 items-center justify-center rounded-xl text-sm font-semibold transition-all active:scale-95
+                                                ${isSelected
+                                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/50'
+                                                    : isCurrent
+                                                    ? 'border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20'
+                                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'
+                                                }`}
+                                        >
+                                            {name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="border-t border-slate-100 px-3 py-2.5 dark:border-slate-700">
+                                <button
+                                    type="button"
+                                    onClick={goToCurrentMonth}
+                                    className="w-full rounded-lg bg-indigo-50 py-1.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                                >
+                                    Ir al mes actual
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    <input
+                        ref={monthInputRef}
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value || getCurrentMonthValue())}
+                        className="sr-only"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                    />
+                </div>
          </div>
          
          <div className="overflow-x-auto">
@@ -98,7 +271,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                   <tr>
                      <th className="px-6 py-4">Agencia / Cliente</th>
                      <th className="px-6 py-4">Plan Asignado</th>
-                     <th className="px-6 py-4">Consumo Actual</th>
+                     <th className="px-6 py-4">Consumo del Mes</th>
                      <th className="px-6 py-4 text-center">Estado Límite</th>
                      <th className="px-6 py-4 text-right bg-slate-50/50">Facturación Estimada</th>
                      <th className="px-6 py-4 text-center bg-slate-50/50">Acciones</th>
@@ -106,9 +279,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                </thead>
                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {agencies.map(agency => {
-                      const details = calculateInvoiceDetails(agency);
-                      const isOver = agency.currentUsage > details.limit;
-                      const percent = details.limit > 0 ? (agency.currentUsage / details.limit) * 100 : 0;
+                      const usageCount = getMonthlyUsage(agency.id);
+                      const details = calculateInvoiceDetails(agency, usageCount);
+                      const isOver = usageCount > details.limit;
+                      const percent = details.limit > 0 ? (usageCount / details.limit) * 100 : 0;
                       
                       return (
                         <tr key={agency.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
@@ -124,7 +298,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                            <td className="px-6 py-4">
                                <div className="flex flex-col gap-1 max-w-[140px]">
                                    <div className="flex justify-between text-xs font-medium">
-                                       <span className="text-slate-600 dark:text-slate-300">{agency.currentUsage}</span>
+                                       <span className="text-slate-600 dark:text-slate-300">{usageCount}</span>
                                        <span className="text-slate-400">/ {details.limit}</span>
                                    </div>
                                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -215,12 +389,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                           </div>
                           <div className="text-right">
                               <h3 className="text-xs font-bold text-slate-400 uppercase mb-1">Periodo:</h3>
-                              <p className="font-medium text-slate-700">Mes Actual</p>
+                              <p className="font-medium text-slate-700 capitalize">{selectedMonthLabel}</p>
                           </div>
                       </div>
 
                       {(() => {
-                          const details = calculateInvoiceDetails(invoicePreview);
+                          const details = calculateInvoiceDetails(invoicePreview, getMonthlyUsage(invoicePreview.id));
                           return (
                               <>
                                 <table className="w-full mb-8">
@@ -243,8 +417,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                                         {details.extraPages > 0 && (
                                             <tr className="border-b border-slate-100 bg-amber-50/30">
                                                 <td className="py-4 text-slate-700">
-                                                    <span className="font-bold block text-amber-700">Páginas Adicionales (Excedente)</span>
-                                                    <span className="text-xs text-amber-600">Superado el límite de {details.limit} págs</span>
+                                                    <span className="font-bold block text-amber-700">Procesamientos Adicionales (Excedente)</span>
+                                                    <span className="text-xs text-amber-600">Superado el límite de {details.limit} procesamientos</span>
                                                 </td>
                                                 <td className="py-4 text-center text-slate-600">{details.extraPages}</td>
                                                 <td className="py-4 text-right font-medium text-amber-700">${details.extra.toFixed(2)}</td>

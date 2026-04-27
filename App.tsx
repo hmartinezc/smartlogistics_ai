@@ -50,9 +50,10 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   // Cargar resultados batch cuando cambia la agencia
   useEffect(() => {
     if (isAuthenticated && currentAgencyId) {
-      loadResults(currentAgencyId === 'GLOBAL' ? undefined : currentAgencyId);
+      const shouldLoadAllResults = currentUser?.role === 'ADMIN' && appState === AppState.DASHBOARD_ADMIN;
+      loadResults(shouldLoadAllResults || currentAgencyId === 'GLOBAL' ? undefined : currentAgencyId);
     }
-  }, [isAuthenticated, currentAgencyId, loadResults]);
+  }, [appState, currentUser?.role, isAuthenticated, currentAgencyId, loadResults]);
 
   // Reset logic when widget opens/closes
   useEffect(() => {
@@ -191,7 +192,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   };
 
   const handleBatchComplete = async (newResults: BatchItem[]) => {
-    const successCount = newResults.filter(r => r.status === 'SUCCESS').length;
+    const processedCount = newResults.filter(r => r.status === 'SUCCESS' || r.status === 'ERROR').length;
     let targetAgencyId = currentAgencyId;
     if (targetAgencyId === 'GLOBAL') {
         targetAgencyId = currentUser?.agencyIds[0] || agencies[0]?.id;
@@ -202,9 +203,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
         agencyId: targetAgencyId 
     }));
     
-    if (successCount > 0 && targetAgencyId) {
+    if (processedCount > 0 && targetAgencyId) {
       try {
-        const updated = await api.bumpAgencyUsage(targetAgencyId, successCount);
+        const updated = await api.bumpAgencyUsage(targetAgencyId, processedCount);
         setAgencies(prev => prev.map(a => a.id === updated.id ? updated : a));
       } catch (err) {
         console.error('Error actualizando uso de agencia:', err);

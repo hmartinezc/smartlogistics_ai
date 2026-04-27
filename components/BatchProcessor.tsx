@@ -26,8 +26,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({ files, format, onComple
       id: generateId(),
       file,
       fileName: file.name,
-      status: 'PENDING' as const,
-      processedAt: new Date().toISOString()
+      status: 'PENDING' as const
     }));
     setItems(initialItems);
     setCompletedCount(0);
@@ -59,7 +58,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({ files, format, onComple
 
           try {
             const data = await api.extractLogisticsData(currentItem.file!, format);
-            const successItem = { ...currentItem, status: 'SUCCESS' as const, result: data };
+            const successItem = { ...currentItem, status: 'SUCCESS' as const, result: data, processedAt: new Date().toISOString() };
             results[currentIndex] = successItem;
 
             setItems(prev => prev.map(item => 
@@ -70,7 +69,8 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({ files, format, onComple
             const errorItem = { 
               ...currentItem, 
               status: 'ERROR' as const, 
-              error: error.message || 'Error desconocido' 
+              error: error.message || 'Error desconocido',
+              processedAt: new Date().toISOString()
             };
             results[currentIndex] = errorItem;
 

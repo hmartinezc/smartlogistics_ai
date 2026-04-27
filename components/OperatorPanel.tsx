@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Agency, BatchItem } from '../types';
 import { buildInvoicedAwbRecords, getBatchItemOperationDate, getOperationDateKey } from '../services/operationalService';
 import { downloadAsJSON, formatDateTime, formatNumber } from '../utils/helpers';
-import { AlertCircle, CheckCircle, Download, FileText, Hash, Package, Plane } from './Icons';
+import { AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Hash, Package, Plane } from './Icons';
 import { enrichBatchItemsForExport } from '../services/productMatchService';
 import { ApiError } from '../services/apiClient';
 
@@ -16,10 +16,73 @@ const LOW_CONFIDENCE_THRESHOLD = 75;
 
 const sanitizeFileSegment = (value: string): string => value.replace(/[^a-zA-Z0-9_-]+/g, '_');
 
+const MONTHS_ES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const MONTHS_ES_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const DAYS_ES_MIN = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+
+const formatOperationDateDisplay = (dateStr: string): string => {
+  if (!dateStr) return 'Seleccionar';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  return `${d} ${MONTHS_ES_SHORT[m - 1]} ${y}`;
+};
+
 const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId, currentAgency }) => {
   const [operationDate, setOperationDate] = useState<string>(getOperationDateKey());
   const [exportingMawb, setExportingMawb] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<{ tone: 'error' | 'warning' | 'success'; message: string } | null>(null);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [isDatePickerOpen]);
+
+  const openDatePicker = () => {
+    const [y, m] = operationDate.split('-').map(Number);
+    if (y && m) { setViewYear(y); setViewMonth(m - 1); }
+    setIsDatePickerOpen((v) => !v);
+  };
+
+  const goToMonth = (dir: -1 | 1) => {
+    setViewMonth((m) => {
+      const next = m + dir;
+      if (next < 0) { setViewYear((y) => y - 1); return 11; }
+      if (next > 11) { setViewYear((y) => y + 1); return 0; }
+      return next;
+    });
+  };
+
+  const handleDaySelect = (day: number) => {
+    const val = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    setOperationDate(val);
+    setIsDatePickerOpen(false);
+  };
+
+  const handleGoToday = () => {
+    const today = getOperationDateKey();
+    setOperationDate(today);
+    const [y, m] = today.split('-').map(Number);
+    setViewYear(y);
+    setViewMonth(m - 1);
+    setIsDatePickerOpen(false);
+  };
+
+  const calendarGrid = useMemo(() => {
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
+    const totalCells = Math.ceil((firstDayOfWeek + daysInMonth) / 7) * 7;
+    return { daysInMonth, firstDayOfWeek, totalCells };
+  }, [viewYear, viewMonth]);
 
   const filteredDayResults = useMemo(() => {
     return results
@@ -150,16 +213,82 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
         </div>
 
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-stretch">
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <label className="block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
-              Fecha Operativa
-            </label>
-            <input
-              type="date"
-              value={operationDate}
-              onChange={(event) => setOperationDate(event.target.value)}
-              className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 md:w-56"
-            />
+          <div ref={datePickerRef} className="relative">
+            <button
+              type="button"
+              onClick={openDatePicker}
+              className="group flex min-h-[76px] w-full cursor-pointer flex-col justify-center gap-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md active:scale-[0.99] dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 dark:hover:border-indigo-500/60 md:w-56"
+              aria-label="Seleccionar fecha operativa"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Fecha Operativa</span>
+                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-indigo-500'}`} />
+              </div>
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 transition-colors group-hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:group-hover:bg-indigo-500/30">
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <span className="text-sm font-bold text-slate-800 dark:text-white">{formatOperationDateDisplay(operationDate)}</span>
+              </div>
+            </button>
+
+            {isDatePickerOpen && (
+              <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-700 dark:bg-slate-800 dark:ring-white/10">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                  <button type="button" onClick={() => goToMonth(-1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white">
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-sm font-bold capitalize text-slate-800 dark:text-white">
+                    {MONTHS_ES_FULL[viewMonth]} {viewYear}
+                  </span>
+                  <button type="button" onClick={() => goToMonth(1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-7 px-3 pt-3">
+                  {DAYS_ES_MIN.map((d) => (
+                    <div key={d} className="flex h-8 items-center justify-center text-[10px] font-bold uppercase text-slate-400">{d}</div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 px-3 pb-2">
+                  {Array.from({ length: calendarGrid.totalCells }, (_, i) => {
+                    const day = i - calendarGrid.firstDayOfWeek + 1;
+                    if (day < 1 || day > calendarGrid.daysInMonth) return <div key={i} />;
+                    const val = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const isSelected = val === operationDate;
+                    const isToday = val === getOperationDateKey();
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleDaySelect(day)}
+                        className={`flex h-9 items-center justify-center rounded-lg text-sm font-medium transition-all active:scale-95
+                          ${isSelected
+                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/50'
+                            : isToday
+                            ? 'border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20'
+                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'
+                          }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="border-t border-slate-100 px-3 py-2.5 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={handleGoToday}
+                    className="w-full rounded-lg bg-indigo-50 py-1.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                  >
+                    Ir a hoy
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
