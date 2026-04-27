@@ -373,7 +373,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                     <ResultsDashboard 
                         results={batchResults} 
                         onBack={() => setAppState(AppState.PROCESS_SELECTION)} 
-                        onClearHistory={handleClearHistory} 
+                        onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
                         onUpdateItem={handleUpdateResult} 
                     />
                 )}

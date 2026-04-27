@@ -198,6 +198,10 @@ batch.delete('/', async (c) => {
     return authUser;
   }
 
+  if (authUser.role !== 'ADMIN') {
+    return c.json({ error: 'Solo un administrador puede limpiar el historial completo.' }, 403);
+  }
+
   const db = getDb();
   const agencyId = c.req.query('agencyId');
 
@@ -208,11 +212,6 @@ batch.delete('/', async (c) => {
     }
 
     await db.execute({ sql: 'DELETE FROM batch_items WHERE agency_id = ?', args: [agencyId] });
-  } else if (authUser.role !== 'ADMIN') {
-    await db.execute({
-      sql: `DELETE FROM batch_items WHERE agency_id IN (${authUser.agencyIds.map(() => '?').join(',')})`,
-      args: authUser.agencyIds,
-    });
   } else {
     await db.execute('DELETE FROM batch_items');
   }
