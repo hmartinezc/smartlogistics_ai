@@ -60,6 +60,33 @@ export interface BatchItem {
   agencyId?: string; // Agency context where this was processed
 }
 
+export interface DocumentProcessingAuditEntry {
+  id: string;
+  batchItemId: string;
+  fileName: string;
+  agencyId: string;
+  agencyName?: string;
+  status: 'SUCCESS' | 'ERROR';
+  extractionOk: boolean;
+  error?: string;
+  processedAt: string;
+  processedDate: string;
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
+  source: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DocumentProcessingAuditQuery {
+  agencyId?: string;
+  month?: string;
+  date?: string;
+  from?: string;
+  to?: string;
+}
+
 export type UserRole = 'ADMIN' | 'OPERADOR' | 'SUPERVISOR';
 
 export interface SubscriptionPlan {

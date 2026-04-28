@@ -25,6 +25,7 @@
 subscription_plans ────< agencies ────< agency_emails
                               │
                               ├────< batch_items
+                              │       └──── document_processing_audit (referencia lógica por batch_item_id)
                               │
                               ├────< booked_awb_records
                               │
@@ -160,7 +161,36 @@ Cada fila es un documento procesado. El campo `result_json` guarda el `InvoiceDa
 
 ---
 
-### 8. `booked_awb_records` — AWBs Reservados (Panel Operativo)
+### 8. `document_processing_audit` — Auditoría de Procesamiento de PDFs
+
+Cada fila representa un documento PDF terminado (`SUCCESS` o `ERROR`) para fines de auditoría, métricas y facturación. Esta tabla es independiente de `batch_items`: si se limpian los datos extraídos, el histórico contable permanece.
+
+| Columna          | Tipo | Restricción                                | Descripción                         |
+|------------------|------|--------------------------------------------|-------------------------------------|
+| `id`             | TEXT | **PRIMARY KEY**                            | ID del registro de auditoría        |
+| `batch_item_id`  | TEXT | NOT NULL, **UNIQUE**                       | ID lógico del item procesado        |
+| `file_name`      | TEXT | NOT NULL                                   | Nombre del PDF original             |
+| `agency_id`      | TEXT | NOT NULL                                   | Agencia propietaria                 |
+| `agency_name`    | TEXT | nullable                                   | Nombre de agencia al procesar       |
+| `status`         | TEXT | CHECK(`SUCCESS`, `ERROR`)                  | Resultado de la extracción          |
+| `extraction_ok`  | INTEGER | CHECK(0, 1)                             | 1 si fue correcta, 0 si falló       |
+| `error`          | TEXT | nullable                                   | Mensaje de error si falló           |
+| `processed_at`   | TEXT | NOT NULL                                   | Fecha/hora exacta de procesamiento  |
+| `processed_date` | TEXT | NOT NULL                                   | Fecha `YYYY-MM-DD` para reportes    |
+| `user_id`        | TEXT | nullable                                   | Usuario autenticado que procesó     |
+| `user_email`     | TEXT | nullable                                   | Email del usuario autenticado       |
+| `user_name`      | TEXT | nullable                                   | Nombre del usuario autenticado      |
+| `source`         | TEXT | NOT NULL                                   | Origen del registro                 |
+| `created_at`     | TEXT | DEFAULT now                                | Fecha de creación                   |
+| `updated_at`     | TEXT | DEFAULT now                                | Última actualización                |
+
+**Índices:** `idx_document_audit_agency_date`, `idx_document_audit_date`, `idx_document_audit_status`, `idx_document_audit_user_date`
+
+**Backfill:** durante `runMigrations`, se insertan de forma idempotente los registros históricos existentes en `batch_items` que estén en estado `SUCCESS` o `ERROR`.
+
+---
+
+### 9. `booked_awb_records` — AWBs Reservados (Panel Operativo)
 
 Registros de AWBs reservados para la conciliación operativa.
 
@@ -179,7 +209,7 @@ Registros de AWBs reservados para la conciliación operativa.
 
 ---
 
-### 9. `app_settings` — Configuración de la App
+### 10. `app_settings` — Configuración de la App
 
 Almacén key-value para configuraciones generales.
 
@@ -242,6 +272,15 @@ Almacén key-value para configuraciones generales.
 
 **Autorización:** cada sesión solo puede leer o modificar batches de sus agencias; `ADMIN` puede ver todo.
 
+### Auditoría (`/api/audit`)
+
+| Método | Ruta                              | Descripción                                      |
+|--------|-----------------------------------|--------------------------------------------------|
+| GET    | `/api/audit/document-processing`  | Lista auditoría de PDFs procesados               |
+
+**Filtros:** `agencyId`, `month=YYYY-MM`, `date=YYYY-MM-DD`, `from=YYYY-MM-DD`, `to=YYYY-MM-DD`  
+**Autorización:** `ADMIN` puede consultar global; operadores/supervisores solo sus agencias asignadas.
+
 ### Operacional (`/api/operational`)
 
 | Método | Ruta                            | Descripción                           |
@@ -299,6 +338,7 @@ Almacén key-value para configuraciones generales.
 9. **Passwords en seed** — se insertan hasheadas con `scrypt`
 10. **Autorización API** — todas las rutas salvo `/api/health` y `/api/auth/login` requieren sesión válida
 11. **Aislamiento por rol/agencia** — operador y supervisor no pueden consultar datos administrativos globales
+12. **Auditoría de PDFs** — cada batch terminado persiste un registro independiente de `batch_items`; Admin Metrics usa esta tabla como fuente de verdad
 
 ---
 

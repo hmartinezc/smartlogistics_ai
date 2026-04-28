@@ -25,6 +25,7 @@ import productMatchesRoutes from './routes/product-matches.js';
 import settingsRoutes from './routes/settings.js';
 import plansRoutes from './routes/plans.js';
 import aiRoutes from './routes/ai.js';
+import auditRoutes from './routes/audit.js';
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,6 +48,7 @@ app.route('/api/product-matches', productMatchesRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/plans', plansRoutes);
 app.route('/api/ai', aiRoutes);
+app.route('/api/audit', auditRoutes);
 
 // ── Health check ──
 app.get('/api/health', (c) => c.json({ status: 'ok', db: 'libsql', time: new Date().toISOString() }));

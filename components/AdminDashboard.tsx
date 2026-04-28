@@ -1,12 +1,22 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, BrainCircuit, FileText, TrendingUp, Users, Shield, Package, Mail, Eye, X, CheckCircle, Calendar, ChevronDown, ChevronLeft, ChevronRight } from './Icons';
-import { Agency, SubscriptionPlan, BatchItem } from '../types';
+import { Agency, SubscriptionPlan, DocumentProcessingAuditEntry } from '../types';
+import { api } from '../services/apiClient';
 
 interface AdminDashboardProps {
-  results: BatchItem[];
   agencies: Agency[];
   plans: SubscriptionPlan[];
+}
+
+interface MonthlyUsageStats {
+        total: number;
+        success: number;
+        error: number;
+}
+
+interface DailyUsageStats extends MonthlyUsageStats {
+    date: string;
 }
 
 const getCurrentMonthValue = () => {
@@ -15,13 +25,11 @@ const getCurrentMonthValue = () => {
     return `${now.getFullYear()}-${month}`;
 };
 
-const getBatchItemMonth = (item: BatchItem): string | null => {
-    const dateValue = item.processedAt || item.createdAt;
+const getAuditMonth = (entry: DocumentProcessingAuditEntry): string | null => {
+    const dateValue = entry.processedDate || entry.processedAt;
     const match = dateValue?.match(/^(\d{4})-(\d{2})/);
     return match ? `${match[1]}-${match[2]}` : null;
 };
-
-const isFinishedProcessing = (item: BatchItem) => item.status === 'SUCCESS' || item.status === 'ERROR';
 
 const formatMonthLabel = (monthValue: string) => {
     const [year, month] = monthValue.split('-').map(Number);
@@ -35,10 +43,27 @@ const formatMonthLabel = (monthValue: string) => {
     });
 };
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plans }) => {
+const formatDayLabel = (dateValue: string) => {
+    const [year, month, day] = dateValue.split('-').map(Number);
+    if (!year || !month || !day) {
+        return dateValue;
+    }
+
+    return new Date(year, month - 1, day).toLocaleDateString('es-EC', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+    });
+};
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
     const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
+    const [auditEntries, setAuditEntries] = useState<DocumentProcessingAuditEntry[]>([]);
+    const [isAuditLoading, setIsAuditLoading] = useState(false);
+    const [auditError, setAuditError] = useState<string | null>(null);
+    const [dailyBreakdownAgency, setDailyBreakdownAgency] = useState<Agency | null>(null);
     const monthInputRef = useRef<HTMLInputElement>(null);
     const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +77,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
         document.addEventListener('mousedown', handleOutside);
         return () => document.removeEventListener('mousedown', handleOutside);
     }, [isPickerOpen]);
+
+    useEffect(() => {
+        let cancelled = false;
+        setIsAuditLoading(true);
+        setAuditError(null);
+        setAuditEntries([]);
+
+        api.getDocumentProcessingAudit({ month: selectedMonth })
+            .then((entries) => {
+                if (!cancelled) {
+                    setAuditEntries(entries);
+                }
+            })
+            .catch((err) => {
+                console.error('Error cargando auditoría de procesamientos:', err);
+                if (!cancelled) {
+                    setAuditEntries([]);
+                    setAuditError('No se pudo cargar la auditoría del periodo seleccionado.');
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsAuditLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedMonth]);
 
     const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -72,26 +127,67 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
 
     const selectedMonthLabel = formatMonthLabel(selectedMonth);
     const monthlyUsageByAgency = useMemo(() => {
-        const usage = new Map<string, number>();
+        const usage = new Map<string, MonthlyUsageStats>();
 
-        results.forEach((item) => {
-            if (!item.agencyId || !isFinishedProcessing(item) || getBatchItemMonth(item) !== selectedMonth) {
+        auditEntries.forEach((entry) => {
+            if (!entry.agencyId || getAuditMonth(entry) !== selectedMonth) {
                 return;
             }
 
-            usage.set(item.agencyId, (usage.get(item.agencyId) || 0) + 1);
+            const current = usage.get(entry.agencyId) || { total: 0, success: 0, error: 0 };
+            current.total += 1;
+            if (entry.status === 'SUCCESS') {
+                current.success += 1;
+            } else {
+                current.error += 1;
+            }
+            usage.set(entry.agencyId, current);
         });
 
         return usage;
-    }, [results, selectedMonth]);
+    }, [auditEntries, selectedMonth]);
 
     const totalProcessedForMonth = useMemo(
-        () => Array.from(monthlyUsageByAgency.values()).reduce((total, agencyUsage) => total + agencyUsage, 0),
+        () => Array.from(monthlyUsageByAgency.values()).reduce((total, agencyUsage) => total + agencyUsage.total, 0),
         [monthlyUsageByAgency]
     );
 
+    const dailyBreakdown = useMemo<DailyUsageStats[]>(() => {
+        if (!dailyBreakdownAgency) {
+            return [];
+        }
+
+        const days = new Map<string, DailyUsageStats>();
+        auditEntries.forEach((entry) => {
+            if (entry.agencyId !== dailyBreakdownAgency.id || getAuditMonth(entry) !== selectedMonth) {
+                return;
+            }
+
+            const date = entry.processedDate || entry.processedAt.slice(0, 10);
+            const current = days.get(date) || { date, total: 0, success: 0, error: 0 };
+            current.total += 1;
+            if (entry.status === 'SUCCESS') {
+                current.success += 1;
+            } else {
+                current.error += 1;
+            }
+            days.set(date, current);
+        });
+
+        return Array.from(days.values()).sort((left, right) => left.date.localeCompare(right.date));
+    }, [auditEntries, dailyBreakdownAgency, selectedMonth]);
+
+    const dailyBreakdownTotals = useMemo(
+        () => dailyBreakdown.reduce<MonthlyUsageStats>((totals, day) => ({
+            total: totals.total + day.total,
+            success: totals.success + day.success,
+            error: totals.error + day.error,
+        }), { total: 0, success: 0, error: 0 }),
+        [dailyBreakdown]
+    );
+
   const getPlan = (planId: string) => plans.find(p => p.id === planId);
-    const getMonthlyUsage = (agencyId: string) => monthlyUsageByAgency.get(agencyId) || 0;
+    const getMonthlyUsage = (agencyId: string) => monthlyUsageByAgency.get(agencyId) || { total: 0, success: 0, error: 0 };
 
     const calculateInvoiceDetails = (agency: Agency, usageCount: number) => {
     const plan = getPlan(agency.planId);
@@ -136,10 +232,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
             </p>
           </div>
           <div className="text-right">
-                 <div className="text-4xl font-bold text-indigo-600">{totalProcessedForMonth}</div>
-                 <div className="text-xs text-slate-400 uppercase font-bold">Procesamientos {selectedMonthLabel}</div>
+                                 <div className="text-4xl font-bold text-indigo-600">{isAuditLoading ? '...' : totalProcessedForMonth}</div>
+                                 <div className="text-xs text-slate-400 uppercase font-bold">Procesamientos {selectedMonthLabel}</div>
           </div>
       </div>
+
+            {auditError && (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300">
+                        {auditError}
+                </div>
+            )}
 
       {/* Plans Reference Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -279,10 +381,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                </thead>
                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {agencies.map(agency => {
-                      const usageCount = getMonthlyUsage(agency.id);
-                      const details = calculateInvoiceDetails(agency, usageCount);
-                      const isOver = usageCount > details.limit;
-                      const percent = details.limit > 0 ? (usageCount / details.limit) * 100 : 0;
+                      const usageStats = getMonthlyUsage(agency.id);
+                      const details = calculateInvoiceDetails(agency, usageStats.total);
+                      const isOver = usageStats.total > details.limit;
+                      const percent = details.limit > 0 ? (usageStats.total / details.limit) * 100 : 0;
                       
                       return (
                         <tr key={agency.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
@@ -298,11 +400,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                            <td className="px-6 py-4">
                                <div className="flex flex-col gap-1 max-w-[140px]">
                                    <div className="flex justify-between text-xs font-medium">
-                                       <span className="text-slate-600 dark:text-slate-300">{usageCount}</span>
+                                       <span className="text-slate-600 dark:text-slate-300">{usageStats.total}</span>
                                        <span className="text-slate-400">/ {details.limit}</span>
                                    </div>
                                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                        <div className={`h-full rounded-full ${isOver ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${Math.min(percent, 100)}%`}}></div>
+                                   </div>
+                                   <div className="flex items-center gap-2 text-[10px] font-bold">
+                                       <span className="text-green-600">OK {usageStats.success}</span>
+                                       <span className="text-red-500">Error {usageStats.error}</span>
                                    </div>
                                </div>
                            </td>
@@ -327,6 +433,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                            </td>
                            <td className="px-6 py-4 bg-slate-50/30">
                               <div className="flex items-center justify-center gap-2">
+                                                                    <button
+                                                                        onClick={() => setDailyBreakdownAgency(agency)}
+                                                                        className="p-2 text-sky-600 hover:bg-sky-100 rounded-full transition-colors disabled:opacity-40"
+                                                                        title="Ver detalle diario"
+                                                                        disabled={isAuditLoading}
+                                                                    >
+                                                                            <BarChart3 className="w-5 h-5" />
+                                                                    </button>
                                   <button 
                                     onClick={() => setInvoicePreview(agency)}
                                     className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors"
@@ -394,7 +508,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                       </div>
 
                       {(() => {
-                          const details = calculateInvoiceDetails(invoicePreview, getMonthlyUsage(invoicePreview.id));
+                          const details = calculateInvoiceDetails(invoicePreview, getMonthlyUsage(invoicePreview.id).total);
                           return (
                               <>
                                 <table className="w-full mb-8">
@@ -463,6 +577,89 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ results, agencies, plan
                           <Mail className="w-4 h-4" />
                           Enviar Factura Ahora
                       </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {dailyBreakdownAgency && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-300 dark:bg-slate-800">
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 px-6 py-5 dark:border-slate-700 dark:bg-slate-900/60">
+                      <div className="min-w-0">
+                          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                              <BarChart3 className="h-3.5 w-3.5" />
+                              Detalle diario
+                          </div>
+                          <h2 className="truncate text-xl font-bold text-slate-800 dark:text-white">{dailyBreakdownAgency.name}</h2>
+                          <p className="mt-1 text-sm capitalize text-slate-500 dark:text-slate-400">{selectedMonthLabel}</p>
+                      </div>
+                      <button
+                          type="button"
+                          onClick={() => setDailyBreakdownAgency(null)}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+                          aria-label="Cerrar detalle diario"
+                      >
+                          <X className="h-5 w-5" />
+                      </button>
+                  </div>
+
+                  <div className="p-6">
+                      <div className="mb-5 grid grid-cols-3 gap-3">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/40">
+                              <p className="text-xs font-bold uppercase text-slate-400">Total</p>
+                              <p className="mt-1 text-2xl font-bold text-slate-800 dark:text-white">{dailyBreakdownTotals.total}</p>
+                          </div>
+                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-900/20">
+                              <p className="text-xs font-bold uppercase text-emerald-600 dark:text-emerald-300">Correctos</p>
+                              <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-200">{dailyBreakdownTotals.success}</p>
+                          </div>
+                          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/50 dark:bg-rose-900/20">
+                              <p className="text-xs font-bold uppercase text-rose-600 dark:text-rose-300">Con error</p>
+                              <p className="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-200">{dailyBreakdownTotals.error}</p>
+                          </div>
+                      </div>
+
+                      <div className="max-h-[52vh] overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                          <table className="w-full text-left text-sm">
+                              <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                                  <tr>
+                                      <th className="px-4 py-3">Fecha</th>
+                                      <th className="px-4 py-3 text-center">Total</th>
+                                      <th className="px-4 py-3 text-center">Correctos</th>
+                                      <th className="px-4 py-3 text-center">Errores</th>
+                                      <th className="px-4 py-3">Actividad</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                  {dailyBreakdown.length === 0 ? (
+                                      <tr>
+                                          <td colSpan={5} className="px-4 py-10 text-center text-sm font-medium text-slate-400">
+                                              Sin procesamientos en este periodo.
+                                          </td>
+                                      </tr>
+                                  ) : dailyBreakdown.map((day) => {
+                                      const successPercent = day.total > 0 ? (day.success / day.total) * 100 : 0;
+                                      const errorPercent = day.total > 0 ? (day.error / day.total) * 100 : 0;
+
+                                      return (
+                                          <tr key={day.date} className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
+                                              <td className="px-4 py-3 font-semibold capitalize text-slate-700 dark:text-slate-200">{formatDayLabel(day.date)}</td>
+                                              <td className="px-4 py-3 text-center font-bold text-slate-800 dark:text-white">{day.total}</td>
+                                              <td className="px-4 py-3 text-center font-bold text-emerald-600">{day.success}</td>
+                                              <td className="px-4 py-3 text-center font-bold text-rose-600">{day.error}</td>
+                                              <td className="px-4 py-3">
+                                                  <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                                                      <div className="bg-emerald-500" style={{ width: `${successPercent}%` }} />
+                                                      <div className="bg-rose-500" style={{ width: `${errorPercent}%` }} />
+                                                  </div>
+                                              </td>
+                                          </tr>
+                                      );
+                                  })}
+                              </tbody>
+                          </table>
+                      </div>
                   </div>
               </div>
           </div>

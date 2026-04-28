@@ -17,6 +17,7 @@ import type { Client } from '@libsql/client';
  * user_agencies        → Asignación usuario ↔ agencia (M:N)
  * auth_sessions        → Sesiones de autenticación activas
  * batch_items          → Resultados de procesamiento de facturas
+ * document_processing_audit → Auditoría contable de PDFs procesados
  * booked_awb_records   → Registros de AWBs reservados (operacional)
  * app_settings         → Configuración de la app (key-value)
  */
@@ -90,6 +91,27 @@ const SCHEMA_STATEMENTS: string[] = [
     created_at     TEXT DEFAULT (datetime('now'))
   )`,
 
+  // ── Auditoría Contable de Procesamiento de Documentos ──
+  // Independiente de batch_items para no perder métricas al limpiar datos extraídos.
+  `CREATE TABLE IF NOT EXISTS document_processing_audit (
+    id             TEXT PRIMARY KEY,
+    batch_item_id  TEXT NOT NULL UNIQUE,
+    file_name      TEXT NOT NULL,
+    agency_id      TEXT NOT NULL,
+    agency_name    TEXT,
+    status         TEXT NOT NULL CHECK(status IN ('SUCCESS', 'ERROR')),
+    extraction_ok  INTEGER NOT NULL CHECK(extraction_ok IN (0, 1)),
+    error          TEXT,
+    processed_at   TEXT NOT NULL,
+    processed_date TEXT NOT NULL,
+    user_id        TEXT,
+    user_email     TEXT,
+    user_name      TEXT,
+    source         TEXT NOT NULL DEFAULT 'batch_processing',
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now'))
+  )`,
+
   // ── AWBs Reservados (Panel Operativo) ──
   `CREATE TABLE IF NOT EXISTS booked_awb_records (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,6 +164,10 @@ const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_user_agencies_agency ON user_agencies(agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_batch_items_agency ON batch_items(agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_batch_items_status ON batch_items(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_audit_agency_date ON document_processing_audit(agency_id, processed_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_audit_date ON document_processing_audit(processed_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_audit_status ON document_processing_audit(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_audit_user_date ON document_processing_audit(user_id, processed_date)`,
   `CREATE INDEX IF NOT EXISTS idx_booked_awb_date ON booked_awb_records(operation_date, agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_product_matches_agency ON product_matches(agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_product_matches_agency_product ON product_matches(agency_id, product)`,
@@ -158,5 +184,51 @@ export async function runMigrations(db: Client): Promise<void> {
     await db.execute(sql);
   }
 
+  await backfillDocumentProcessingAudit(db);
+
   console.log(`✅ Migraciones ejecutadas: ${SCHEMA_STATEMENTS.length} statements`);
+}
+
+async function backfillDocumentProcessingAudit(db: Client): Promise<void> {
+  await db.execute(`
+    INSERT OR IGNORE INTO document_processing_audit (
+      id,
+      batch_item_id,
+      file_name,
+      agency_id,
+      agency_name,
+      status,
+      extraction_ok,
+      error,
+      processed_at,
+      processed_date,
+      user_id,
+      user_email,
+      user_name,
+      source,
+      created_at,
+      updated_at
+    )
+    SELECT
+      'audit_' || b.id,
+      b.id,
+      b.file_name,
+      COALESCE(b.agency_id, 'UNKNOWN'),
+      a.name,
+      b.status,
+      CASE WHEN b.status = 'SUCCESS' THEN 1 ELSE 0 END,
+      b.error,
+      COALESCE(b.processed_at, b.created_at, datetime('now')),
+      substr(COALESCE(b.processed_at, b.created_at, datetime('now')), 1, 10),
+      u.id,
+      u.email,
+      COALESCE(u.name, b.user_email),
+      'batch_items_backfill',
+      COALESCE(b.created_at, datetime('now')),
+      datetime('now')
+    FROM batch_items b
+    LEFT JOIN agencies a ON a.id = b.agency_id
+    LEFT JOIN users u ON u.email = b.user_email OR u.name = b.user_email
+    WHERE b.status IN ('SUCCESS', 'ERROR')
+  `);
 }

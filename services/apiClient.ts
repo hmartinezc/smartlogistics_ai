@@ -223,6 +223,19 @@ export const api = {
     await request(`/batch${query}`, { method: 'DELETE' });
   },
 
+  // ── Audit ──
+  async getDocumentProcessingAudit(params: import('../types').DocumentProcessingAuditQuery = {}): Promise<import('../types').DocumentProcessingAuditEntry[]> {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        search.set(key, value);
+      }
+    });
+
+    const query = search.toString();
+    return request(`/audit/document-processing${query ? `?${query}` : ''}`);
+  },
+
   // ── Operational ──
   async getReconciliation(agencyId: string, date: string): Promise<import('../types').AwbReconciliationRow[]> {
     return request(`/operational/reconciliation?agencyId=${encodeURIComponent(agencyId)}&date=${encodeURIComponent(date)}`);
