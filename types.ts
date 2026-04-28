@@ -121,6 +121,8 @@ export interface User {
 export interface OperationalQueryParams {
   agencyId: string;
   operationDate: string;
+  operationDateStart?: string;
+  operationDateEnd?: string;
 }
 
 export interface BookedAwbRecord {

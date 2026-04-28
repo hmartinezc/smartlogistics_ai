@@ -1,11 +1,16 @@
 import { AwbReconciliationRow, BatchItem, BookedAwbRecord, InvoicedAwbRecord, OperationalQueryParams } from '../types';
 
-const toDateKey = (dateValue?: string): string => {
-  const date = dateValue ? new Date(dateValue) : new Date();
+const toDateKey = (dateValue?: string | Date): string => {
+  const date = dateValue instanceof Date ? dateValue : dateValue ? new Date(dateValue) : new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const parseDateKey = (dateKey: string): Date => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
 };
 
 const buildHash = (value: string): number => {
@@ -13,6 +18,21 @@ const buildHash = (value: string): number => {
 };
 
 export const getOperationDateKey = (dateValue?: string): string => toDateKey(dateValue);
+
+export const shiftOperationDateKey = (dateKey: string, offsetDays: number): string => {
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() + offsetDays);
+  return toDateKey(date);
+};
+
+export const getOperationDateRange = (operationDate: string, beforeDays = 1, afterDays = 1) => ({
+  startDate: shiftOperationDateKey(operationDate, -beforeDays),
+  endDate: shiftOperationDateKey(operationDate, afterDays),
+});
+
+export const isOperationDateInRange = (operationDate: string, startDate: string, endDate: string): boolean => (
+  operationDate >= startDate && operationDate <= endDate
+);
 
 export const getBatchItemOperationDate = (item: BatchItem): string => (
   getOperationDateKey(item.createdAt || item.processedAt)
@@ -23,11 +43,13 @@ export const buildInvoicedAwbRecords = (
   params: OperationalQueryParams
 ): InvoicedAwbRecord[] => {
   const summary = new Map<string, InvoicedAwbRecord>();
+  const startDate = params.operationDateStart || params.operationDate;
+  const endDate = params.operationDateEnd || params.operationDate;
 
   results
     .filter((item) => item.status === 'SUCCESS' && item.result)
     .filter((item) => params.agencyId === 'GLOBAL' || item.agencyId === params.agencyId)
-    .filter((item) => getBatchItemOperationDate(item) === params.operationDate)
+    .filter((item) => isOperationDateInRange(getBatchItemOperationDate(item), startDate, endDate))
     .forEach((item) => {
       const mawb = item.result?.mawb || 'UNKNOWN';
       const current = summary.get(mawb) || {

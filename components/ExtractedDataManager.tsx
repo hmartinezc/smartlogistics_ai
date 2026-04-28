@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BatchItem } from '../types';
-import { AlertCircle, BrainCircuit, Calendar, CheckCircle, ChevronDown, FileText, RefreshCw, Search, Trash2, X } from './Icons';
+import { AlertCircle, BrainCircuit, Calendar, CheckCircle, ChevronDown, FileText, Package, RefreshCw, Search, Trash2, X } from './Icons';
 import { getConfidenceColor } from '../utils/helpers';
 
 type StatusFilter = 'ALL' | BatchItem['status'];
@@ -54,9 +54,11 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [isDateFiltersOpen, setIsDateFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const statusMenuRef = useRef<HTMLDivElement | null>(null);
+  const dateFiltersRef = useRef<HTMLDivElement | null>(null);
 
   const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
@@ -98,6 +100,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   });
 
   const filteredIds = filteredResults.map((item) => item.id);
+  const filteredPiecesCount = filteredResults.reduce((total, item) => total + (Number(item.result?.totalPieces) || 0), 0);
   const selectedVisibleCount = filteredResults.filter((item) => selectedIds.includes(item.id)).length;
   const successCount = results.filter((item) => item.status === 'SUCCESS').length;
   const errorCount = results.filter((item) => item.status === 'ERROR').length;
@@ -106,6 +109,11 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   const selectedStatusOption = STATUS_OPTIONS.find((option) => option.value === statusFilter) || STATUS_OPTIONS[0];
   const hasDateFilter = dateFrom.length > 0 || dateTo.length > 0;
   const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'ALL' || hasDateFilter;
+  const dateFilterSummary = dateRangeInvalid
+    ? 'Rango inválido'
+    : hasDateFilter
+      ? `${filteredResults.length} registros en el rango`
+      : 'Todos los días';
 
   const getStatusCount = (status: StatusFilter) => {
     if (status === 'ALL') return results.length;
@@ -138,6 +146,26 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isStatusMenuOpen]);
+
+  useEffect(() => {
+    if (!isDateFiltersOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!dateFiltersRef.current) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && !dateFiltersRef.current.contains(target)) {
+        setIsDateFiltersOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDateFiltersOpen]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]);
@@ -185,7 +213,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6 h-full flex flex-col">
       {/* Stat Cards — compact, consistent with app design */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
           <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 rounded-lg">
             <FileText className="w-5 h-5" />
@@ -193,6 +221,15 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
           <div>
             <p className="text-sm text-slate-500 dark:text-slate-400">Registros</p>
             <p className="text-2xl font-bold text-slate-800 dark:text-white">{results.length}</p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
+          <div className="p-3 bg-sky-100 dark:bg-sky-900/50 text-sky-600 rounded-lg">
+            <Package className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Piezas filtradas</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">{filteredPiecesCount.toLocaleString('es-EC')}</p>
           </div>
         </div>
         <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
@@ -326,6 +363,94 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 </button>
               )}
 
+              <div className="relative" ref={dateFiltersRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsDateFiltersOpen((current) => !current)}
+                  className={`relative inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border text-sm font-semibold transition-colors ${dateRangeInvalid ? 'border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300' : hasDateFilter ? 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900'}`}
+                  aria-label="Filtrar por fecha procesada"
+                  aria-haspopup="dialog"
+                  aria-expanded={isDateFiltersOpen}
+                  title="Filtrar por fecha procesada"
+                >
+                  <Calendar className="w-4 h-4" />
+                  {hasDateFilter && (
+                    <span className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-800 ${dateRangeInvalid ? 'bg-amber-500' : 'bg-indigo-500'}`} />
+                  )}
+                </button>
+
+                {isDateFiltersOpen && (
+                  <div className="absolute right-0 z-30 mt-2 w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
+                    <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${hasDateFilter ? 'border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300' : 'border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+                          <Calendar className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800 dark:text-white">Fecha procesada</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{dateFilterSummary}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 p-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          Desde
+                          <input
+                            type="date"
+                            value={dateFrom}
+                            max={dateTo || undefined}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                          />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          Hasta
+                          <input
+                            type="date"
+                            value={dateTo}
+                            min={dateFrom || undefined}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => applyDateWindow(1)}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300"
+                        >
+                          Hoy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyDateWindow(7)}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300"
+                        >
+                          7 días
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyDateWindow(30)}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300"
+                        >
+                          30 días
+                        </button>
+                      </div>
+
+                      {dateRangeInvalid && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300">
+                          La fecha inicial no puede ser mayor que la fecha final.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => onRefresh()}
                 disabled={isBusy}
@@ -335,73 +460,6 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 Recargar
               </button>
             </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 px-4 py-3">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-lg border ${hasDateFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-600 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white border-slate-200 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'}`}>
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-white">Fecha procesada</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{hasDateFilter ? `${filteredResults.length} registros en el rango` : 'Todos los días'}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  Desde
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    max={dateTo || undefined}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="mt-1 block w-full min-w-[150px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </label>
-                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  Hasta
-                  <input
-                    type="date"
-                    value={dateTo}
-                    min={dateFrom || undefined}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="mt-1 block w-full min-w-[150px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </label>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => applyDateWindow(1)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
-                  >
-                    Hoy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyDateWindow(7)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
-                  >
-                    7 días
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyDateWindow(30)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
-                  >
-                    30 días
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {dateRangeInvalid && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300">
-                La fecha inicial no puede ser mayor que la fecha final.
-              </div>
-            )}
           </div>
 
           {/* Action row */}

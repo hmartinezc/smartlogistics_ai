@@ -18,6 +18,11 @@ export interface EnrichedBatchExportResult {
   missingMatches: number;
 }
 
+export interface BatchExportDocument extends ExportInvoiceData {
+  filename: string;
+  processedAt?: string;
+}
+
 const EMPTY_MATCH: ProductMatchExport = {
   clientProductCode: '',
   clientProductDescription: '',
@@ -105,4 +110,17 @@ export async function enrichBatchItemsForExport(batchItems: BatchItem[]): Promis
   });
 
   return { items, missingMatches };
+}
+
+export function buildBatchExportDocuments(exportItems: EnrichedBatchExportItem[]): BatchExportDocument[] {
+  return exportItems.map(({ item, data }) => ({
+    filename: item.fileName,
+    processedAt: item.processedAt,
+    ...data,
+  }));
+}
+
+export function buildAwbExportFilename(awb: string): string {
+  const awbSuffix = awb.replace(/[^a-zA-Z0-9_-]+/g, '_');
+  return `TCBV_SESSION_EXPORT_${awbSuffix}_${new Date().getTime()}.json`;
 }

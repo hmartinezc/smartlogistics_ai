@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Agency, BatchItem } from '../types';
-import { buildInvoicedAwbRecords, getBatchItemOperationDate, getOperationDateKey } from '../services/operationalService';
+import { buildInvoicedAwbRecords, getBatchItemOperationDate, getOperationDateKey, getOperationDateRange, isOperationDateInRange } from '../services/operationalService';
 import { downloadAsJSON, formatDateTime, formatNumber } from '../utils/helpers';
 import { AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Hash, Package, Plane } from './Icons';
-import { enrichBatchItemsForExport } from '../services/productMatchService';
+import { buildAwbExportFilename, buildBatchExportDocuments, enrichBatchItemsForExport } from '../services/productMatchService';
 import { ApiError } from '../services/apiClient';
 
 interface OperatorPanelProps {
@@ -13,8 +13,6 @@ interface OperatorPanelProps {
 }
 
 const LOW_CONFIDENCE_THRESHOLD = 75;
-
-const sanitizeFileSegment = (value: string): string => value.replace(/[^a-zA-Z0-9_-]+/g, '_');
 
 const MONTHS_ES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MONTHS_ES_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -84,11 +82,14 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
     return { daysInMonth, firstDayOfWeek, totalCells };
   }, [viewYear, viewMonth]);
 
+  const operationDateRange = useMemo(() => getOperationDateRange(operationDate), [operationDate]);
+  const operationDateRangeLabel = `${formatOperationDateDisplay(operationDateRange.startDate)} - ${formatOperationDateDisplay(operationDateRange.endDate)}`;
+
   const filteredDayResults = useMemo(() => {
     return results
       .filter((item) => currentAgencyId === 'GLOBAL' || item.agencyId === currentAgencyId)
-      .filter((item) => getBatchItemOperationDate(item) === operationDate);
-  }, [currentAgencyId, operationDate, results]);
+      .filter((item) => isOperationDateInRange(getBatchItemOperationDate(item), operationDateRange.startDate, operationDateRange.endDate));
+  }, [currentAgencyId, operationDateRange.endDate, operationDateRange.startDate, results]);
 
   const filteredSuccessResults = useMemo(() => {
     return filteredDayResults
@@ -122,8 +123,10 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
     return buildInvoicedAwbRecords(results, {
       agencyId: currentAgencyId,
       operationDate,
+      operationDateStart: operationDateRange.startDate,
+      operationDateEnd: operationDateRange.endDate,
     });
-  }, [currentAgencyId, operationDate, results]);
+  }, [currentAgencyId, operationDate, operationDateRange.endDate, operationDateRange.startDate, results]);
 
   const awbRows = useMemo(() => {
     return invoicedAwbs.map((record) => {
@@ -165,15 +168,9 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
 
     try {
       const { items: exportItems, missingMatches } = await enrichBatchItemsForExport(sourceItems);
-      const documents = exportItems.map(({ item, data }) => ({
-        filename: item.fileName,
-        processedAt: item.processedAt,
-        user: item.user,
-        agencyId: item.agencyId,
-        ...data,
-      }));
+      const documents = buildBatchExportDocuments(exportItems);
 
-      downloadAsJSON(documents, `AWB_${sanitizeFileSegment(mawb)}_${operationDate}.json`);
+      downloadAsJSON(documents, buildAwbExportFilename(mawb));
 
       setExportNotice(
         missingMatches > 0
@@ -213,22 +210,25 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
         </div>
 
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-stretch">
-          <div ref={datePickerRef} className="relative">
+          <div ref={datePickerRef} className="relative flex md:self-stretch">
             <button
               type="button"
               onClick={openDatePicker}
-              className="group flex min-h-[76px] w-full cursor-pointer flex-col justify-center gap-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md active:scale-[0.99] dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 dark:hover:border-indigo-500/60 md:w-56"
-              aria-label="Seleccionar fecha operativa"
+              className="group flex h-full min-h-[112px] w-full cursor-pointer flex-col justify-center gap-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md active:scale-[0.99] dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 dark:hover:border-indigo-500/60 md:w-64"
+              aria-label="Seleccionar rango operativo"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Fecha Operativa</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Rango Operativo</span>
                 <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-indigo-500'}`} />
               </div>
               <div className="flex items-center gap-2.5">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 transition-colors group-hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:group-hover:bg-indigo-500/30">
                   <Calendar className="h-4 w-4" />
                 </div>
-                <span className="text-sm font-bold text-slate-800 dark:text-white">{formatOperationDateDisplay(operationDate)}</span>
+                <div className="min-w-0">
+                  <span className="block text-sm font-bold text-slate-800 dark:text-white">{formatOperationDateDisplay(operationDate)}</span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">{operationDateRangeLabel}</span>
+                </div>
               </div>
             </button>
 
@@ -291,12 +291,12 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
             )}
           </div>
 
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
+          <div className="flex min-h-[112px] flex-col justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-300">
               Fuente
             </p>
             <p className="mt-3 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-              Historial procesado del día seleccionado
+              Historial procesado del rango operativo
             </p>
             <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-200/80">
               Click en una AWB para descargar el JSON de sus facturas extraídas.
@@ -312,7 +312,7 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
             <Plane className="w-5 h-5 text-indigo-500" />
           </div>
           <h3 className="mt-5 text-4xl font-bold text-indigo-600 dark:text-indigo-400">{totals.awbs}</h3>
-          <p className="mt-2 text-xs text-slate-400">Guías madre con facturación en la fecha elegida.</p>
+          <p className="mt-2 text-xs text-slate-400">Guías madre con facturación en el rango elegido.</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -330,7 +330,7 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
             <Package className="w-5 h-5 text-amber-500" />
           </div>
           <h3 className="mt-5 text-4xl font-bold text-slate-800 dark:text-white">{formatNumber(totals.pieces, 0)}</h3>
-          <p className="mt-2 text-xs text-slate-400">Suma facturada de piezas dentro del día operativo.</p>
+          <p className="mt-2 text-xs text-slate-400">Suma facturada de piezas dentro del rango operativo.</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -351,12 +351,12 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
             </div>
             <div>
               <h3 className={`text-sm font-bold uppercase tracking-[0.18em] ${incidentResults.length > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-                Incidencias del día
+                Incidencias del rango
               </h3>
               <p className={`mt-1 text-sm ${incidentResults.length > 0 ? 'text-amber-900 dark:text-amber-100' : 'text-emerald-900 dark:text-emerald-100'}`}>
                 {incidentResults.length > 0
                   ? `${incidentResults.length} documento(s) requieren atención por error de extracción o baja confianza.`
-                  : 'No se detectaron incidencias para la fecha operativa seleccionada.'}
+                  : 'No se detectaron incidencias para el rango operativo seleccionado.'}
               </p>
             </div>
           </div>
@@ -437,7 +437,7 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({ results, currentAgencyId,
                   <td colSpan={5} className="px-6 py-14 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                       <Package className="w-8 h-8 opacity-20" />
-                      <span>No hay facturas exitosas para la fecha operativa seleccionada.</span>
+                      <span>No hay facturas exitosas para el rango operativo seleccionado.</span>
                     </div>
                   </td>
                 </tr>
