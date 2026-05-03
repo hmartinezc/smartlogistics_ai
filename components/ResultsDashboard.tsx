@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
 import { createPortal } from 'react-dom';
 import { BatchItem } from '../types';
 import {
@@ -192,95 +192,97 @@ interface HistoryTooltipAnchorProps {
   children: React.ReactNode;
 }
 
-const HistoryTooltipAnchor: React.FC<HistoryTooltipAnchorProps> = ({
-  tooltipTitle,
-  tooltipValue,
-  details,
-  showOnlyWhenOverflow = false,
-  className = '',
-  children,
-}) => {
-  const anchorRef = useRef<HTMLSpanElement | null>(null);
-  const [tooltip, setTooltip] = useState<HistoryTooltipState | null>(null);
+const HistoryTooltipAnchor: React.FC<HistoryTooltipAnchorProps> = React.memo(
+  ({
+    tooltipTitle,
+    tooltipValue,
+    details,
+    showOnlyWhenOverflow = false,
+    className = '',
+    children,
+  }) => {
+    const anchorRef = useRef<HTMLSpanElement | null>(null);
+    const [tooltip, setTooltip] = useState<HistoryTooltipState | null>(null);
 
-  const hideTooltip = () => setTooltip(null);
+    const hideTooltip = () => setTooltip(null);
 
-  const showTooltip = () => {
-    const anchor = anchorRef.current;
-    if (!anchor) return;
+    const showTooltip = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
 
-    const overflowTarget =
-      anchor.querySelector<HTMLElement>('[data-history-tooltip-measure]') || anchor;
-    const isOverflowing =
-      overflowTarget.scrollWidth > overflowTarget.clientWidth + 1 ||
-      overflowTarget.scrollHeight > overflowTarget.clientHeight + 1;
-    const shouldShow = !showOnlyWhenOverflow || isOverflowing || hasTooltipDetails(details);
+      const overflowTarget =
+        anchor.querySelector<HTMLElement>('[data-history-tooltip-measure]') || anchor;
+      const isOverflowing =
+        overflowTarget.scrollWidth > overflowTarget.clientWidth + 1 ||
+        overflowTarget.scrollHeight > overflowTarget.clientHeight + 1;
+      const shouldShow = !showOnlyWhenOverflow || isOverflowing || hasTooltipDetails(details);
 
-    if (!shouldShow) {
-      setTooltip(null);
-      return;
-    }
+      if (!shouldShow) {
+        setTooltip(null);
+        return;
+      }
 
-    const rect = anchor.getBoundingClientRect();
-    const width = Math.max(160, Math.min(260, window.innerWidth - 32));
-    const maxLeft = Math.max(12, window.innerWidth - width - 12);
-    const left = Math.min(Math.max(rect.left + rect.width / 2 - width / 2, 12), maxLeft);
-    const placement = rect.top > 116 ? 'top' : 'bottom';
-    const top = placement === 'top' ? rect.top - 8 : rect.bottom + 8;
+      const rect = anchor.getBoundingClientRect();
+      const width = Math.max(160, Math.min(260, window.innerWidth - 32));
+      const maxLeft = Math.max(12, window.innerWidth - width - 12);
+      const left = Math.min(Math.max(rect.left + rect.width / 2 - width / 2, 12), maxLeft);
+      const placement = rect.top > 116 ? 'top' : 'bottom';
+      const top = placement === 'top' ? rect.top - 8 : rect.bottom + 8;
 
-    setTooltip({ left, top, width, placement });
-  };
+      setTooltip({ left, top, width, placement });
+    };
 
-  return (
-    <span
-      ref={anchorRef}
-      className={`inline-flex items-center ${className}`}
-      onMouseEnter={showTooltip}
-      onMouseLeave={hideTooltip}
-      onFocus={showTooltip}
-      onBlur={hideTooltip}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          hideTooltip();
-        }
-      }}
-    >
-      {children}
-      {tooltip &&
-        createPortal(
-          <div
-            role="tooltip"
-            style={{ left: tooltip.left, top: tooltip.top, width: tooltip.width }}
-            className={`pointer-events-none fixed z-[80] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs text-slate-700 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 ${tooltip.placement === 'top' ? '-translate-y-full' : ''}`}
-          >
+    return (
+      <span
+        ref={anchorRef}
+        className={`inline-flex items-center ${className}`}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        onFocus={showTooltip}
+        onBlur={hideTooltip}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            hideTooltip();
+          }
+        }}
+      >
+        {children}
+        {tooltip &&
+          createPortal(
             <div
-              className={`absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 ${tooltip.placement === 'top' ? '-bottom-1 border-b border-r' : '-top-1 border-l border-t'}`}
-            />
-            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
-              {tooltipTitle}
-            </p>
-            <p className="mt-0.5 whitespace-normal break-words text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100">
-              {tooltipValue}
-            </p>
-            {details?.filter(hasDetailValue).map((detail, index) => (
+              role="tooltip"
+              style={{ left: tooltip.left, top: tooltip.top, width: tooltip.width }}
+              className={`pointer-events-none fixed z-[80] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs text-slate-700 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 ${tooltip.placement === 'top' ? '-translate-y-full' : ''}`}
+            >
               <div
-                key={`${detail.label}-${index}`}
-                className={`mt-1.5 rounded-md px-2 py-1 ${detail.tone === 'danger' ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200' : 'bg-slate-50 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200'}`}
-              >
-                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">
-                  {detail.label}
-                </p>
-                <p className="mt-0.5 whitespace-normal break-words text-[11px] font-medium leading-snug">
-                  {detail.value}
-                </p>
-              </div>
-            ))}
-          </div>,
-          document.body,
-        )}
-    </span>
-  );
-};
+                className={`absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 ${tooltip.placement === 'top' ? '-bottom-1 border-b border-r' : '-top-1 border-l border-t'}`}
+              />
+              <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+                {tooltipTitle}
+              </p>
+              <p className="mt-0.5 whitespace-normal break-words text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100">
+                {tooltipValue}
+              </p>
+              {details?.filter(hasDetailValue).map((detail, index) => (
+                <div
+                  key={`${detail.label}-${index}`}
+                  className={`mt-1.5 rounded-md px-2 py-1 ${detail.tone === 'danger' ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200' : 'bg-slate-50 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200'}`}
+                >
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">
+                    {detail.label}
+                  </p>
+                  <p className="mt-0.5 whitespace-normal break-words text-[11px] font-medium leading-snug">
+                    {detail.value}
+                  </p>
+                </div>
+              ))}
+            </div>,
+            document.body,
+          )}
+      </span>
+    );
+  },
+);
 
 interface HistoryOverflowTextProps {
   label: string;
@@ -291,36 +293,31 @@ interface HistoryOverflowTextProps {
   emptyValue?: string;
 }
 
-const HistoryOverflowText: React.FC<HistoryOverflowTextProps> = ({
-  label,
-  value,
-  details,
-  className = '',
-  textClassName = '',
-  emptyValue = '-',
-}) => {
-  const displayValue =
-    value === null || value === undefined || value === '' ? emptyValue : String(value);
-  const hasUsefulTooltip = displayValue !== emptyValue || hasTooltipDetails(details);
+const HistoryOverflowText: React.FC<HistoryOverflowTextProps> = React.memo(
+  ({ label, value, details, className = '', textClassName = '', emptyValue = '-' }) => {
+    const displayValue =
+      value === null || value === undefined || value === '' ? emptyValue : String(value);
+    const hasUsefulTooltip = displayValue !== emptyValue || hasTooltipDetails(details);
 
-  return (
-    <HistoryTooltipAnchor
-      tooltipTitle={label}
-      tooltipValue={displayValue}
-      details={details}
-      showOnlyWhenOverflow
-      className={`flex w-full min-w-0 items-center ${className}`}
-    >
-      <span
-        data-history-tooltip-measure
-        tabIndex={hasUsefulTooltip ? 0 : -1}
-        className={`block w-full min-w-0 truncate rounded-md outline-none ${hasUsefulTooltip ? 'cursor-help focus-visible:ring-2 focus-visible:ring-indigo-500/35' : ''} ${textClassName}`}
+    return (
+      <HistoryTooltipAnchor
+        tooltipTitle={label}
+        tooltipValue={displayValue}
+        details={details}
+        showOnlyWhenOverflow
+        className={`flex w-full min-w-0 items-center ${className}`}
       >
-        {displayValue}
-      </span>
-    </HistoryTooltipAnchor>
-  );
-};
+        <span
+          data-history-tooltip-measure
+          tabIndex={hasUsefulTooltip ? 0 : -1}
+          className={`block w-full min-w-0 truncate rounded-md outline-none ${hasUsefulTooltip ? 'cursor-help focus-visible:ring-2 focus-visible:ring-indigo-500/35' : ''} ${textClassName}`}
+        >
+          {displayValue}
+        </span>
+      </HistoryTooltipAnchor>
+    );
+  },
+);
 
 const formatPiecesValue = (value?: number): string =>
   typeof value === 'number' ? value.toLocaleString('es-EC') : '-';
@@ -338,6 +335,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [selectedAwb, setSelectedAwb] = useState('ALL');
   const [awbSearch, setAwbSearch] = useState('');
   const [globalSearch, setGlobalSearch] = useState('');
+  const deferredGlobalSearch = useDeferredValue(globalSearch);
   const [processedDateFilter, setProcessedDateFilter] = useState('');
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [mawbFilter, setMawbFilter] = useState('');
@@ -420,7 +418,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   }, [results, selectedAwb]);
 
   const filteredResults = useMemo(() => {
-    const normalizedGlobalSearch = globalSearch.trim().toLowerCase();
+    const normalizedGlobalSearch = deferredGlobalSearch.trim().toLowerCase();
     const compactGlobalSearch = normalizedGlobalSearch.replace(/[^a-z0-9]/g, '');
     const normalizedMawbFilter = mawbFilter.trim().toLowerCase();
     const normalizedInvoiceFilter = invoiceFilter.trim().toLowerCase();
@@ -492,7 +490,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     });
   }, [
     awbFilteredResults,
-    globalSearch,
+    deferredGlobalSearch,
     hawbFilter,
     invoiceDateFilter,
     invoiceFilter,
@@ -1626,4 +1624,4 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   );
 };
 
-export default ResultsDashboard;
+export default React.memo(ResultsDashboard);

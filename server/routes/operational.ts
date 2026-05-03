@@ -40,6 +40,7 @@ operational.get('/reconciliation', async (c) => {
   });
 
   // Obtener AWBs facturados (agregados desde batch_items por fecha)
+  const dateEnd = `${date}T23:59:59.999Z`;
   const invoiced = await db.execute({
     sql: `SELECT
             json_extract(result_json, '$.mawb') as mawb,
@@ -50,9 +51,9 @@ operational.get('/reconciliation', async (c) => {
           WHERE agency_id = ?
             AND status = 'SUCCESS'
             AND result_json IS NOT NULL
-            AND date(processed_at) = date(?)
+            AND processed_at >= ? AND processed_at <= ?
           GROUP BY json_extract(result_json, '$.mawb')`,
-    args: [agencyId, date],
+    args: [agencyId, date, dateEnd],
   });
 
   // Construir mapa de invoiced

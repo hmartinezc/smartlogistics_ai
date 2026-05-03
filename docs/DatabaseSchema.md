@@ -159,7 +159,7 @@ Cada fila es un documento procesado. El campo `result_json` guarda el `InvoiceDa
 | `agency_id`    | TEXT | **FK** → `agencies.id`                                       | Agencia propietaria                    |
 | `created_at`   | TEXT | DEFAULT now                                                  | Fecha de creación                      |
 
-**Índices:** `idx_batch_items_agency`, `idx_batch_items_status`
+**Índices:** `idx_batch_items_agency`, `idx_batch_items_status`, `idx_batch_items_agency_created` en `(agency_id, created_at DESC)`, `idx_batch_items_agency_status_processed` en `(agency_id, status, processed_at)`
 
 ---
 

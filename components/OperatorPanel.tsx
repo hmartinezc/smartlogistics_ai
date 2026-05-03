@@ -655,4 +655,4 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
   );
 };
 
-export default OperatorPanel;
+export default React.memo(OperatorPanel);

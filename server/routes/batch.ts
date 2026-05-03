@@ -115,18 +115,22 @@ batch.get('/', async (c) => {
     }
 
     result = await db.execute({
-      sql: 'SELECT * FROM batch_items WHERE agency_id = ? ORDER BY created_at DESC',
+      sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
+            FROM batch_items WHERE agency_id = ? ORDER BY created_at DESC`,
       args: [agencyId],
     });
   } else if (authUser.role !== 'ADMIN') {
     result = await db.execute({
-      sql: `SELECT * FROM batch_items
+      sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
+            FROM batch_items
             WHERE agency_id IN (${authUser.agencyIds.map(() => '?').join(',')})
             ORDER BY created_at DESC`,
       args: authUser.agencyIds,
     });
   } else {
-    result = await db.execute('SELECT * FROM batch_items ORDER BY created_at DESC');
+    result = await db.execute(
+      'SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at FROM batch_items ORDER BY created_at DESC',
+    );
   }
 
   return c.json(result.rows.map(buildBatchItem));

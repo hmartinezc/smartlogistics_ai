@@ -22,6 +22,12 @@
 - `.opencode/rules/typescript/` — TypeScript-specific rules extending the common ones.
 - Rules are read by the AI during development to enforce standards. See each file for details.
 
+## Skills (domain knowledge for agents)
+
+- `.opencode/skills/` — 13 specialized skill documents loaded by agents as needed.
+- Project-specific: `cost-aware-llm-pipeline`, `database-migrations`, `customs-trade-compliance`, `deployment-patterns`, `docker-patterns`, `ai-regression-testing`, `continuous-learning`, `e2e-testing`.
+- Stack-specific: `hono` (backend API), `react-best-practices` (frontend Vite+React), `tailwind-css-patterns`, `turso-libsql`, `vite`.
+
 ## Runtime And Data
 
 - Backend entrypoint is `server/index.ts`; route modules mount under `/api/*` and `/api/health` is the healthcheck.

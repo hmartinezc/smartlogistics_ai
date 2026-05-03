@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
 import { BatchItem } from '../types';
 import {
   AlertCircle,
@@ -63,6 +63,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   onDeleteItems,
 }) => {
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
@@ -77,46 +78,50 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
 
   const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
-  const filteredResults = dateRangeInvalid
-    ? []
-    : results.filter((item) => {
-        const normalizedQuery = query.trim().toLowerCase();
-        const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
-        const itemDate = getRecordDateKey(item);
-        const matchesDate =
-          (!dateFrom && !dateTo) ||
-          (Boolean(itemDate) &&
-            (!dateFrom || itemDate >= dateFrom) &&
-            (!dateTo || itemDate <= dateTo));
+  const filteredResults = useMemo(
+    () =>
+      dateRangeInvalid
+        ? []
+        : results.filter((item) => {
+            const normalizedQuery = deferredQuery.trim().toLowerCase();
+            const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
+            const itemDate = getRecordDateKey(item);
+            const matchesDate =
+              (!dateFrom && !dateTo) ||
+              (Boolean(itemDate) &&
+                (!dateFrom || itemDate >= dateFrom) &&
+                (!dateTo || itemDate <= dateTo));
 
-        if (!matchesStatus) {
-          return false;
-        }
+            if (!matchesStatus) {
+              return false;
+            }
 
-        if (!matchesDate) {
-          return false;
-        }
+            if (!matchesDate) {
+              return false;
+            }
 
-        if (!normalizedQuery) {
-          return true;
-        }
+            if (!normalizedQuery) {
+              return true;
+            }
 
-        const haystack = [
-          item.fileName,
-          item.agencyId,
-          item.user,
-          item.result?.invoiceNumber,
-          item.result?.mawb,
-          item.result?.hawb,
-          item.result?.shipperName,
-          item.result?.consigneeName,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
+            const haystack = [
+              item.fileName,
+              item.agencyId,
+              item.user,
+              item.result?.invoiceNumber,
+              item.result?.mawb,
+              item.result?.hawb,
+              item.result?.shipperName,
+              item.result?.consigneeName,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase();
 
-        return haystack.includes(normalizedQuery);
-      });
+            return haystack.includes(normalizedQuery);
+          }),
+    [results, deferredQuery, statusFilter, dateFrom, dateTo, dateRangeInvalid],
+  );
 
   const filteredIds = filteredResults.map((item) => item.id);
   const filteredPiecesCount = filteredResults.reduce(
@@ -872,4 +877,4 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   );
 };
 
-export default ExtractedDataManager;
+export default React.memo(ExtractedDataManager);

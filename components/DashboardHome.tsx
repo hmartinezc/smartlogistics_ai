@@ -413,4 +413,4 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
   );
 };
 
-export default DashboardHome;
+export default React.memo(DashboardHome);

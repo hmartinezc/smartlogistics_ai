@@ -17,6 +17,8 @@
 - Phase 2: Added planner, database-reviewer, tdd-guide agents; fixed all models to DeepSeek/Qwen/Kimi
 - Phase 3: Added cost-aware-llm, customs-trade-compliance, ai-regression-testing, database-migrations skills
 - Phase 4: Added session memory, continuous-learning, deployment-patterns, docker-patterns skills
+- Phase 5: Cleaned up skills — removed 6 irrelevant skills, trimmed 3 to project scope, moved .agents/skills/ → .opencode/skills/
+- Phase 6: Added 11 commands (plan, build-fix, code-review, checkpoint, quality-gate, skill-create, model-route, learn, update-docs, refactor-clean, feature-dev) and 8 agents (architect, code-reviewer, refactor-cleaner, e2e-runner, performance-optimizer, loop-operator, conversation-analyzer, type-design-analyzer) adapted from ECC
 
 ## Architecture Decisions (Active)
 
@@ -82,18 +84,26 @@ npm run check        # All checks combined
 
 | Agent                 | Model                         | Use                    |
 | --------------------- | ----------------------------- | ---------------------- |
+| architect             | opencode-go/deepseek-v4-pro   | Architecture decisions |
+| type-design-analyzer  | opencode-go/deepseek-v4-pro   | Type design review     |
 | planner               | opencode-go/deepseek-v4-pro   | Feature planning       |
-| database-reviewer     | opencode-go/deepseek-v4-flash | Schema/query review    |
+| code-reviewer         | opencode-go/deepseek-v4-pro   | Code review            |
+| security-reviewer     | opencode-go/deepseek-v4-pro   | Security audit         |
+| performance-optimizer | opencode-go/deepseek-v4-pro   | Performance tuning     |
+| typescript-reviewer   | opencode-go/deepseek-v4-pro   | TS code review         |
+| a11y-architect        | opencode-go/deepseek-v4-pro   | Accessibility          |
 | tdd-guide             | opencode-go/deepseek-v4-pro   | Test-first development |
+| database-reviewer     | opencode-go/deepseek-v4-flash | Schema/query review    |
 | code-explorer         | opencode-go/deepseek-v4-flash | Codebase exploration   |
 | general               | opencode-go/deepseek-v4-flash | General-purpose tasks  |
 | explore               | opencode-go/deepseek-v4-flash | Fast codebase search   |
 | build-error-resolver  | opencode-go/deepseek-v4-flash | Fix build errors       |
-| security-reviewer     | opencode-go/deepseek-v4-pro   | Security audit         |
+| refactor-cleaner      | opencode-go/deepseek-v4-flash | Dead code removal      |
+| e2e-runner            | opencode-go/deepseek-v4-flash | E2E testing            |
+| loop-operator         | opencode-go/deepseek-v4-flash | Extraction refinement  |
+| conversation-analyzer | opencode-go/deepseek-v4-flash | Session analysis       |
 | silent-failure-hunter | opencode-go/deepseek-v4-flash | Find silent failures   |
-| typescript-reviewer   | opencode-go/deepseek-v4-pro   | Code review            |
 | doc-updater           | opencode-go/deepseek-v4-flash | Documentation          |
-| a11y-architect        | opencode-go/deepseek-v4-pro   | Accessibility          |
 
 ## Session Notes
 

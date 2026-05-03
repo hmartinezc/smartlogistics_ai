@@ -164,6 +164,8 @@ const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_user_agencies_agency ON user_agencies(agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_batch_items_agency ON batch_items(agency_id)`,
   `CREATE INDEX IF NOT EXISTS idx_batch_items_status ON batch_items(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_batch_items_agency_created ON batch_items(agency_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_batch_items_agency_status_processed ON batch_items(agency_id, status, processed_at)`,
   `CREATE INDEX IF NOT EXISTS idx_document_audit_agency_date ON document_processing_audit(agency_id, processed_date)`,
   `CREATE INDEX IF NOT EXISTS idx_document_audit_date ON document_processing_audit(processed_date)`,
   `CREATE INDEX IF NOT EXISTS idx_document_audit_status ON document_processing_audit(status)`,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AgentType, AppState, BatchItem, User, Agency } from './types';
 import {
   useAuth,
@@ -84,13 +84,6 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       );
     }
   }, [appState, currentUser?.role, isAuthenticated, currentAgencyId, loadResults]);
-
-  // Reset logic when widget opens/closes
-  useEffect(() => {
-    if (!isOpen && isWidgetMode) {
-      // keeping state alive is better UX
-    }
-  }, [isOpen, isWidgetMode]);
 
   useEffect(() => {
     if (!sessionReady) return; // Esperar a que se restaure la sesión
@@ -364,105 +357,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     );
   }
 
-  const MainContent = () => (
-    <>
-      {appState === AppState.LOGIN ? (
-        <div className="w-full h-full overflow-y-auto">
-          <LoginScreen onLogin={handleLogin} />
-        </div>
-      ) : (
-        <>
-          <Sidebar
-            currentTab={appState}
-            onNavigate={handleNavigate}
-            onLogout={handleLogout}
-            isDarkMode={isDarkMode}
-            onToggleTheme={toggleDarkMode}
-            userRole={currentUser?.role || 'OPERADOR'}
-            userName={currentUser?.name || 'Usuario'}
-            availableAgencies={availableAgencies}
-            currentAgencyId={currentAgencyId}
-            onSwitchAgency={handleSwitchAgencyContext}
-          />
-
-          <main className="flex-1 overflow-hidden relative flex flex-col">
-            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
-              {appState === AppState.DASHBOARD_ADMIN && currentUser?.role === 'ADMIN' && (
-                <AdminDashboard agencies={agencies} plans={PLANS} />
-              )}
-              {appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
-                <DashboardHome
-                  results={batchResults}
-                  currentAgencyId={currentAgencyId}
-                  currentAgency={currentAgency}
-                  currentPlan={contextPlan}
-                />
-              )}
-              {appState === AppState.DASHBOARD_PANEL && currentUser && (
-                <OperatorPanel
-                  results={batchResults}
-                  currentAgencyId={currentAgencyId}
-                  currentAgency={currentAgency}
-                />
-              )}
-              {appState === AppState.USER_MANAGEMENT && currentUser?.role === 'ADMIN' && (
-                <UserManagement
-                  users={users}
-                  agencies={agencies}
-                  onAddUser={handleAddUser}
-                  onUpdateUser={handleUpdateUser}
-                  onDeleteUser={handleDeleteUser}
-                />
-              )}
-              {appState === AppState.AGENCY_CONFIG && currentUser?.role === 'ADMIN' && (
-                <AgenciesConfiguration
-                  agencies={agencies}
-                  plans={PLANS}
-                  onAddAgency={handleAddAgency}
-                  onUpdateAgency={handleUpdateAgency}
-                  onDeleteAgency={handleDeleteAgency}
-                />
-              )}
-              {appState === AppState.PRODUCT_MATCHES && currentUser && (
-                <ProductMatchCatalog
-                  currentAgencyId={currentAgencyId}
-                  currentAgency={currentAgency}
-                />
-              )}
-              {appState === AppState.PROCESS_SELECTION && (
-                <TemplateGallery onSelectFiles={handleFilesSelected} />
-              )}
-              {appState === AppState.BATCH_RUNNING && (
-                <div className="h-full flex flex-col justify-center">
-                  <BatchProcessor
-                    files={batchFiles}
-                    format={selectedFormat}
-                    batchId={currentBatchId}
-                    onComplete={(results) => handleBatchComplete(currentBatchId, results)}
-                  />
-                </div>
-              )}
-              {appState === AppState.HISTORY_RESULTS && (
-                <ResultsDashboard
-                  results={batchResults}
-                  onBack={() => setAppState(AppState.PROCESS_SELECTION)}
-                  onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
-                  onUpdateItem={handleUpdateResult}
-                />
-              )}
-              {appState === AppState.DATA_CLEANUP && (
-                <ExtractedDataManager
-                  results={batchResults}
-                  isBusy={isCleaningData}
-                  onRefresh={handleRefreshBatchResults}
-                  onDeleteItems={handleDeleteBatchItems}
-                />
-              )}
-            </div>
-          </main>
-        </>
-      )}
-    </>
+  const handleBackToProcessSelection = useCallback(
+    () => setAppState(AppState.PROCESS_SELECTION),
+    [],
   );
 
   return (
@@ -478,7 +375,102 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       )}
 
       <div className={innerClasses}>
-        <MainContent />
+        {appState === AppState.LOGIN ? (
+          <div className="w-full h-full overflow-y-auto">
+            <LoginScreen onLogin={handleLogin} />
+          </div>
+        ) : (
+          <>
+            <Sidebar
+              currentTab={appState}
+              onNavigate={handleNavigate}
+              onLogout={handleLogout}
+              isDarkMode={isDarkMode}
+              onToggleTheme={toggleDarkMode}
+              userRole={currentUser?.role || 'OPERADOR'}
+              userName={currentUser?.name || 'Usuario'}
+              availableAgencies={availableAgencies}
+              currentAgencyId={currentAgencyId}
+              onSwitchAgency={handleSwitchAgencyContext}
+            />
+
+            <main className="flex-1 overflow-hidden relative flex flex-col">
+              <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+                {appState === AppState.DASHBOARD_ADMIN && currentUser?.role === 'ADMIN' && (
+                  <AdminDashboard agencies={agencies} plans={PLANS} />
+                )}
+                {appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
+                  <DashboardHome
+                    results={batchResults}
+                    currentAgencyId={currentAgencyId}
+                    currentAgency={currentAgency}
+                    currentPlan={contextPlan}
+                  />
+                )}
+                {appState === AppState.DASHBOARD_PANEL && currentUser && (
+                  <OperatorPanel
+                    results={batchResults}
+                    currentAgencyId={currentAgencyId}
+                    currentAgency={currentAgency}
+                  />
+                )}
+                {appState === AppState.USER_MANAGEMENT && currentUser?.role === 'ADMIN' && (
+                  <UserManagement
+                    users={users}
+                    agencies={agencies}
+                    onAddUser={handleAddUser}
+                    onUpdateUser={handleUpdateUser}
+                    onDeleteUser={handleDeleteUser}
+                  />
+                )}
+                {appState === AppState.AGENCY_CONFIG && currentUser?.role === 'ADMIN' && (
+                  <AgenciesConfiguration
+                    agencies={agencies}
+                    plans={PLANS}
+                    onAddAgency={handleAddAgency}
+                    onUpdateAgency={handleUpdateAgency}
+                    onDeleteAgency={handleDeleteAgency}
+                  />
+                )}
+                {appState === AppState.PRODUCT_MATCHES && currentUser && (
+                  <ProductMatchCatalog
+                    currentAgencyId={currentAgencyId}
+                    currentAgency={currentAgency}
+                  />
+                )}
+                {appState === AppState.PROCESS_SELECTION && (
+                  <TemplateGallery onSelectFiles={handleFilesSelected} />
+                )}
+                {appState === AppState.BATCH_RUNNING && (
+                  <div className="h-full flex flex-col justify-center">
+                    <BatchProcessor
+                      files={batchFiles}
+                      format={selectedFormat}
+                      batchId={currentBatchId}
+                      onComplete={(results) => handleBatchComplete(currentBatchId, results)}
+                    />
+                  </div>
+                )}
+                {appState === AppState.HISTORY_RESULTS && (
+                  <ResultsDashboard
+                    results={batchResults}
+                    onBack={handleBackToProcessSelection}
+                    onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
+                    onUpdateItem={handleUpdateResult}
+                  />
+                )}
+                {appState === AppState.DATA_CLEANUP && (
+                  <ExtractedDataManager
+                    results={batchResults}
+                    isBusy={isCleaningData}
+                    onRefresh={handleRefreshBatchResults}
+                    onDeleteItems={handleDeleteBatchItems}
+                  />
+                )}
+              </div>
+            </main>
+          </>
+        )}
       </div>
     </div>
   );
