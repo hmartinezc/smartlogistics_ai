@@ -39,9 +39,12 @@ If the product is NOT listed here, use the EQ-based proportional distribution (s
 | Roses / Spray Roses | HB | **250** |
 | Gypsophila / Gypso | QB | **150** |
 | Alstroemeria | QB | **150** |
+| Any other product | QB | **150** |
 
-**HOW TO USE (when product matches):**
-- Example: Roses, 1 HB + 1 QB = 250 + 100 = 350 stems total.
+**HOW TO USE (when product matches or default applies):**
+- Roses: 1 HB + 1 QB = 250 + 100 = 350, or 8 QB + 1 HB = 800 + 350 = 1150.
+- Any other product not listed above: use 150 stems per QB as default.
+- The remainder after assigning table values goes to the biggest box type (highest EQ).
 `;
 
 // --------------------------
@@ -101,10 +104,11 @@ export const ADVANCED_DISTRIBUTION_LOGIC = `
 
 **HOW TO DISTRIBUTE STEMS ACROSS MULTIPLE BOX TYPES:**
 
-**STEP 1 — Product matches the knowledge base:**
+**STEP 1 — Product matches the knowledge base (or default applies):**
 Use the EXACT per-box values from the table. These are FIXED, not ratios to scale.
 - For each box type in the table, multiply: stems = box_count × stems_per_box.
 - These values are LOCKED — do not scale them.
+- **Default**: If the product is NOT Roses, Gypso, or Alstroemeria, use QB = 150 stems per box.
 - If there is a box type NOT in the table, assign the REMAINING stems to it:
   remaining = footer.totalStems - sum(table_box_stems).
   Put the remainder into the box type with the highest EQ (the biggest box).
