@@ -8,7 +8,7 @@ tools:
   bash: true
   grep: true
   glob: true
-model: haiku
+model: deepseek-v4-flash
 ---
 
 # Documentation Specialist
@@ -46,6 +46,7 @@ You keep documentation accurate and up to date with the codebase.
 ## When to Update
 
 ALWAYS update docs after:
+
 - API route changes.
 - DB schema or seed changes.
 - Env var changes.

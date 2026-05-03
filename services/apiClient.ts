@@ -54,7 +54,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number) {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -159,14 +162,18 @@ export const api = {
     return request(`/product-matches?agencyId=${encodeURIComponent(agencyId)}`);
   },
 
-  async createProductMatch(item: import('../types').ProductMatchCatalogItem): Promise<import('../types').ProductMatchCatalogItem> {
+  async createProductMatch(
+    item: import('../types').ProductMatchCatalogItem,
+  ): Promise<import('../types').ProductMatchCatalogItem> {
     return request('/product-matches', {
       method: 'POST',
       body: JSON.stringify(item),
     });
   },
 
-  async updateProductMatch(item: import('../types').ProductMatchCatalogItem): Promise<import('../types').ProductMatchCatalogItem> {
+  async updateProductMatch(
+    item: import('../types').ProductMatchCatalogItem,
+  ): Promise<import('../types').ProductMatchCatalogItem> {
     return request(`/product-matches/${item.id}`, {
       method: 'PUT',
       body: JSON.stringify(item),
@@ -179,7 +186,9 @@ export const api = {
     });
   },
 
-  async bootstrapProductMatches(agencyId: string): Promise<import('../types').ProductMatchBootstrapResult> {
+  async bootstrapProductMatches(
+    agencyId: string,
+  ): Promise<import('../types').ProductMatchBootstrapResult> {
     return request('/product-matches/bootstrap', {
       method: 'POST',
       body: JSON.stringify({ agencyId }),
@@ -193,12 +202,17 @@ export const api = {
       headers['X-Session-Id'] = sessionId;
     }
 
-    const response = await fetch(`${API_BASE}/product-matches/template?agencyId=${encodeURIComponent(agencyId)}`, {
-      headers,
-    });
+    const response = await fetch(
+      `${API_BASE}/product-matches/template?agencyId=${encodeURIComponent(agencyId)}`,
+      {
+        headers,
+      },
+    );
 
     if (!response.ok) {
-      const body = await response.json().catch(() => ({ error: 'Error al descargar la plantilla.' }));
+      const body = await response
+        .json()
+        .catch(() => ({ error: 'Error al descargar la plantilla.' }));
       throw new ApiError(body.error || response.statusText, response.status);
     }
 
@@ -213,7 +227,10 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  async importProductMatches(agencyId: string, file: File): Promise<{ ok: boolean; importedCount: number; duplicateCount?: number; message?: string }> {
+  async importProductMatches(
+    agencyId: string,
+    file: File,
+  ): Promise<{ ok: boolean; importedCount: number; duplicateCount?: number; message?: string }> {
     const formData = new FormData();
     formData.append('agencyId', agencyId);
     formData.append('file', file);
@@ -263,7 +280,9 @@ export const api = {
     });
   },
 
-  async deleteBatchItems(ids: string[]): Promise<{ ok: boolean; count: number; deletedIds: string[] }> {
+  async deleteBatchItems(
+    ids: string[],
+  ): Promise<{ ok: boolean; count: number; deletedIds: string[] }> {
     return request('/batch/items', {
       method: 'DELETE',
       body: JSON.stringify({ ids }),
@@ -276,7 +295,9 @@ export const api = {
   },
 
   // ── Audit ──
-  async getDocumentProcessingAudit(params: import('../types').DocumentProcessingAuditQuery = {}): Promise<import('../types').DocumentProcessingAuditEntry[]> {
+  async getDocumentProcessingAudit(
+    params: import('../types').DocumentProcessingAuditQuery = {},
+  ): Promise<import('../types').DocumentProcessingAuditEntry[]> {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value) {
@@ -289,8 +310,13 @@ export const api = {
   },
 
   // ── Operational ──
-  async getReconciliation(agencyId: string, date: string): Promise<import('../types').AwbReconciliationRow[]> {
-    return request(`/operational/reconciliation?agencyId=${encodeURIComponent(agencyId)}&date=${encodeURIComponent(date)}`);
+  async getReconciliation(
+    agencyId: string,
+    date: string,
+  ): Promise<import('../types').AwbReconciliationRow[]> {
+    return request(
+      `/operational/reconciliation?agencyId=${encodeURIComponent(agencyId)}&date=${encodeURIComponent(date)}`,
+    );
   },
 
   async createBookedAwb(record: import('../types').BookedAwbRecord): Promise<void> {
@@ -313,7 +339,10 @@ export const api = {
     });
   },
 
-  async extractLogisticsData(file: File, format: import('../types').AgentType): Promise<import('../types').InvoiceData> {
+  async extractLogisticsData(
+    file: File,
+    format: import('../types').AgentType,
+  ): Promise<import('../types').InvoiceData> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('format', format);

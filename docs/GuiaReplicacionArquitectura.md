@@ -91,7 +91,7 @@ El flujo de creacion es:
 import { randomBytes, scryptSync } from 'node:crypto';
 
 function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex');       // 16 bytes aleatorios
+  const salt = randomBytes(16).toString('hex'); // 16 bytes aleatorios
   const hash = scryptSync(password, salt, 64).toString('hex'); // 64 bytes de hash
   return `scrypt$${salt}$${hash}`;
 }
@@ -108,7 +108,7 @@ function verifyPassword(password: string, storedValue: string): boolean {
   const actual = Buffer.from(scryptSync(password, salt, 64).toString('hex'), 'hex');
 
   if (expected.length !== actual.length) return false;
-  return timingSafeEqual(expected, actual);  // resistente a timing attacks
+  return timingSafeEqual(expected, actual); // resistente a timing attacks
 }
 ```
 
@@ -185,12 +185,12 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 
 El patron centraliza toda la logica de permisos en `server/security.ts` con estas funciones:
 
-| Funcion | Responsabilidad |
-|---------|----------------|
-| `hashPassword(password)` | Genera `scrypt$salt$hash` |
-| `verifyPassword(password, stored)` | Verifica con timingSafeEqual |
-| `requireAuth(c)` | Valida sesion, carga usuario, retorna AuthUser o 401/403 |
-| `requireRole(c, user, roles[])` | Verifica que el usuario tenga uno de los roles permitidos |
+| Funcion                                | Responsabilidad                                                      |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| `hashPassword(password)`               | Genera `scrypt$salt$hash`                                            |
+| `verifyPassword(password, stored)`     | Verifica con timingSafeEqual                                         |
+| `requireAuth(c)`                       | Valida sesion, carga usuario, retorna AuthUser o 401/403             |
+| `requireRole(c, user, roles[])`        | Verifica que el usuario tenga uno de los roles permitidos            |
 | `ensureContextAccess(user, contextId)` | Verifica acceso al tenant/sede/sucursal. ADMIN puede acceder a todo. |
 
 **Regla critica**: ningun endpoint debe implementar su propia logica de permisos. Todos usan estos helpers estandarizados. Ejemplo de un endpoint protegido:
@@ -198,10 +198,10 @@ El patron centraliza toda la logica de permisos en `server/security.ts` con esta
 ```ts
 route.get('/items', async (c) => {
   const userOrRes = await requireAuth(c);
-  if (userOrRes instanceof Response) return userOrRes;  // 401 o 403
+  if (userOrRes instanceof Response) return userOrRes; // 401 o 403
 
   const roleCheck = requireRole(c, userOrRes, ['ADMIN', 'OPERADOR']);
-  if (roleCheck) return roleCheck;  // 403 si no tiene rol
+  if (roleCheck) return roleCheck; // 403 si no tiene rol
 
   // ... logica de negocio
 });
@@ -224,7 +224,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   const sessionId = getSessionId();
   if (sessionId) {
-    headers['X-Session-Id'] = sessionId;  // automatico en cada request
+    headers['X-Session-Id'] = sessionId; // automatico en cada request
   }
   const response = await fetch(`/api${path}`, { ...options, headers });
   if (!response.ok) {
@@ -236,6 +236,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 ```
 
 **Puntos clave del apiClient:**
+
 - nunca se pasa el sessionId manualmente desde los componentes — el apiClient lo inyecta siempre
 - el sessionId vive en memoria (`_sessionId`) con localStorage como backup
 - la clase `ApiError` encapsula errores HTTP con `status` y `message`
@@ -295,12 +296,12 @@ El `App.tsx` debe manejar:
 
 ### 5.3 Hooks fundamentales que siempre se necesitan
 
-| Hook | Responsabilidad | Detalles |
-|------|----------------|----------|
-| `useAuth` | Login, logout, restauracion de sesion | Retorna `currentUser`, `loginApi()`, `logout()`, `restoreSession()`, `sessionReady`, `isAdmin` |
-| `useApiData` | Carga de catalogos comunes al montar | Hace `Promise.all` de las cargas iniciales, retorna datos + `loading` + `refresh()` |
-| `useContextSelector` | Contexto operativo activo | Resuelve el contexto por defecto, persiste en localStorage, filtra segun permisos del usuario |
-| `useDarkMode` | Tema visual | Opcional pero util — persiste en localStorage |
+| Hook                 | Responsabilidad                       | Detalles                                                                                       |
+| -------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `useAuth`            | Login, logout, restauracion de sesion | Retorna `currentUser`, `loginApi()`, `logout()`, `restoreSession()`, `sessionReady`, `isAdmin` |
+| `useApiData`         | Carga de catalogos comunes al montar  | Hace `Promise.all` de las cargas iniciales, retorna datos + `loading` + `refresh()`            |
+| `useContextSelector` | Contexto operativo activo             | Resuelve el contexto por defecto, persiste en localStorage, filtra segun permisos del usuario  |
+| `useDarkMode`        | Tema visual                           | Opcional pero util — persiste en localStorage                                                  |
 
 Ademas, cada modulo de negocio tendra sus propios hooks (ej: `useReceipts`, `useOrders`, `useProducts`). Lo importante es que **cada hook tiene una sola responsabilidad**.
 
@@ -326,16 +327,16 @@ Hono es adecuado cuando se quiere un backend pequeno, rapido y facil de leer. Fu
 
 Estos archivos siempre existen en cualquier proyecto que use este patron:
 
-| Archivo | Responsabilidad |
-|---------|----------------|
-| `server/index.ts` | Arranque del servidor, CORS, montaje de rutas, SPA fallback |
-| `server/db.ts` | Conexion unica a libSQL/Turso (singleton) |
-| `server/schema.ts` | Creacion de tablas con `CREATE TABLE IF NOT EXISTS` |
-| `server/seed.ts` | Datos iniciales idempotentes (admin, catalogos base) |
-| `server/security.ts` | Hash, sesiones, requireAuth, requireRole, ensureContextAccess |
-| `server/routes/auth.ts` | Login, sesion, logout |
-| `server/routes/users.ts` | CRUD de usuarios |
-| `server/routes/settings.ts` | Configuracion key-value de la app |
+| Archivo                     | Responsabilidad                                               |
+| --------------------------- | ------------------------------------------------------------- |
+| `server/index.ts`           | Arranque del servidor, CORS, montaje de rutas, SPA fallback   |
+| `server/db.ts`              | Conexion unica a libSQL/Turso (singleton)                     |
+| `server/schema.ts`          | Creacion de tablas con `CREATE TABLE IF NOT EXISTS`           |
+| `server/seed.ts`            | Datos iniciales idempotentes (admin, catalogos base)          |
+| `server/security.ts`        | Hash, sesiones, requireAuth, requireRole, ensureContextAccess |
+| `server/routes/auth.ts`     | Login, sesion, logout                                         |
+| `server/routes/users.ts`    | CRUD de usuarios                                              |
+| `server/routes/settings.ts` | Configuracion key-value de la app                             |
 
 Luego, cada dominio de negocio agrega sus propios archivos de rutas. Ejemplo para bodega: `routes/warehouses.ts`, `routes/receipts.ts`, `routes/dispatches.ts`. Ejemplo para ventas: `routes/products.ts`, `routes/orders.ts`, `routes/customers.ts`. **El patron del backend no cambia — cambian los archivos de dominio.**
 
@@ -374,6 +375,7 @@ export async function runMigrations(db: Client): Promise<void> {
 ```
 
 **PRAGMAs obligatorios:**
+
 - `journal_mode = WAL` — permite lecturas concurrentes sin bloquear escrituras
 - `foreign_keys = ON` — sin esto, las REFERENCES en las tablas no se validan (SQLite las ignora por defecto)
 
@@ -403,11 +405,13 @@ Esto permite que el contenedor se reinicie sin duplicar datos. **El agente debe 
 Siempre incluir:
 
 ```ts
-app.get('/api/health', (c) => c.json({
-  status: 'ok',
-  db: 'libsql',
-  time: new Date().toISOString()
-}));
+app.get('/api/health', (c) =>
+  c.json({
+    status: 'ok',
+    db: 'libsql',
+    time: new Date().toISOString(),
+  }),
+);
 ```
 
 Coolify usa este endpoint para saber si el contenedor esta sano.
@@ -466,11 +470,15 @@ export function getDb(): Client {
 }
 
 export async function closeDb(): Promise<void> {
-  if (_client) { _client.close(); _client = null; }
+  if (_client) {
+    _client.close();
+    _client = null;
+  }
 }
 ```
 
 **Puntos clave:**
+
 - singleton — una sola instancia por proceso
 - la URL determina el modo: `file:` = local, `libsql://` = remoto
 - `authToken` solo se necesita para Turso remoto
@@ -478,10 +486,10 @@ export async function closeDb(): Promise<void> {
 
 ### 7.3 Modos de conexion
 
-| Modo | TURSO_DATABASE_URL | TURSO_AUTH_TOKEN | Cuando usarlo |
-|------|-------------------|-----------------|---------------|
-| Local | `file:./data/app.db` | (vacio) | Desarrollo, testing, inicio rapido |
-| Turso remoto | `libsql://tu-db.turso.io` | `token_real` | Produccion, separar app y DB |
+| Modo         | TURSO_DATABASE_URL        | TURSO_AUTH_TOKEN | Cuando usarlo                      |
+| ------------ | ------------------------- | ---------------- | ---------------------------------- |
+| Local        | `file:./data/app.db`      | (vacio)          | Desarrollo, testing, inicio rapido |
+| Turso remoto | `libsql://tu-db.turso.io` | `token_real`     | Produccion, separar app y DB       |
 
 ### 7.4 Buenas practicas con libSQL
 
@@ -530,26 +538,26 @@ Cada proyecto define su propio dominio, pero el patron de tablas siempre se divi
 
 Estas tablas existen en **todo** proyecto que use este patron:
 
-| Tabla | Proposito |
-|-------|-----------|
-| `users` | Usuarios del sistema (email, name, password scrypt, role, is_active) |
-| `auth_sessions` | Sesiones activas (id UUID, user_id, expires_at) |
-| `user_contexts` | Relacion M:N entre usuario y contexto operativo (agencia, sede, sucursal) |
-| `contexts` | Entidades del tenant/sede (agencias, bodegas, sucursales — el nombre cambia por dominio) |
-| `app_settings` | Configuracion key-value de la aplicacion |
+| Tabla           | Proposito                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| `users`         | Usuarios del sistema (email, name, password scrypt, role, is_active)                     |
+| `auth_sessions` | Sesiones activas (id UUID, user_id, expires_at)                                          |
+| `user_contexts` | Relacion M:N entre usuario y contexto operativo (agencia, sede, sucursal)                |
+| `contexts`      | Entidades del tenant/sede (agencias, bodegas, sucursales — el nombre cambia por dominio) |
+| `app_settings`  | Configuracion key-value de la aplicacion                                                 |
 
 ### 8.2 Tablas de dominio (cambian por proyecto)
 
 Estas tablas dependen del negocio. Ejemplo comparativo:
 
-| Dominio Bodega | Dominio Ventas | Dominio Clinica |
-|---------------|---------------|-----------------|
-| `warehouses` | `stores` | `clinics` |
-| `receipts` | `orders` | `appointments` |
-| `receipt_items` | `order_items` | `consultations` |
-| `dispatches` | `invoices` | `prescriptions` |
-| `inventory_movements` | `payments` | `medical_records` |
-| `package_types` | `product_categories` | `specialties` |
+| Dominio Bodega        | Dominio Ventas       | Dominio Clinica   |
+| --------------------- | -------------------- | ----------------- |
+| `warehouses`          | `stores`             | `clinics`         |
+| `receipts`            | `orders`             | `appointments`    |
+| `receipt_items`       | `order_items`        | `consultations`   |
+| `dispatches`          | `invoices`           | `prescriptions`   |
+| `inventory_movements` | `payments`           | `medical_records` |
+| `package_types`       | `product_categories` | `specialties`     |
 
 **Lo que no cambia es la estructura**: tablas maestras + tablas operativas + tablas de historial/trazabilidad. El agente debe diseñar las tablas del dominio, no copiar las de otro proyecto.
 
@@ -699,10 +707,10 @@ Desplegar un solo servicio que sirva:
 
 Elegir una de estas dos estrategias para base de datos:
 
-| Estrategia | Variable | Ideal para |
-|-----------|----------|------------|
-| Base local persistente | `file:./data/app.db` + volumen en `/app/data` | Inicio, carga moderada |
-| Turso remoto | `libsql://...` + `TURSO_AUTH_TOKEN` | Produccion, separar app y DB |
+| Estrategia             | Variable                                      | Ideal para                   |
+| ---------------------- | --------------------------------------------- | ---------------------------- |
+| Base local persistente | `file:./data/app.db` + volumen en `/app/data` | Inicio, carga moderada       |
+| Turso remoto           | `libsql://...` + `TURSO_AUTH_TOKEN`           | Produccion, separar app y DB |
 
 ### 11.2 Dockerfile recomendado
 

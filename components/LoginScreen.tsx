@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Lock, ArrowRight, BrainCircuit, AlertCircle, Zap, Globe, Shield } from './Icons';
 
@@ -34,7 +33,10 @@ const ParticleField: React.FC = () => {
   }, []);
 
   return (
-    <svg className="absolute inset-0 w-full h-full z-0 opacity-40" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      className="absolute inset-0 w-full h-full z-0 opacity-40"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       {particles.map((p, i) => (
         <circle
           key={i}
@@ -51,8 +53,10 @@ const ParticleField: React.FC = () => {
         return (
           <line
             key={`l-${i}`}
-            x1={`${p.cx}%`} y1={`${p.cy}%`}
-            x2={`${next.cx}%`} y2={`${next.cy}%`}
+            x1={`${p.cx}%`}
+            y1={`${p.cy}%`}
+            x2={`${next.cx}%`}
+            y2={`${next.cy}%`}
             stroke="rgba(99,210,255,0.12)"
             strokeWidth="0.5"
           />
@@ -63,7 +67,13 @@ const ParticleField: React.FC = () => {
 };
 
 /* ── Floating hexagon shapes ──────────────────────── */
-const Hexagon: React.FC<{ size: number; x: string; y: string; delay: number; opacity: number }> = ({ size, x, y, delay, opacity }) => (
+const Hexagon: React.FC<{ size: number; x: string; y: string; delay: number; opacity: number }> = ({
+  size,
+  x,
+  y,
+  delay,
+  opacity,
+}) => (
   <svg
     className="absolute animate-hex-float"
     style={{ left: x, top: y, animationDelay: `${delay}s`, width: size, height: size }}
@@ -119,11 +129,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   return (
     <div className="flex h-screen w-full bg-white dark:bg-slate-900 overflow-hidden">
-
       {/* ───── Left Side – Form ───── */}
       <div className="w-full lg:w-[45%] flex flex-col justify-center items-center p-8 lg:p-12 relative z-10">
         <div className="w-full max-w-md space-y-8 animate-in slide-in-from-left duration-700">
-
           <div className="mb-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-semibold uppercase tracking-wide mb-4 border border-indigo-100 dark:border-indigo-800">
               <BrainCircuit className="w-3 h-3" />
@@ -145,7 +153,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email Corporativo</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Email Corporativo
+              </label>
               <input
                 type="email"
                 value={email}
@@ -157,7 +167,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contraseña</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Contraseña
+              </label>
               <div className="relative">
                 <input
                   type="password"
@@ -178,14 +190,32 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <svg
+                    className="animate-spin h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Verificando...
                 </span>
               ) : (
-                <>Acceder a Plataforma <ArrowRight className="w-5 h-5" /></>
+                <>
+                  Acceder a Plataforma <ArrowRight className="w-5 h-5" />
+                </>
               )}
             </button>
           </form>
@@ -198,7 +228,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
       {/* ───── Right Side – Futuristic Visual ───── */}
       <div className="hidden lg:flex w-[55%] relative items-center justify-center overflow-hidden bg-black">
-
         {/* Deep gradient base */}
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-black to-slate-950" />
 
@@ -222,7 +251,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         <div
           className="absolute left-0 right-0 h-px z-20 animate-scan"
           style={{
-            background: 'linear-gradient(90deg, transparent, rgba(6,182,212,0.8) 30%, rgba(6,182,212,1) 50%, rgba(6,182,212,0.8) 70%, transparent)',
+            background:
+              'linear-gradient(90deg, transparent, rgba(6,182,212,0.8) 30%, rgba(6,182,212,1) 50%, rgba(6,182,212,0.8) 70%, transparent)',
             boxShadow: '0 0 20px 3px rgba(6,182,212,0.5)',
           }}
         />
@@ -236,7 +266,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
         {/* ── Central Orb with orbiting rings ── */}
         <div className="relative z-10 flex flex-col items-center">
-
           {/* Orbiting ring system */}
           <div className="relative w-56 h-56 flex items-center justify-center mb-8">
             {/* Outer ring */}
@@ -250,10 +279,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
             {/* Middle ring */}
             <div className="absolute inset-6 rounded-full border border-indigo-400/25 animate-orbit-reverse" />
-            <div
-              className="absolute animate-orbit-reverse"
-              style={{ inset: '24px' }}
-            >
+            <div className="absolute animate-orbit-reverse" style={{ inset: '24px' }}>
               <div className="absolute -bottom-1 right-0 w-2 h-2 bg-violet-400 rounded-full shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
             </div>
 
@@ -284,7 +310,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               <div key={stat.label} className="text-center">
                 <div className="flex items-center justify-center gap-1 text-cyan-400 mb-1">
                   {stat.icon}
-                  <span className="text-xs uppercase tracking-wider text-cyan-400/60">{stat.label}</span>
+                  <span className="text-xs uppercase tracking-wider text-cyan-400/60">
+                    {stat.label}
+                  </span>
                 </div>
                 <span className="text-white text-lg font-bold font-mono">{stat.value}</span>
               </div>
@@ -306,7 +334,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             {/* Animated log lines */}
             <div className="space-y-2 font-mono text-xs">
               {terminalMessages.slice(0, msgIndex).map((msg, i) => (
-                <div key={i} className="text-cyan-600/50 truncate">{msg}</div>
+                <div key={i} className="text-cyan-600/50 truncate">
+                  {msg}
+                </div>
               ))}
               <div className="text-cyan-300 flex">
                 <span>{displayText}</span>
@@ -332,7 +362,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         <div className="absolute bottom-8 right-8 w-16 h-16 border-r-2 border-b-2 border-indigo-500/30 rounded-br-lg" />
 
         {/* Subtle vignette */}
-        <div className="absolute inset-0 pointer-events-none z-30" style={{ background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%)' }} />
+        <div
+          className="absolute inset-0 pointer-events-none z-30"
+          style={{
+            background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%)',
+          }}
+        />
       </div>
     </div>
   );

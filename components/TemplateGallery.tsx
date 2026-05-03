@@ -1,7 +1,17 @@
-
 import React from 'react';
 import { AgentType } from '../types';
-import { ArrowRight, BrainCircuit, CheckCircle, FileText, FileWarning, Lock, Package, Shield, Upload, Zap } from './Icons';
+import {
+  ArrowRight,
+  BrainCircuit,
+  CheckCircle,
+  FileText,
+  FileWarning,
+  Lock,
+  Package,
+  Shield,
+  Upload,
+  Zap,
+} from './Icons';
 
 interface TemplateGalleryProps {
   onSelectFiles: (files: File[], format: AgentType) => void;
@@ -10,7 +20,8 @@ interface TemplateGalleryProps {
 const ACTIVE_AGENT = {
   id: 'AGENT_GENERIC_A' as AgentType,
   name: 'Agente Factura General',
-  description: 'Procesa facturas comerciales estándar, valida totales y prepara los datos para revisión operativa.',
+  description:
+    'Procesa facturas comerciales estándar, valida totales y prepara los datos para revisión operativa.',
   tags: ['PDF', 'Factura comercial', 'Validación IA'],
 };
 
@@ -47,9 +58,12 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
             <BrainCircuit className="h-3.5 w-3.5" />
             Agentes IA
           </div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Procesamiento inteligente de facturas</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Procesamiento inteligente de facturas
+          </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Carga uno o varios PDFs y el agente general se encarga de extraer, validar y preparar la información para revisión.
+            Carga uno o varios PDFs y el agente general se encarga de extraer, validar y preparar la
+            información para revisión.
           </p>
         </div>
 
@@ -68,8 +82,12 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
                   <FileText className="h-7 w-7" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{ACTIVE_AGENT.name}</h3>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{ACTIVE_AGENT.description}</p>
+                  <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    {ACTIVE_AGENT.name}
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {ACTIVE_AGENT.description}
+                  </p>
                 </div>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
@@ -83,7 +101,9 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
               <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-cyan-600 shadow-sm ring-1 ring-cyan-100 transition-transform group-hover:-translate-y-1 dark:bg-slate-950 dark:text-cyan-300 dark:ring-cyan-500/20">
                 <Upload className="h-8 w-8" />
               </div>
-              <div className="text-xl font-bold text-slate-900 dark:text-white">Seleccionar PDFs para procesar</div>
+              <div className="text-xl font-bold text-slate-900 dark:text-white">
+                Seleccionar PDFs para procesar
+              </div>
               <p className="mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
                 Haz clic aquí o arrastra el lote de facturas en PDF.
               </p>
@@ -102,7 +122,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
 
             <div className="mt-5 flex flex-wrap gap-2">
               {ACTIVE_AGENT.tags.map((tag) => (
-                <span key={tag} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <span
+                  key={tag}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                >
                   {tag}
                 </span>
               ))}
@@ -115,16 +138,31 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
                 <BrainCircuit className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Flujo operativo</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Carga, extracción y revisión.</p>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Flujo operativo
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Carga, extracción y revisión.
+                </p>
               </div>
             </div>
 
             <div className="space-y-3">
-              {['Recibe PDFs del operador', 'Extrae datos estructurados', 'Envía resultados al historial'].map((step, index) => (
-                <div key={step} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-xs font-bold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">{index + 1}</div>
-                  <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{step}</span>
+              {[
+                'Recibe PDFs del operador',
+                'Extrae datos estructurados',
+                'Envía resultados al historial',
+              ].map((step, index) => (
+                <div
+                  key={step}
+                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70"
+                >
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-xs font-bold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+                    {index + 1}
+                  </div>
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    {step}
+                  </span>
                 </div>
               ))}
             </div>
@@ -136,7 +174,9 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Agentes futuros</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Tipos de procesamiento reservados para próximas etapas.</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Tipos de procesamiento reservados para próximas etapas.
+            </p>
           </div>
         </div>
 
@@ -145,7 +185,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
             const Icon = agent.icon;
 
             return (
-              <div key={agent.name} className="relative overflow-hidden rounded-[22px] border border-slate-200 bg-white/70 p-5 opacity-75 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+              <div
+                key={agent.name}
+                className="relative overflow-hidden rounded-[22px] border border-slate-200 bg-white/70 p-5 opacity-75 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+              >
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                     <Icon className="h-5 w-5" />
@@ -156,8 +199,13 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelectFiles }) => {
                   </div>
                 </div>
                 <h4 className="font-bold text-slate-700 dark:text-slate-200">{agent.name}</h4>
-                <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-500 dark:text-slate-400">{agent.description}</p>
-                <button disabled className="mt-5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-400 dark:border-slate-700 dark:bg-slate-800/70">
+                <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {agent.description}
+                </p>
+                <button
+                  disabled
+                  className="mt-5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-400 dark:border-slate-700 dark:bg-slate-800/70"
+                >
                   Próximamente
                 </button>
               </div>

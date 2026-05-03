@@ -10,7 +10,7 @@ import { createClient, type Client } from '@libsql/client';
 let _client: Client | null = null;
 
 export interface DbConfig {
-  url: string;       // "file:./data/smart-invoice.db" o "libsql://tu-db.turso.io"
+  url: string; // "file:./data/smart-invoice.db" o "libsql://tu-db.turso.io"
   authToken?: string; // Solo para Turso remoto
 }
 

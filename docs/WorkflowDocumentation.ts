@@ -1,4 +1,3 @@
-
 export const WORKFLOW_DOCS = `
 # Documentación del Flujo de Trabajo (Workflow Logic)
 

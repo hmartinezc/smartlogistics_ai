@@ -87,7 +87,11 @@ export const canAccessAppState = (user: User | null, target: AppState): boolean 
   return canRoleAccessAppState(user.role, target);
 };
 
-export const canAccessAgency = (user: User | null, agencyId: string, agencies: Agency[]): boolean => {
+export const canAccessAgency = (
+  user: User | null,
+  agencyId: string,
+  agencies: Agency[],
+): boolean => {
   if (!user || !agencyId) {
     return false;
   }
@@ -101,7 +105,7 @@ export const canAccessAgency = (user: User | null, agencyId: string, agencies: A
   }
 
   return agencies.some(
-    (agency) => agency.id === agencyId && agency.isActive && user.agencyIds.includes(agency.id)
+    (agency) => agency.id === agencyId && agency.isActive && user.agencyIds.includes(agency.id),
   );
 };
 
@@ -109,10 +113,12 @@ export const authenticateUser = (
   users: User[],
   agencies: Agency[],
   email: string,
-  password: string
+  password: string,
 ): AuthResult => {
   const user = users.find(
-    (candidate) => candidate.email.toLowerCase() === email.toLowerCase().trim() && candidate.password === password
+    (candidate) =>
+      candidate.email.toLowerCase() === email.toLowerCase().trim() &&
+      candidate.password === password,
   );
 
   if (!user) {

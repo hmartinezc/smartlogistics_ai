@@ -59,7 +59,7 @@ auth.post('/login', async (c) => {
     sql: 'SELECT agency_id FROM user_agencies WHERE user_id = ?',
     args: [String(row.id)],
   });
-  const agencyIds = agencyRows.rows.map(r => String(r.agency_id));
+  const agencyIds = agencyRows.rows.map((r) => String(r.agency_id));
 
   // Crear sesión (8 horas)
   const sessionId = crypto.randomUUID();
@@ -111,7 +111,7 @@ auth.get('/session', async (c) => {
     sql: 'SELECT agency_id FROM user_agencies WHERE user_id = ?',
     args: [String(row.uid)],
   });
-  const agencyIds = agencyRows.rows.map(r => String(r.agency_id));
+  const agencyIds = agencyRows.rows.map((r) => String(r.agency_id));
 
   return c.json({
     session: {

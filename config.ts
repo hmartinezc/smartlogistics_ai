@@ -22,26 +22,26 @@ export const AI_CONFIG = {
 // Planes de Suscripción
 // --------------------------
 export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
-  { 
-    id: 'PLAN_BASIC', 
-    name: 'Starter (5k)', 
-    limit: 5000, 
-    baseCost: 525, 
-    extraPageCost: 0.06 
+  {
+    id: 'PLAN_BASIC',
+    name: 'Starter (5k)',
+    limit: 5000,
+    baseCost: 525,
+    extraPageCost: 0.06,
   },
-  { 
-    id: 'PLAN_PRO', 
-    name: 'Growth (8k)', 
-    limit: 8000, 
-    baseCost: 600, 
-    extraPageCost: 0.05 
+  {
+    id: 'PLAN_PRO',
+    name: 'Growth (8k)',
+    limit: 8000,
+    baseCost: 600,
+    extraPageCost: 0.05,
   },
-  { 
-    id: 'PLAN_ENTERPRISE', 
-    name: 'Scale (15k)', 
-    limit: 15000, 
-    baseCost: 799, 
-    extraPageCost: 0.05 
+  {
+    id: 'PLAN_ENTERPRISE',
+    name: 'Scale (15k)',
+    limit: 15000,
+    baseCost: 799,
+    extraPageCost: 0.05,
   },
 ] as const;
 
@@ -49,59 +49,59 @@ export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
 // Datos Mock Iniciales / Credenciales seed de desarrollo local
 // --------------------------
 export const INITIAL_AGENCIES: Agency[] = [
-  { 
-    id: 'AGENCY_HQ', 
-    name: 'SmartLogistics HQ', 
-    emails: ['billing@smartlogistics.com', 'admin@smartlogistics.com'], 
-    planId: 'PLAN_ENTERPRISE', 
-    currentUsage: 4500, 
-    isActive: true 
+  {
+    id: 'AGENCY_HQ',
+    name: 'SmartLogistics HQ',
+    emails: ['billing@smartlogistics.com', 'admin@smartlogistics.com'],
+    planId: 'PLAN_ENTERPRISE',
+    currentUsage: 4500,
+    isActive: true,
   },
-  { 
-    id: 'AGENCY_CLIENT_A', 
-    name: 'Flores Del Valle', 
-    emails: ['finanzas@floresdelvalle.com'], 
-    planId: 'PLAN_BASIC', 
-    currentUsage: 4950, 
-    isActive: true 
+  {
+    id: 'AGENCY_CLIENT_A',
+    name: 'Flores Del Valle',
+    emails: ['finanzas@floresdelvalle.com'],
+    planId: 'PLAN_BASIC',
+    currentUsage: 4950,
+    isActive: true,
   },
-  { 
-    id: 'AGENCY_CLIENT_B', 
-    name: 'Cargo Express', 
-    emails: ['pagos@cargoexpress.net'], 
-    planId: 'PLAN_PRO', 
-    currentUsage: 8200, 
-    isActive: true 
+  {
+    id: 'AGENCY_CLIENT_B',
+    name: 'Cargo Express',
+    emails: ['pagos@cargoexpress.net'],
+    planId: 'PLAN_PRO',
+    currentUsage: 8200,
+    isActive: true,
   },
 ];
 
 export const INITIAL_USERS: User[] = [
-  { 
-    id: '1', 
-    name: 'System Admin', 
-    email: 'admin@smart.com', 
-    password: '1234', 
-    role: 'ADMIN', 
-    agencyIds: ['AGENCY_HQ'], 
-    isActive: true 
+  {
+    id: '1',
+    name: 'System Admin',
+    email: 'admin@smart.com',
+    password: '1234',
+    role: 'ADMIN',
+    agencyIds: ['AGENCY_HQ'],
+    isActive: true,
   },
-  { 
-    id: '2', 
-    name: 'Operador Logística', 
-    email: 'operador@smart.com', 
-    password: '1234', 
-    role: 'OPERADOR', 
-    agencyIds: ['AGENCY_CLIENT_A'], 
-    isActive: true 
+  {
+    id: '2',
+    name: 'Operador Logística',
+    email: 'operador@smart.com',
+    password: '1234',
+    role: 'OPERADOR',
+    agencyIds: ['AGENCY_CLIENT_A'],
+    isActive: true,
   },
-  { 
-    id: '3', 
-    name: 'Supervisor Turno', 
-    email: 'supervisor@smart.com', 
-    password: '1234', 
-    role: 'SUPERVISOR', 
-    agencyIds: ['AGENCY_CLIENT_B', 'AGENCY_CLIENT_A'], 
-    isActive: true 
+  {
+    id: '3',
+    name: 'Supervisor Turno',
+    email: 'supervisor@smart.com',
+    password: '1234',
+    role: 'SUPERVISOR',
+    agencyIds: ['AGENCY_CLIENT_B', 'AGENCY_CLIENT_A'],
+    isActive: true,
   },
 ];
 
@@ -109,19 +109,31 @@ export const INITIAL_USERS: User[] = [
 // Configuración de Box Types (Logística Flores)
 // --------------------------
 export const BOX_TYPE_FACTORS: Record<string, number> = {
-  FB: 1.00,    // Full Box
-  HB: 0.50,    // Half Box
-  QB: 0.25,    // Quarter Box
-  EB: 0.125,   // Eighth Box
-  DS: 0.0625,  // Dieciseisavo / Split
+  FB: 1.0, // Full Box
+  HB: 0.5, // Half Box
+  QB: 0.25, // Quarter Box
+  EB: 0.125, // Eighth Box
+  DS: 0.0625, // Dieciseisavo / Split
 } as const;
 
 export const BOX_TYPE_ALIASES: Record<string, string> = {
-  F: 'FB', FX: 'FB', PL: 'FB', P: 'FB', FULL: 'FB',
-  H: 'HB', '1/2': 'HB', HALF: 'HB',
-  Q: 'QB', '1/4': 'QB', QUARTER: 'QB',
-  E: 'EB', '1/8': 'EB', OCTAVO: 'EB',
-  D: 'DS', '1/16': 'DS', SPLIT: 'DS',
+  F: 'FB',
+  FX: 'FB',
+  PL: 'FB',
+  P: 'FB',
+  FULL: 'FB',
+  H: 'HB',
+  '1/2': 'HB',
+  HALF: 'HB',
+  Q: 'QB',
+  '1/4': 'QB',
+  QUARTER: 'QB',
+  E: 'EB',
+  '1/8': 'EB',
+  OCTAVO: 'EB',
+  D: 'DS',
+  '1/16': 'DS',
+  SPLIT: 'DS',
 } as const;
 
 // --------------------------

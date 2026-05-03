@@ -1,4 +1,3 @@
-
 export const VSCODE_GUIDE = `
 # Guía de Compilación e Integración (VS Code)
 

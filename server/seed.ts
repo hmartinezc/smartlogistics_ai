@@ -52,10 +52,22 @@ export async function runSeed(db: Client): Promise<void> {
 
   // ── Emails de Agencias ──
   await db.batch([
-    { sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)', args: ['AGENCY_HQ', 'billing@smartlogistics.com'] },
-    { sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)', args: ['AGENCY_HQ', 'admin@smartlogistics.com'] },
-    { sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)', args: ['AGENCY_CLIENT_A', 'finanzas@floresdelvalle.com'] },
-    { sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)', args: ['AGENCY_CLIENT_B', 'pagos@cargoexpress.net'] },
+    {
+      sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)',
+      args: ['AGENCY_HQ', 'billing@smartlogistics.com'],
+    },
+    {
+      sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)',
+      args: ['AGENCY_HQ', 'admin@smartlogistics.com'],
+    },
+    {
+      sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)',
+      args: ['AGENCY_CLIENT_A', 'finanzas@floresdelvalle.com'],
+    },
+    {
+      sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)',
+      args: ['AGENCY_CLIENT_B', 'pagos@cargoexpress.net'],
+    },
   ]);
 
   // ── Usuarios ──
@@ -70,16 +82,35 @@ export async function runSeed(db: Client): Promise<void> {
     },
     {
       sql: `INSERT INTO users (id, email, password, name, role, is_active) VALUES (?, ?, ?, ?, ?, ?)`,
-      args: ['3', 'supervisor@smart.com', hashPassword('1234'), 'Supervisor Turno', 'SUPERVISOR', 1],
+      args: [
+        '3',
+        'supervisor@smart.com',
+        hashPassword('1234'),
+        'Supervisor Turno',
+        'SUPERVISOR',
+        1,
+      ],
     },
   ]);
 
   // ── Asignaciones Usuario ↔ Agencia ──
   await db.batch([
-    { sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)', args: ['1', 'AGENCY_HQ'] },
-    { sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)', args: ['2', 'AGENCY_CLIENT_A'] },
-    { sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)', args: ['3', 'AGENCY_CLIENT_B'] },
-    { sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)', args: ['3', 'AGENCY_CLIENT_A'] },
+    {
+      sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)',
+      args: ['1', 'AGENCY_HQ'],
+    },
+    {
+      sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)',
+      args: ['2', 'AGENCY_CLIENT_A'],
+    },
+    {
+      sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)',
+      args: ['3', 'AGENCY_CLIENT_B'],
+    },
+    {
+      sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)',
+      args: ['3', 'AGENCY_CLIENT_A'],
+    },
   ]);
 
   // ── Configuración por defecto ──

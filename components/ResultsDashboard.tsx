@@ -1,11 +1,36 @@
-
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BatchItem } from '../types';
-import { CheckCircle, AlertCircle, FileText, Download, ArrowRight, Eye, Trash2, ChevronDown, Hash, Search, Package, Calendar, X, Grid, List } from './Icons';
+import {
+  CheckCircle,
+  AlertCircle,
+  FileText,
+  Download,
+  ArrowRight,
+  Eye,
+  Trash2,
+  ChevronDown,
+  Hash,
+  Search,
+  Package,
+  Calendar,
+  X,
+  Grid,
+  List,
+} from './Icons';
 import ValidationForm from './ValidationForm';
-import { getConfidenceLabel, getConfidenceLevel, downloadAsJSON, formatDate, formatCurrency } from '../utils/helpers';
-import { buildAwbExportFilename, buildBatchExportDocuments, enrichBatchItemsForExport } from '../services/productMatchService';
+import {
+  getConfidenceLabel,
+  getConfidenceLevel,
+  downloadAsJSON,
+  formatDate,
+  formatCurrency,
+} from '../utils/helpers';
+import {
+  buildAwbExportFilename,
+  buildBatchExportDocuments,
+  enrichBatchItemsForExport,
+} from '../services/productMatchService';
 import { ApiError } from '../services/apiClient';
 
 interface ResultsDashboardProps {
@@ -77,7 +102,8 @@ const toDateKey = (dateValue?: string): string => {
   return formatDateKey(date);
 };
 
-const getProcessedDateKey = (item: BatchItem): string => toDateKey(item.processedAt || item.createdAt);
+const getProcessedDateKey = (item: BatchItem): string =>
+  toDateKey(item.processedAt || item.createdAt);
 
 const getInvoiceDateKey = (item: BatchItem): string => toDateKey(item.result?.date);
 
@@ -88,7 +114,10 @@ const getGroupFieldLabel = (groupBy: GroupByKey): string => {
   return 'Sin agrupar';
 };
 
-const getGroupValue = (item: BatchItem, groupBy: GroupByKey): { id: string; label: string; fieldLabel: string } => {
+const getGroupValue = (
+  item: BatchItem,
+  groupBy: GroupByKey,
+): { id: string; label: string; fieldLabel: string } => {
   const fieldLabel = getGroupFieldLabel(groupBy);
 
   if (groupBy === 'mawb') {
@@ -103,7 +132,11 @@ const getGroupValue = (item: BatchItem, groupBy: GroupByKey): { id: string; labe
 
   if (groupBy === 'processedDate') {
     const dateKey = getProcessedDateKey(item);
-    return { id: dateKey || '__empty_processed_date', label: dateKey ? formatDate(dateKey) : 'Sin fecha procesada', fieldLabel };
+    return {
+      id: dateKey || '__empty_processed_date',
+      label: dateKey ? formatDate(dateKey) : 'Sin fecha procesada',
+      fieldLabel,
+    };
   }
 
   return { id: '__all', label: 'Sin agrupar', fieldLabel };
@@ -147,7 +180,8 @@ const hasDetailValue = (detail: HistoryTooltipDetail): boolean => {
   return true;
 };
 
-const hasTooltipDetails = (details?: HistoryTooltipDetail[]): boolean => Boolean(details?.some(hasDetailValue));
+const hasTooltipDetails = (details?: HistoryTooltipDetail[]): boolean =>
+  Boolean(details?.some(hasDetailValue));
 
 interface HistoryTooltipAnchorProps {
   tooltipTitle: string;
@@ -175,8 +209,11 @@ const HistoryTooltipAnchor: React.FC<HistoryTooltipAnchorProps> = ({
     const anchor = anchorRef.current;
     if (!anchor) return;
 
-    const overflowTarget = anchor.querySelector<HTMLElement>('[data-history-tooltip-measure]') || anchor;
-    const isOverflowing = overflowTarget.scrollWidth > overflowTarget.clientWidth + 1 || overflowTarget.scrollHeight > overflowTarget.clientHeight + 1;
+    const overflowTarget =
+      anchor.querySelector<HTMLElement>('[data-history-tooltip-measure]') || anchor;
+    const isOverflowing =
+      overflowTarget.scrollWidth > overflowTarget.clientWidth + 1 ||
+      overflowTarget.scrollHeight > overflowTarget.clientHeight + 1;
     const shouldShow = !showOnlyWhenOverflow || isOverflowing || hasTooltipDetails(details);
 
     if (!shouldShow) {
@@ -209,29 +246,38 @@ const HistoryTooltipAnchor: React.FC<HistoryTooltipAnchorProps> = ({
       }}
     >
       {children}
-      {tooltip && createPortal(
-        <div
-          role="tooltip"
-          style={{ left: tooltip.left, top: tooltip.top, width: tooltip.width }}
-          className={`pointer-events-none fixed z-[80] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs text-slate-700 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 ${tooltip.placement === 'top' ? '-translate-y-full' : ''}`}
-        >
+      {tooltip &&
+        createPortal(
           <div
-            className={`absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 ${tooltip.placement === 'top' ? '-bottom-1 border-b border-r' : '-top-1 border-l border-t'}`}
-          />
-          <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">{tooltipTitle}</p>
-          <p className="mt-0.5 whitespace-normal break-words text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100">{tooltipValue}</p>
-          {details?.filter(hasDetailValue).map((detail, index) => (
+            role="tooltip"
+            style={{ left: tooltip.left, top: tooltip.top, width: tooltip.width }}
+            className={`pointer-events-none fixed z-[80] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs text-slate-700 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 ${tooltip.placement === 'top' ? '-translate-y-full' : ''}`}
+          >
             <div
-              key={`${detail.label}-${index}`}
-              className={`mt-1.5 rounded-md px-2 py-1 ${detail.tone === 'danger' ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200' : 'bg-slate-50 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200'}`}
-            >
-              <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">{detail.label}</p>
-              <p className="mt-0.5 whitespace-normal break-words text-[11px] font-medium leading-snug">{detail.value}</p>
-            </div>
-          ))}
-        </div>,
-        document.body
-      )}
+              className={`absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 ${tooltip.placement === 'top' ? '-bottom-1 border-b border-r' : '-top-1 border-l border-t'}`}
+            />
+            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+              {tooltipTitle}
+            </p>
+            <p className="mt-0.5 whitespace-normal break-words text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100">
+              {tooltipValue}
+            </p>
+            {details?.filter(hasDetailValue).map((detail, index) => (
+              <div
+                key={`${detail.label}-${index}`}
+                className={`mt-1.5 rounded-md px-2 py-1 ${detail.tone === 'danger' ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200' : 'bg-slate-50 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200'}`}
+              >
+                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">
+                  {detail.label}
+                </p>
+                <p className="mt-0.5 whitespace-normal break-words text-[11px] font-medium leading-snug">
+                  {detail.value}
+                </p>
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
     </span>
   );
 };
@@ -253,7 +299,8 @@ const HistoryOverflowText: React.FC<HistoryOverflowTextProps> = ({
   textClassName = '',
   emptyValue = '-',
 }) => {
-  const displayValue = value === null || value === undefined || value === '' ? emptyValue : String(value);
+  const displayValue =
+    value === null || value === undefined || value === '' ? emptyValue : String(value);
   const hasUsefulTooltip = displayValue !== emptyValue || hasTooltipDetails(details);
 
   return (
@@ -275,11 +322,18 @@ const HistoryOverflowText: React.FC<HistoryOverflowTextProps> = ({
   );
 };
 
-const formatPiecesValue = (value?: number): string => typeof value === 'number' ? value.toLocaleString('es-EC') : '-';
+const formatPiecesValue = (value?: number): string =>
+  typeof value === 'number' ? value.toLocaleString('es-EC') : '-';
 
-const formatCurrencyValue = (value?: number): string => typeof value === 'number' ? formatCurrency(value) : '-';
+const formatCurrencyValue = (value?: number): string =>
+  typeof value === 'number' ? formatCurrency(value) : '-';
 
-const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, onClearHistory, onUpdateItem }) => {
+const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
+  results,
+  onBack,
+  onClearHistory,
+  onUpdateItem,
+}) => {
   const [viewingItem, setViewingItem] = useState<BatchItem | null>(null);
   const [selectedAwb, setSelectedAwb] = useState('ALL');
   const [awbSearch, setAwbSearch] = useState('');
@@ -291,12 +345,17 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
   const [hawbFilter, setHawbFilter] = useState('');
   const [groupBy, setGroupBy] = useState<GroupByKey>('none');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(
+    null,
+  );
   const [openColumnFilter, setOpenColumnFilter] = useState<ColumnFilterKey | null>(null);
   const [isAwbMenuOpen, setIsAwbMenuOpen] = useState(false);
   const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [downloadNotice, setDownloadNotice] = useState<{ tone: 'error' | 'warning' | 'success'; message: string } | null>(null);
+  const [downloadNotice, setDownloadNotice] = useState<{
+    tone: 'error' | 'warning' | 'success';
+    message: string;
+  } | null>(null);
   const awbMenuRef = useRef<HTMLDivElement | null>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const groupMenuRef = useRef<HTMLDivElement | null>(null);
@@ -311,9 +370,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     hawbFilter.trim().length > 0,
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
-  const successCount = results.filter(r => r.status === 'SUCCESS').length;
-  const errorCount = results.filter(r => r.status === 'ERROR').length;
-  const selectedGroupOption = GROUP_OPTIONS.find((option) => option.key === groupBy) || GROUP_OPTIONS[0];
+  const successCount = results.filter((r) => r.status === 'SUCCESS').length;
+  const errorCount = results.filter((r) => r.status === 'ERROR').length;
+  const selectedGroupOption =
+    GROUP_OPTIONS.find((option) => option.key === groupBy) || GROUP_OPTIONS[0];
 
   const awbCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -344,7 +404,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     return awbOptions.filter((awb) => {
       const normalizedAwb = awb.toLowerCase();
       const compactAwb = normalizedAwb.replace(/[^a-z0-9]/g, '');
-      return normalizedAwb.includes(normalizedSearch) || Boolean(compactSearch && compactAwb.includes(compactSearch));
+      return (
+        normalizedAwb.includes(normalizedSearch) ||
+        Boolean(compactSearch && compactAwb.includes(compactSearch))
+      );
     });
   }, [awbOptions, awbSearch]);
 
@@ -385,7 +448,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
         const matchesGlobalSearch = searchableValues.some((value) => {
           const normalizedValue = String(value || '').toLowerCase();
           const compactValue = normalizedValue.replace(/[^a-z0-9]/g, '');
-          return normalizedValue.includes(normalizedGlobalSearch) || Boolean(compactGlobalSearch && compactValue.includes(compactGlobalSearch));
+          return (
+            normalizedValue.includes(normalizedGlobalSearch) ||
+            Boolean(compactGlobalSearch && compactValue.includes(compactGlobalSearch))
+          );
         });
 
         if (!matchesGlobalSearch) {
@@ -401,21 +467,38 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
         return false;
       }
 
-      if (normalizedMawbFilter && !item.result?.mawb?.toLowerCase().includes(normalizedMawbFilter)) {
+      if (
+        normalizedMawbFilter &&
+        !item.result?.mawb?.toLowerCase().includes(normalizedMawbFilter)
+      ) {
         return false;
       }
 
-      if (normalizedInvoiceFilter && !item.result?.invoiceNumber?.toLowerCase().includes(normalizedInvoiceFilter)) {
+      if (
+        normalizedInvoiceFilter &&
+        !item.result?.invoiceNumber?.toLowerCase().includes(normalizedInvoiceFilter)
+      ) {
         return false;
       }
 
-      if (normalizedHawbFilter && !item.result?.hawb?.toLowerCase().includes(normalizedHawbFilter)) {
+      if (
+        normalizedHawbFilter &&
+        !item.result?.hawb?.toLowerCase().includes(normalizedHawbFilter)
+      ) {
         return false;
       }
 
       return true;
     });
-  }, [awbFilteredResults, globalSearch, hawbFilter, invoiceDateFilter, invoiceFilter, mawbFilter, processedDateFilter]);
+  }, [
+    awbFilteredResults,
+    globalSearch,
+    hawbFilter,
+    invoiceDateFilter,
+    invoiceFilter,
+    mawbFilter,
+    processedDateFilter,
+  ]);
 
   const sortedResults = useMemo(() => {
     if (!sortConfig) {
@@ -426,9 +509,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
       const leftValue = getSortValue(left, sortConfig.key);
       const rightValue = getSortValue(right, sortConfig.key);
 
-      const comparison = typeof leftValue === 'number' && typeof rightValue === 'number'
-        ? leftValue - rightValue
-        : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true });
+      const comparison =
+        typeof leftValue === 'number' && typeof rightValue === 'number'
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true });
 
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
@@ -484,10 +568,16 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
 
   const collapsedGroupCount = groupBy === 'none' ? 0 : collapsedGroupIds.size;
   const hasCollapsedGroups = collapsedGroupCount > 0;
-  const allGroupsCollapsed = groupedResults.length > 0 && collapsedGroupCount === groupedResults.length;
+  const allGroupsCollapsed =
+    groupedResults.length > 0 && collapsedGroupCount === groupedResults.length;
 
-  const filteredSuccessResults = awbFilteredResults.filter((item) => item.status === 'SUCCESS' && item.result);
-  const filteredPiecesCount = filteredResults.reduce((total, item) => total + (Number(item.result?.totalPieces) || 0), 0);
+  const filteredSuccessResults = awbFilteredResults.filter(
+    (item) => item.status === 'SUCCESS' && item.result,
+  );
+  const filteredPiecesCount = filteredResults.reduce(
+    (total, item) => total + (Number(item.result?.totalPieces) || 0),
+    0,
+  );
   const selectedAwbLabel = selectedAwb === 'ALL' ? 'Selecciona MAWB' : selectedAwb;
   const isSearchingAwb = awbSearch.trim().length > 0;
 
@@ -577,7 +667,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
 
   useEffect(() => {
     if (groupBy === 'none') {
-      setCollapsedGroupIds((current) => current.size === 0 ? current : new Set());
+      setCollapsedGroupIds((current) => (current.size === 0 ? current : new Set()));
       return;
     }
 
@@ -641,7 +731,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     filterKey: ColumnFilterKey,
     isActive: boolean,
     title: string,
-    icon: 'calendar' | 'hash' | 'search' = 'search'
+    icon: 'calendar' | 'hash' | 'search' = 'search',
   ) => {
     const FilterIcon = icon === 'calendar' ? Calendar : icon === 'hash' ? Hash : Search;
 
@@ -654,7 +744,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
           onClick={() => {
             setIsAwbMenuOpen(false);
             setIsGroupMenuOpen(false);
-            setOpenColumnFilter((current) => current === filterKey ? null : filterKey);
+            setOpenColumnFilter((current) => (current === filterKey ? null : filterKey));
           }}
           className={`inline-flex h-6 w-6 items-center justify-center rounded-md border transition-colors ${isActive ? 'border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300' : 'border-transparent text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-600 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}
         >
@@ -668,7 +758,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     filterKey: ColumnFilterKey,
     title: string,
     children: React.ReactNode,
-    align: 'left' | 'right' = 'left'
+    align: 'left' | 'right' = 'left',
   ) => {
     if (openColumnFilter !== filterKey) {
       return null;
@@ -681,11 +771,11 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
         className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full z-30 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-2xl shadow-slate-200/70 normal-case dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40 sm:w-72`}
       >
         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">{title}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+            {title}
+          </p>
         </div>
-        <div className="p-3">
-          {children}
-        </div>
+        <div className="p-3">{children}</div>
       </div>
     );
   };
@@ -696,70 +786,81 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     value: string,
     onChange: (value: string) => void,
     placeholder: string,
-    align: 'left' | 'right' = 'left'
-  ) => renderFilterPanel(
-    filterKey,
-    title,
-    <>
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          autoFocus
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-        />
-      </div>
-      {value.trim().length > 0 && (
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-        >
-          <X className="h-3.5 w-3.5" />
-          Limpiar
-        </button>
-      )}
-    </>,
-    align
-  );
+    align: 'left' | 'right' = 'left',
+  ) =>
+    renderFilterPanel(
+      filterKey,
+      title,
+      <>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            autoFocus
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={placeholder}
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+          />
+        </div>
+        {value.trim().length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpiar
+          </button>
+        )}
+      </>,
+      align,
+    );
 
   const renderDateFilterPanel = (
     filterKey: ColumnFilterKey,
     title: string,
     value: string,
-    onChange: (value: string) => void
-  ) => renderFilterPanel(
-    filterKey,
-    title,
-    <>
-      <input
-        autoFocus
-        type="date"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-shadow focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-        >
-          <X className="h-3.5 w-3.5" />
-          Limpiar
-        </button>
-      )}
-    </>
-  );
+    onChange: (value: string) => void,
+  ) =>
+    renderFilterPanel(
+      filterKey,
+      title,
+      <>
+        <input
+          autoFocus
+          type="date"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-shadow focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpiar
+          </button>
+        )}
+      </>,
+    );
 
-  const sortableHeader = (key: SortKey, label: string, className: string, filterButton?: React.ReactNode, filterPanel?: React.ReactNode) => {
+  const sortableHeader = (
+    key: SortKey,
+    label: string,
+    className: string,
+    filterButton?: React.ReactNode,
+    filterPanel?: React.ReactNode,
+  ) => {
     const isActive = sortConfig?.key === key;
     const direction = isActive ? sortConfig.direction : undefined;
 
     return (
-      <th className={`${className} relative`} aria-sort={isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <th
+        className={`${className} relative`}
+        aria-sort={isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
         <div className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
           <button
             type="button"
@@ -767,7 +868,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
             className={`inline-flex min-w-0 items-center gap-1 rounded-md text-[11px] font-bold uppercase tracking-[0.06em] transition-colors ${isActive ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100'}`}
           >
             <span className="truncate">{label}</span>
-            <ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${isActive ? 'opacity-100' : 'opacity-40'} ${direction === 'asc' ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`h-3 w-3 shrink-0 transition-transform ${isActive ? 'opacity-100' : 'opacity-40'} ${direction === 'asc' ? 'rotate-180' : ''}`}
+            />
           </button>
           {filterButton}
         </div>
@@ -776,11 +879,18 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     );
   };
 
-  const filterHeader = (label: string, className: string, filterButton: React.ReactNode, filterPanel: React.ReactNode) => {
+  const filterHeader = (
+    label: string,
+    className: string,
+    filterButton: React.ReactNode,
+    filterPanel: React.ReactNode,
+  ) => {
     return (
       <th className={`${className} relative`}>
         <div className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
-          <span className="truncate text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{label}</span>
+          <span className="truncate text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
+            {label}
+          </span>
           {filterButton}
         </div>
         {filterPanel}
@@ -822,8 +932,12 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
             className="absolute right-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-2xl shadow-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
           >
             <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Agrupar tabla</p>
-              <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">Selecciona un campo para ordenar la lectura por bloques.</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Agrupar tabla
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Selecciona un campo para ordenar la lectura por bloques.
+              </p>
             </div>
 
             <div className="space-y-1 p-2">
@@ -839,12 +953,16 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
                     onClick={() => handleSelectGroup(option.key)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
                   >
-                    <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isSelected ? 'bg-white text-indigo-600 ring-1 ring-indigo-100 dark:bg-slate-900 dark:text-indigo-300 dark:ring-indigo-500/30' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}>
+                    <span
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isSelected ? 'bg-white text-indigo-600 ring-1 ring-indigo-100 dark:bg-slate-900 dark:text-indigo-300 dark:ring-indigo-500/30' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}
+                    >
                       {renderGroupOptionIcon(option.key)}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-bold leading-tight">{option.label}</span>
-                      <span className="mt-0.5 block text-xs font-medium leading-snug text-slate-500 dark:text-slate-400">{option.description}</span>
+                      <span className="mt-0.5 block text-xs font-medium leading-snug text-slate-500 dark:text-slate-400">
+                        {option.description}
+                      </span>
                     </span>
                     {isSelected && <CheckCircle className="h-4 w-4 shrink-0 text-indigo-500" />}
                   </button>
@@ -875,7 +993,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
                   </button>
                 </div>
                 <p className="mt-2 text-center text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                  {hasCollapsedGroups ? `${collapsedGroupCount} de ${groupedResults.length} grupos colapsados` : 'Todos los grupos están expandidos'}
+                  {hasCollapsedGroups
+                    ? `${collapsedGroupCount} de ${groupedResults.length} grupos colapsados`
+                    : 'Todos los grupos están expandidos'}
                 </p>
               </div>
             )}
@@ -887,7 +1007,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
 
   const renderGroupSummaryRow = (group: HistoryGroup, isCollapsed: boolean) => (
     <tr key={`group-${group.id}`} className="bg-slate-50/95 dark:bg-slate-900/85">
-      <td colSpan={11} className="!h-auto !border-r-0 !border-slate-200 !px-0 !py-0 dark:!border-slate-700">
+      <td
+        colSpan={11}
+        className="!h-auto !border-r-0 !border-slate-200 !px-0 !py-0 dark:!border-slate-700"
+      >
         <button
           type="button"
           aria-expanded={!isCollapsed}
@@ -897,17 +1020,26 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
         >
           <div className="flex min-w-0 items-center gap-3">
             <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-500/20">
-              {group.fieldLabel === 'Fecha procesada' ? <Calendar className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
+              {group.fieldLabel === 'Fecha procesada' ? (
+                <Calendar className="h-4 w-4" />
+              ) : (
+                <Hash className="h-4 w-4" />
+              )}
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Agrupado por {group.fieldLabel}</p>
-              <p className="mt-0.5 truncate font-mono text-sm font-bold text-slate-800 dark:text-slate-100">{group.label}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                Agrupado por {group.fieldLabel}
+              </p>
+              <p className="mt-0.5 truncate font-mono text-sm font-bold text-slate-800 dark:text-slate-100">
+                {group.label}
+              </p>
             </div>
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 text-xs font-bold">
             <span className="inline-flex h-7 items-center rounded-full bg-white px-2.5 text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
-              {group.itemCount.toLocaleString('es-EC')} {group.itemCount === 1 ? 'registro' : 'registros'}
+              {group.itemCount.toLocaleString('es-EC')}{' '}
+              {group.itemCount === 1 ? 'registro' : 'registros'}
             </span>
             <span className="inline-flex h-7 items-center rounded-full bg-white px-2.5 text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
               {group.hawbCount.toLocaleString('es-EC')} HAWB
@@ -919,7 +1051,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
               {formatCurrencyValue(group.valueTotal)}
             </span>
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-400 ring-1 ring-slate-200 transition-colors group-hover:text-indigo-500 dark:bg-slate-950 dark:text-slate-500 dark:ring-slate-700 dark:group-hover:text-indigo-300">
-              <ChevronDown className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+              />
             </span>
           </div>
         </button>
@@ -932,14 +1066,23 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     const isLowConfidence = item.status === 'SUCCESS' && confidence < 75;
     const processedAt = item.processedAt || item.createdAt;
     const invoiceDate = item.result?.date?.trim();
-    const invoiceDateLabel = invoiceDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? invoiceDate : invoiceDate ? formatDate(invoiceDate) : '-';
+    const invoiceDateLabel = invoiceDate?.match(/^\d{4}-\d{2}-\d{2}$/)
+      ? invoiceDate
+      : invoiceDate
+        ? formatDate(invoiceDate)
+        : '-';
     const mawbLabel = item.result?.mawb?.trim() || '-';
     const hawbLabel = item.result?.hawb?.trim() || '-';
     const invoiceNumberLabel = item.result?.invoiceNumber?.trim() || '-';
-    const fileTooltipDetails = item.error ? [{ label: 'Error detectado', value: item.error, tone: 'danger' as const }] : undefined;
+    const fileTooltipDetails = item.error
+      ? [{ label: 'Error detectado', value: item.error, tone: 'danger' as const }]
+      : undefined;
 
     return (
-      <tr key={item.id} className={`h-14 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50 ${isLowConfidence ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+      <tr
+        key={item.id}
+        className={`h-14 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50 ${isLowConfidence ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}
+      >
         <td>
           {item.status === 'SUCCESS' ? (
             <span className="inline-flex h-6 min-w-[54px] items-center justify-center rounded-full bg-green-100 px-2 text-[11px] font-bold text-green-800 dark:bg-green-900 dark:text-green-300">
@@ -952,7 +1095,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
           )}
         </td>
         <td className="whitespace-nowrap font-medium text-slate-600 dark:text-slate-300">
-          <span className="inline-flex h-6 items-center">{processedAt ? formatDate(processedAt) : '-'}</span>
+          <span className="inline-flex h-6 items-center">
+            {processedAt ? formatDate(processedAt) : '-'}
+          </span>
         </td>
         <td className="min-w-0 font-medium text-slate-900 dark:text-white">
           <HistoryOverflowText
@@ -991,10 +1136,14 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
           />
         </td>
         <td className="whitespace-nowrap text-right font-mono font-semibold text-slate-700 dark:text-slate-200">
-          <span className="inline-flex h-6 items-center">{formatPiecesValue(item.result?.totalPieces)}</span>
+          <span className="inline-flex h-6 items-center">
+            {formatPiecesValue(item.result?.totalPieces)}
+          </span>
         </td>
         <td className="whitespace-nowrap text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-          <span className="inline-flex h-6 items-center">{formatCurrencyValue(item.result?.totalValue)}</span>
+          <span className="inline-flex h-6 items-center">
+            {formatCurrencyValue(item.result?.totalValue)}
+          </span>
         </td>
 
         <td className="text-center">
@@ -1041,7 +1190,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
     setDownloadNotice(null);
 
     try {
-      const { items: exportItems, missingMatches } = await enrichBatchItemsForExport(filteredSuccessResults);
+      const { items: exportItems, missingMatches } =
+        await enrichBatchItemsForExport(filteredSuccessResults);
       const cleanData = buildBatchExportDocuments(exportItems);
 
       downloadAsJSON(cleanData, buildAwbExportFilename(selectedAwb));
@@ -1055,12 +1205,15 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
           : {
               tone: 'success',
               message: 'Se exportó el JSON con matches aplicados sobre el catálogo vigente.',
-            }
+            },
       );
     } catch (error) {
       setDownloadNotice({
         tone: 'error',
-        message: error instanceof ApiError ? error.message : 'No fue posible enriquecer el JSON antes de descargar.',
+        message:
+          error instanceof ApiError
+            ? error.message
+            : 'No fue posible enriquecer el JSON antes de descargar.',
       });
     } finally {
       setIsExporting(false);
@@ -1068,24 +1221,24 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
   };
 
   if (viewingItem && viewingItem.result) {
-      return (
-          // Reduced padding for modal mode to fit minimalist design
-          <div className="p-4 h-full bg-slate-100 dark:bg-slate-900 overflow-hidden flex items-center justify-center">
-             <ValidationForm 
-                data={viewingItem.result} 
-                onSave={(updatedData) => {
-                    if (onUpdateItem) {
-                        onUpdateItem({
-                            ...viewingItem,
-                            result: updatedData,
-                        });
-                    }
-                    setViewingItem(null);
-                }}
-                onCancel={() => setViewingItem(null)}
-             />
-          </div>
-      );
+    return (
+      // Reduced padding for modal mode to fit minimalist design
+      <div className="p-4 h-full bg-slate-100 dark:bg-slate-900 overflow-hidden flex items-center justify-center">
+        <ValidationForm
+          data={viewingItem.result}
+          onSave={(updatedData) => {
+            if (onUpdateItem) {
+              onUpdateItem({
+                ...viewingItem,
+                result: updatedData,
+              });
+            }
+            setViewingItem(null);
+          }}
+          onCancel={() => setViewingItem(null)}
+        />
+      </div>
+    );
   }
 
   return (
@@ -1094,41 +1247,53 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4 xl:gap-6">
         <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5 xl:p-6 xl:gap-4">
           <div className="shrink-0 rounded-lg bg-indigo-100 p-2.5 text-indigo-600 dark:bg-indigo-900/50 sm:p-3">
-             <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
+            <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Archivos Acumulados</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">{results.length}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+              Archivos Acumulados
+            </p>
+            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">
+              {results.length}
+            </p>
           </div>
         </div>
 
         <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5 xl:p-6 xl:gap-4">
           <div className="shrink-0 rounded-lg bg-sky-100 p-2.5 text-sky-600 dark:bg-sky-900/50 sm:p-3">
-             <Package className="h-5 w-5 sm:h-6 sm:w-6" />
+            <Package className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Piezas filtradas</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">{filteredPiecesCount.toLocaleString('es-EC')}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+              Piezas filtradas
+            </p>
+            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">
+              {filteredPiecesCount.toLocaleString('es-EC')}
+            </p>
           </div>
         </div>
-        
+
         <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5 xl:p-6 xl:gap-4">
           <div className="shrink-0 rounded-lg bg-green-100 p-2.5 text-green-600 dark:bg-green-900/50 sm:p-3">
-             <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+            <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Total Exitosos</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">{successCount}</p>
+            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">
+              {successCount}
+            </p>
           </div>
         </div>
 
         <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5 xl:p-6 xl:gap-4">
           <div className="shrink-0 rounded-lg bg-red-100 p-2.5 text-red-600 dark:bg-red-900/50 sm:p-3">
-             <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+            <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Total Fallidos</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">{errorCount}</p>
+            <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">
+              {errorCount}
+            </p>
           </div>
         </div>
       </div>
@@ -1146,157 +1311,177 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             Mostrando {filteredResults.length} de {results.length} registros
-            {groupBy !== 'none' && ` en ${groupedResults.length} ${groupedResults.length === 1 ? 'grupo' : 'grupos'} por ${selectedGroupOption.label}`}
+            {groupBy !== 'none' &&
+              ` en ${groupedResults.length} ${groupedResults.length === 1 ? 'grupo' : 'grupos'} por ${selectedGroupOption.label}`}
           </p>
         </div>
 
-         <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
-            <div className="relative w-full sm:w-64 lg:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="search"
-                value={globalSearch}
-                onChange={(event) => setGlobalSearch(event.target.value)}
-                aria-label="Buscar en historial"
-                placeholder="Buscar archivo, MAWB, HAWB..."
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-9 text-sm font-medium text-slate-700 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
+          <div className="relative w-full sm:w-64 lg:w-72">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={globalSearch}
+              onChange={(event) => setGlobalSearch(event.target.value)}
+              aria-label="Buscar en historial"
+              placeholder="Buscar archivo, MAWB, HAWB..."
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-9 text-sm font-medium text-slate-700 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            />
+            {globalSearch.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={() => setGlobalSearch('')}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="relative" ref={awbMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setOpenColumnFilter(null);
+                setIsGroupMenuOpen(false);
+                setIsAwbMenuOpen((current) => !current);
+              }}
+              className="group flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left shadow-sm transition-colors hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-500/50 dark:hover:bg-slate-900/70 sm:w-[260px] xl:w-[220px]"
+              aria-haspopup="listbox"
+              aria-expanded={isAwbMenuOpen}
+            >
+              <Hash className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-300" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-slate-400 dark:text-slate-500">
+                  MAWB JSON
+                </p>
+                <p className="mt-0.5 truncate text-sm font-semibold leading-tight text-slate-800 dark:text-white">
+                  {selectedAwbLabel}
+                </p>
+              </div>
+              {selectedAwb !== 'ALL' && (
+                <span
+                  className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+                  aria-label="Registros con esta MAWB"
+                >
+                  {awbCounts.get(selectedAwb) || 0}
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isAwbMenuOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-slate-600 dark:group-hover:text-slate-200'}`}
               />
-              {globalSearch.trim().length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setGlobalSearch('')}
-                  aria-label="Limpiar búsqueda"
-                  className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            <div className="relative" ref={awbMenuRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenColumnFilter(null);
-                  setIsGroupMenuOpen(false);
-                  setIsAwbMenuOpen((current) => !current);
-                }}
-                className="group flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left shadow-sm transition-colors hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-500/50 dark:hover:bg-slate-900/70 sm:w-[260px] xl:w-[220px]"
-                aria-haspopup="listbox"
-                aria-expanded={isAwbMenuOpen}
-              >
-                <Hash className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-300" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-slate-400 dark:text-slate-500">MAWB JSON</p>
-                  <p className="mt-0.5 truncate text-sm font-semibold leading-tight text-slate-800 dark:text-white">{selectedAwbLabel}</p>
-                </div>
-                {selectedAwb !== 'ALL' && (
-                  <span
-                    className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300"
-                    aria-label="Registros con esta MAWB"
-                  >
-                    {awbCounts.get(selectedAwb) || 0}
-                  </span>
-                )}
-                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isAwbMenuOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
-              </button>
+            </button>
 
-              {isAwbMenuOpen && (
-                <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40 sm:left-auto sm:right-0 sm:w-80">
-                  <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Seleccionar MAWB para JSON</p>
-                    <div className="relative mt-3">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        ref={awbSearchInputRef}
-                        value={awbSearch}
-                        onChange={(event) => setAwbSearch(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' && filteredAwbOptions.length === 1) {
-                            handleSelectAwb(filteredAwbOptions[0]);
-                          }
-                        }}
-                        placeholder="Buscar MAWB..."
-                        className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                      />
-                    </div>
+            {isAwbMenuOpen && (
+              <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40 sm:left-auto sm:right-0 sm:w-80">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                    Seleccionar MAWB para JSON
+                  </p>
+                  <div className="relative mt-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      ref={awbSearchInputRef}
+                      value={awbSearch}
+                      onChange={(event) => setAwbSearch(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && filteredAwbOptions.length === 1) {
+                          handleSelectAwb(filteredAwbOptions[0]);
+                        }
+                      }}
+                      placeholder="Buscar MAWB..."
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                    />
                   </div>
+                </div>
 
-                  <div className="max-h-72 space-y-1 overflow-auto p-2">
-                    {!isSearchingAwb && (
+                <div className="max-h-72 space-y-1 overflow-auto p-2">
+                  {!isSearchingAwb && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAwb('ALL')}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors ${selectedAwb === 'ALL' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                    >
+                      <span className="text-sm font-semibold">Sin MAWB seleccionada</span>
+                    </button>
+                  )}
+
+                  {filteredAwbOptions.map((awb) => {
+                    const isSelected = selectedAwb === awb;
+
+                    return (
                       <button
+                        key={awb}
                         type="button"
-                        onClick={() => handleSelectAwb('ALL')}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors ${selectedAwb === 'ALL' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                        onClick={() => handleSelectAwb(awb)}
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
                       >
-                        <span className="text-sm font-semibold">Sin MAWB seleccionada</span>
+                        <span className="truncate font-mono text-sm font-semibold">{awb}</span>
                       </button>
-                    )}
+                    );
+                  })}
 
-                    {filteredAwbOptions.map((awb) => {
-                      const isSelected = selectedAwb === awb;
-
-                      return (
-                        <button
-                          key={awb}
-                          type="button"
-                          onClick={() => handleSelectAwb(awb)}
-                          className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
-                        >
-                          <span className="truncate font-mono text-sm font-semibold">{awb}</span>
-                        </button>
-                      );
-                    })}
-
-                    {filteredAwbOptions.length === 0 && (
-                      <div className="px-3 py-6 text-center text-sm text-slate-400 dark:text-slate-500">
-                        No hay MAWB que coincidan.
-                      </div>
-                    )}
-                  </div>
+                  {filteredAwbOptions.length === 0 && (
+                    <div className="px-3 py-6 text-center text-sm text-slate-400 dark:text-slate-500">
+                      No hay MAWB que coincidan.
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
 
-            {hasActiveFilters && (
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 sm:justify-start"
+            >
+              <X className="w-4 h-4" />
+              Limpiar filtros
+            </button>
+          )}
+          {results.length > 0 && onClearHistory && (
+            <HistoryTooltipAnchor
+              tooltipTitle="Acción"
+              tooltipValue="Limpiar historial"
+              className="inline-flex"
+            >
               <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 sm:justify-start"
+                onClick={onClearHistory}
+                aria-label="Limpiar historial"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
               >
-                <X className="w-4 h-4" />
-                Limpiar filtros
+                <Trash2 className="w-5 h-5" />
               </button>
-            )}
-            {results.length > 0 && onClearHistory && (
-              <HistoryTooltipAnchor tooltipTitle="Acción" tooltipValue="Limpiar historial" className="inline-flex">
-                <button 
-                  onClick={onClearHistory}
-                  aria-label="Limpiar historial"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </HistoryTooltipAnchor>
-            )}
-            <button 
-              onClick={onBack}
-              className="flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-               Procesar más
-               <ArrowRight className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => void handleDownloadAll()}
-              disabled={selectedAwb === 'ALL' || filteredSuccessResults.length === 0 || isExporting}
-              className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Download className="w-4 h-4" /> {isExporting ? 'Exportando...' : selectedAwb === 'ALL' ? 'Selecciona MAWB' : 'Exportar MAWB'}
-            </button>
-         </div>
+            </HistoryTooltipAnchor>
+          )}
+          <button
+            onClick={onBack}
+            className="flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            Procesar más
+            <ArrowRight className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => void handleDownloadAll()}
+            disabled={selectedAwb === 'ALL' || filteredSuccessResults.length === 0 || isExporting}
+            className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />{' '}
+            {isExporting
+              ? 'Exportando...'
+              : selectedAwb === 'ALL'
+                ? 'Selecciona MAWB'
+                : 'Exportar MAWB'}
+          </button>
+        </div>
       </div>
 
       {downloadNotice && (
-        <div className={`rounded-xl border px-4 py-3 text-sm ${downloadNotice.tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200' : downloadNotice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'}`}>
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${downloadNotice.tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200' : downloadNotice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'}`}
+        >
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{downloadNotice.message}</span>
@@ -1307,92 +1492,133 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results, onBack, on
       {/* Results Table */}
       <div className="flex min-h-[320px] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
-           {results.length === 0 ? (
-             <div className="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400 sm:p-12">
-                <FileText className="w-12 h-12 mb-4 opacity-20" />
-                <p>No hay facturas procesadas en esta sesión.</p>
-             </div>
-           ) : filteredResults.length === 0 ? (
-             <div className="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400 sm:p-12">
-               <FileText className="w-12 h-12 mb-4 opacity-20" />
-               <p>No hay resultados para los filtros aplicados.</p>
-             </div>
+          {results.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400 sm:p-12">
+              <FileText className="w-12 h-12 mb-4 opacity-20" />
+              <p>No hay facturas procesadas en esta sesión.</p>
+            </div>
+          ) : filteredResults.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400 sm:p-12">
+              <FileText className="w-12 h-12 mb-4 opacity-20" />
+              <p>No hay resultados para los filtros aplicados.</p>
+            </div>
           ) : (
-          <table className="w-full min-w-[1120px] table-fixed border-collapse text-left text-[13px] leading-5">
-            <colgroup>
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-            </colgroup>
-            <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 backdrop-blur text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-400">
-              <tr className="[&>th]:h-12 [&>th]:px-3 [&>th]:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.06em] [&>th]:align-middle [&>th]:border-r [&>th]:border-slate-200/70 dark:[&>th]:border-slate-700/60 [&>th:last-child]:border-r-0">
-                <th>Estado</th>
-                {sortableHeader(
-                  'processedAt',
-                  'Procesado',
-                  'relative',
-                  renderFilterButton('processedDate', processedDateFilter.length > 0, 'Filtrar fecha procesada', 'calendar'),
-                  renderDateFilterPanel('processedDate', 'Fecha procesada', processedDateFilter, setProcessedDateFilter)
-                )}
-                <th>Archivo</th>
-                {sortableHeader(
-                  'invoiceDate',
-                  'Factura',
-                  'relative',
-                  renderFilterButton('invoiceDate', invoiceDateFilter.length > 0, 'Filtrar fecha de factura', 'calendar'),
-                  renderDateFilterPanel('invoiceDate', 'Fecha de factura', invoiceDateFilter, setInvoiceDateFilter)
-                )}
-                {sortableHeader(
-                  'mawb',
-                  'MAWB',
-                  'relative',
-                  renderFilterButton('mawb', mawbFilter.trim().length > 0, 'Filtrar MAWB'),
-                  renderTextFilterPanel('mawb', 'Filtrar MAWB', mawbFilter, setMawbFilter, 'Número MAWB')
-                )}
-                {filterHeader(
-                  'HAWB',
-                  'relative',
-                  renderFilterButton('hawb', hawbFilter.trim().length > 0, 'Filtrar HAWB'),
-                  renderTextFilterPanel('hawb', 'Filtrar HAWB', hawbFilter, setHawbFilter, 'Número HAWB')
-                )}
-                {filterHeader(
-                  'Invoice #',
-                  'relative',
-                  renderFilterButton('invoiceNumber', invoiceFilter.trim().length > 0, 'Filtrar invoice'),
-                  renderTextFilterPanel('invoiceNumber', 'Filtrar invoice', invoiceFilter, setInvoiceFilter, 'Número de invoice', 'right')
-                )}
-                <th className="text-right">Piezas</th>
-                <th className="text-right">Valor</th>
-                <th className="text-center">Fiabilidad</th>
-                <th className="text-center">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <span>Acción</span>
-                    {renderGroupHeaderControl()}
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-[13px] dark:divide-slate-800 [&>tr>td]:h-14 [&>tr>td]:px-3 [&>tr>td]:align-middle [&>tr>td]:border-r [&>tr>td]:border-slate-100/80 dark:[&>tr>td]:border-slate-800/70 [&>tr>td:last-child]:border-r-0">
-              {groupBy === 'none' ? (
-                sortedResults.map(renderResultRow)
-              ) : (
-                groupedResults.map((group) => (
-                  <React.Fragment key={group.id}>
-                    {renderGroupSummaryRow(group, collapsedGroupIds.has(group.id))}
-                    {!collapsedGroupIds.has(group.id) && group.items.map(renderResultRow)}
-                  </React.Fragment>
-                ))
-              )}
-            </tbody>
-          </table>
+            <table className="w-full min-w-[1120px] table-fixed border-collapse text-left text-[13px] leading-5">
+              <colgroup>
+                <col style={{ width: '6%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '6%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '7%' }} />
+              </colgroup>
+              <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 backdrop-blur text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-400">
+                <tr className="[&>th]:h-12 [&>th]:px-3 [&>th]:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.06em] [&>th]:align-middle [&>th]:border-r [&>th]:border-slate-200/70 dark:[&>th]:border-slate-700/60 [&>th:last-child]:border-r-0">
+                  <th>Estado</th>
+                  {sortableHeader(
+                    'processedAt',
+                    'Procesado',
+                    'relative',
+                    renderFilterButton(
+                      'processedDate',
+                      processedDateFilter.length > 0,
+                      'Filtrar fecha procesada',
+                      'calendar',
+                    ),
+                    renderDateFilterPanel(
+                      'processedDate',
+                      'Fecha procesada',
+                      processedDateFilter,
+                      setProcessedDateFilter,
+                    ),
+                  )}
+                  <th>Archivo</th>
+                  {sortableHeader(
+                    'invoiceDate',
+                    'Factura',
+                    'relative',
+                    renderFilterButton(
+                      'invoiceDate',
+                      invoiceDateFilter.length > 0,
+                      'Filtrar fecha de factura',
+                      'calendar',
+                    ),
+                    renderDateFilterPanel(
+                      'invoiceDate',
+                      'Fecha de factura',
+                      invoiceDateFilter,
+                      setInvoiceDateFilter,
+                    ),
+                  )}
+                  {sortableHeader(
+                    'mawb',
+                    'MAWB',
+                    'relative',
+                    renderFilterButton('mawb', mawbFilter.trim().length > 0, 'Filtrar MAWB'),
+                    renderTextFilterPanel(
+                      'mawb',
+                      'Filtrar MAWB',
+                      mawbFilter,
+                      setMawbFilter,
+                      'Número MAWB',
+                    ),
+                  )}
+                  {filterHeader(
+                    'HAWB',
+                    'relative',
+                    renderFilterButton('hawb', hawbFilter.trim().length > 0, 'Filtrar HAWB'),
+                    renderTextFilterPanel(
+                      'hawb',
+                      'Filtrar HAWB',
+                      hawbFilter,
+                      setHawbFilter,
+                      'Número HAWB',
+                    ),
+                  )}
+                  {filterHeader(
+                    'Invoice #',
+                    'relative',
+                    renderFilterButton(
+                      'invoiceNumber',
+                      invoiceFilter.trim().length > 0,
+                      'Filtrar invoice',
+                    ),
+                    renderTextFilterPanel(
+                      'invoiceNumber',
+                      'Filtrar invoice',
+                      invoiceFilter,
+                      setInvoiceFilter,
+                      'Número de invoice',
+                      'right',
+                    ),
+                  )}
+                  <th className="text-right">Piezas</th>
+                  <th className="text-right">Valor</th>
+                  <th className="text-center">Fiabilidad</th>
+                  <th className="text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Acción</span>
+                      {renderGroupHeaderControl()}
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-[13px] dark:divide-slate-800 [&>tr>td]:h-14 [&>tr>td]:px-3 [&>tr>td]:align-middle [&>tr>td]:border-r [&>tr>td]:border-slate-100/80 dark:[&>tr>td]:border-slate-800/70 [&>tr>td:last-child]:border-r-0">
+                {groupBy === 'none'
+                  ? sortedResults.map(renderResultRow)
+                  : groupedResults.map((group) => (
+                      <React.Fragment key={group.id}>
+                        {renderGroupSummaryRow(group, collapsedGroupIds.has(group.id))}
+                        {!collapsedGroupIds.has(group.id) && group.items.map(renderResultRow)}
+                      </React.Fragment>
+                    ))}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

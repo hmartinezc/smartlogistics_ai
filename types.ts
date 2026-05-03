@@ -1,40 +1,39 @@
-
 export interface InvoiceItem {
-  boxType: string;         // *PIECE TYPE (QB, HB)
-  totalPieces: number;     // TOTAL PIECES
-  eqFull: number;          // EQ-FULL BOXES
+  boxType: string; // *PIECE TYPE (QB, HB)
+  totalPieces: number; // TOTAL PIECES
+  eqFull: number; // EQ-FULL BOXES
   productDescription: string; // PRODUCT DESCRIPTION
-  varieties?: string[];    // NEW: List of varieties included in this box/item
-  hts: string;             // HTS
-  nandina: string;         // NANDINA
-  totalStems: number;      // TOTAL-UNT STEMS
-  unitPrice: number;       // UNIT-PRICE PER/STEM
-  totalValue: number;      // TOTAL VALUE-USD
+  varieties?: string[]; // NEW: List of varieties included in this box/item
+  hts: string; // HTS
+  nandina: string; // NANDINA
+  totalStems: number; // TOTAL-UNT STEMS
+  unitPrice: number; // UNIT-PRICE PER/STEM
+  totalValue: number; // TOTAL VALUE-USD
 }
 
 export interface InvoiceData {
   // Header Info
-  invoiceNumber: string;   // COMMERCIAL INVOICE NO.
-  date: string;            // Date
-  shipperName: string;     // Shipper Name
-  shipperAddress: string;  // Shipper Address (Full text)
-  consigneeName: string;   // Consignee Name
-  consigneeAddress: string;// Consignee Address
-  mawb: string;            // MAWB No.
-  hawb: string;            // HAWB No.
-  airline: string;         // Airline
-  freightForwarder: string;// Freight Forwarder
-  ruc: string;             // R.U.C. No.
-  dae: string;             // DAE No.
-  
+  invoiceNumber: string; // COMMERCIAL INVOICE NO.
+  date: string; // Date
+  shipperName: string; // Shipper Name
+  shipperAddress: string; // Shipper Address (Full text)
+  consigneeName: string; // Consignee Name
+  consigneeAddress: string; // Consignee Address
+  mawb: string; // MAWB No.
+  hawb: string; // HAWB No.
+  airline: string; // Airline
+  freightForwarder: string; // Freight Forwarder
+  ruc: string; // R.U.C. No.
+  dae: string; // DAE No.
+
   // Totals
   totalPieces: number;
-  totalEq: number;         // Total EQ
-  totalStems: number;      // Total Stems
-  totalValue: number;      // Total Invoice Value
+  totalEq: number; // Total EQ
+  totalStems: number; // Total Stems
+  totalValue: number; // Total Invoice Value
 
   lineItems: InvoiceItem[];
-  
+
   // AI Self-Evaluation
   confidenceScore: number; // 0 to 100
 }
@@ -100,7 +99,7 @@ export interface SubscriptionPlan {
 export interface Agency {
   id: string;
   name: string;
-  emails: string[]; 
+  emails: string[];
   planId: string;
   currentUsage: number; // Pages processed this month
   isActive: boolean; // Status (Active / Suspended)
@@ -187,26 +186,30 @@ export interface AwbReconciliationRow {
 
 export enum AppState {
   LOGIN = 'LOGIN',
-  DASHBOARD_OPS = 'DASHBOARD_OPS',      // Panel Operativo (Solo Admin)
-  DASHBOARD_PANEL = 'DASHBOARD_PANEL',  // Panel Facturado (Operación)
-  DASHBOARD_ADMIN = 'DASHBOARD_ADMIN',  // Panel Admin (Solo Admin)
-  AGENCY_CONFIG = 'AGENCY_CONFIG',      // Configuración Agencias (Solo Admin)
-  PRODUCT_MATCHES = 'PRODUCT_MATCHES',  // Catálogo Match Productos
+  DASHBOARD_OPS = 'DASHBOARD_OPS', // Panel Operativo (Solo Admin)
+  DASHBOARD_PANEL = 'DASHBOARD_PANEL', // Panel Facturado (Operación)
+  DASHBOARD_ADMIN = 'DASHBOARD_ADMIN', // Panel Admin (Solo Admin)
+  AGENCY_CONFIG = 'AGENCY_CONFIG', // Configuración Agencias (Solo Admin)
+  PRODUCT_MATCHES = 'PRODUCT_MATCHES', // Catálogo Match Productos
   PROCESS_SELECTION = 'PROCESS_SELECTION',
   BATCH_RUNNING = 'BATCH_RUNNING',
   HISTORY_RESULTS = 'HISTORY_RESULTS',
   DATA_CLEANUP = 'DATA_CLEANUP',
-  USER_MANAGEMENT = 'USER_MANAGEMENT'   // Gestión de Usuarios (Solo Admin)
+  USER_MANAGEMENT = 'USER_MANAGEMENT', // Gestión de Usuarios (Solo Admin)
 }
 
 // Updated to reflect the Client Agents
 export type AgentType = 'AGENT_TCBV' | 'AGENT_GENERIC_A' | 'AGENT_GENERIC_B' | 'AGENT_CUSTOMS';
 
-export type DocumentFormat = 'FORMAT_A_STD' | 'FORMAT_B_COMPLEX' | 'FORMAT_C_COMBINED' | 'FORMAT_D_CUSTOMS';
+export type DocumentFormat =
+  | 'FORMAT_A_STD'
+  | 'FORMAT_B_COMPLEX'
+  | 'FORMAT_C_COMBINED'
+  | 'FORMAT_D_CUSTOMS';
 
 export const AGENT_GROUPS = {
-  'AGENT_TCBV': ['TCBV Specific Format'],
-  'AGENT_GENERIC_A': ['Standard Invoice'],
-  'AGENT_GENERIC_B': ['Disabled'],
-  'AGENT_CUSTOMS': ['Disabled']
+  AGENT_TCBV: ['TCBV Specific Format'],
+  AGENT_GENERIC_A: ['Standard Invoice'],
+  AGENT_GENERIC_B: ['Disabled'],
+  AGENT_CUSTOMS: ['Disabled'],
 };

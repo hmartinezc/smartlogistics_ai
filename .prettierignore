@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+*.db
+*.db-wal
+*.db-shm
+package-lock.json
+.agents
+.vercel
+.next
+public

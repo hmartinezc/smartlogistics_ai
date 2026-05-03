@@ -167,22 +167,24 @@ export const downloadAsJSON = (data: unknown, filename: string): void => {
 
 export const downloadAsCSV = (data: Record<string, unknown>[], filename: string): void => {
   if (data.length === 0) return;
-  
+
   const headers = Object.keys(data[0]);
   const csvRows = [
     headers.join(','),
-    ...data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        const stringValue = String(value ?? '');
-        // Escapar comillas y envolver en comillas si contiene comas
-        return stringValue.includes(',') || stringValue.includes('"')
-          ? `"${stringValue.replace(/"/g, '""')}"`
-          : stringValue;
-      }).join(',')
-    )
+    ...data.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header];
+          const stringValue = String(value ?? '');
+          // Escapar comillas y envolver en comillas si contiene comas
+          return stringValue.includes(',') || stringValue.includes('"')
+            ? `"${stringValue.replace(/"/g, '""')}"`
+            : stringValue;
+        })
+        .join(','),
+    ),
   ];
-  
+
   const csvString = csvRows.join('\n');
   const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -200,10 +202,10 @@ export const downloadAsCSV = (data: Record<string, unknown>[], filename: string)
 // --------------------------
 export const debounce = <T extends (...args: unknown[]) => unknown>(
   func: T,
-  wait: number
+  wait: number,
 ): ((...args: Parameters<T>) => void) => {
   let timeoutId: ReturnType<typeof setTimeout>;
-  
+
   return (...args: Parameters<T>) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func(...args), wait);

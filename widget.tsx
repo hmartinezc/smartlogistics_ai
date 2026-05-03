@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 // STRICT RELATIVE IMPORT: Must start with './' to avoid "Failed to resolve module specifier"
-import styles from './index.css?inline'; 
+import styles from './index.css?inline';
 
 class SmartLogisticsWidget extends HTMLElement {
   private root: ReactDOM.Root | null = null;
@@ -14,7 +14,7 @@ class SmartLogisticsWidget extends HTMLElement {
     this.mountPoint = document.createElement('div');
     this.mountPoint.style.width = '100%';
     this.mountPoint.style.height = '100%';
-    this.mountPoint.id = "smart-logistics-root";
+    this.mountPoint.id = 'smart-logistics-root';
   }
 
   connectedCallback() {
@@ -36,7 +36,7 @@ class SmartLogisticsWidget extends HTMLElement {
       // 3. Montar React
       this.shadowRoot.appendChild(this.mountPoint);
       this.style.display = 'none';
-      this.render(false); 
+      this.render(false);
     }
   }
 
@@ -57,15 +57,11 @@ class SmartLogisticsWidget extends HTMLElement {
     if (!this.root) {
       this.root = ReactDOM.createRoot(this.mountPoint);
     }
-    
+
     this.root.render(
       <React.StrictMode>
-        <App 
-            isWidgetMode={true} 
-            isOpen={isOpen} 
-            onClose={() => this.close()} 
-        />
-      </React.StrictMode>
+        <App isWidgetMode={true} isOpen={isOpen} onClose={() => this.close()} />
+      </React.StrictMode>,
     );
   }
 

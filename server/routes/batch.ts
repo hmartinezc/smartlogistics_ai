@@ -32,7 +32,11 @@ function getAuditTimestamp(item: Record<string, unknown>): string {
   return typeof candidate === 'string' && candidate.trim() ? candidate : new Date().toISOString();
 }
 
-function buildAuditStatement(item: Record<string, unknown>, authUser: AuthUser, agencyNames: Map<string, string>) {
+function buildAuditStatement(
+  item: Record<string, unknown>,
+  authUser: AuthUser,
+  agencyNames: Map<string, string>,
+) {
   const status = String(item.status || '');
   const batchItemId = String(item.id);
   const agencyId = String(item.agencyId || 'UNKNOWN');
@@ -150,11 +154,13 @@ batch.post('/', async (c) => {
     }
   }
 
-  const agencyIds = Array.from(new Set(
-    (items as Array<Record<string, unknown>>)
-      .map((item) => String(item.agencyId || ''))
-      .filter(Boolean)
-  ));
+  const agencyIds = Array.from(
+    new Set(
+      (items as Array<Record<string, unknown>>)
+        .map((item) => String(item.agencyId || ''))
+        .filter(Boolean),
+    ),
+  );
   const agencyNames = new Map<string, string>();
   if (agencyIds.length > 0) {
     const agencyRows = await db.execute({
@@ -168,21 +174,21 @@ batch.post('/', async (c) => {
   }
 
   const batchItemStatements = items.map((item: Record<string, unknown>) => ({
-      sql: `INSERT INTO batch_items (id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at)
+    sql: `INSERT INTO batch_items (id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
         ON CONFLICT(id) DO NOTHING`,
-      args: [
-        item.id,
-        item.fileName,
-        item.status,
-        item.result ? JSON.stringify(item.result) : null,
-        item.error || null,
-        item.processedAt || null,
-        item.user || null,
-        item.agencyId || null,
-        item.createdAt || null,
-      ] as InValue[],
-    }));
+    args: [
+      item.id,
+      item.fileName,
+      item.status,
+      item.result ? JSON.stringify(item.result) : null,
+      item.error || null,
+      item.processedAt || null,
+      item.user || null,
+      item.agencyId || null,
+      item.createdAt || null,
+    ] as InValue[],
+  }));
 
   const auditStatements = (items as Array<Record<string, unknown>>)
     .filter((item) => AUDITABLE_STATUSES.has(String(item.status || '')))
@@ -204,7 +210,10 @@ batch.put('/:id', async (c) => {
   const body = await c.req.json();
   const db = getDb();
 
-  const existing = await db.execute({ sql: 'SELECT file_name, agency_id, created_at FROM batch_items WHERE id = ?', args: [id] });
+  const existing = await db.execute({
+    sql: 'SELECT file_name, agency_id, created_at FROM batch_items WHERE id = ?',
+    args: [id],
+  });
   if (existing.rows.length === 0) {
     return c.json({ error: 'Item no encontrado' }, 404);
   }
@@ -234,20 +243,27 @@ batch.put('/:id', async (c) => {
 
   if (AUDITABLE_STATUSES.has(String(body.status || ''))) {
     const agencyNames = new Map<string, string>();
-    const agencyRows = await db.execute({ sql: 'SELECT id, name FROM agencies WHERE id = ?', args: [agencyId] });
+    const agencyRows = await db.execute({
+      sql: 'SELECT id, name FROM agencies WHERE id = ?',
+      args: [agencyId],
+    });
     if (agencyRows.rows.length > 0) {
       agencyNames.set(String(agencyRows.rows[0].id), String(agencyRows.rows[0].name));
     }
 
     await db.batch([
       updateStatement,
-      buildAuditStatement({
-        ...body,
-        id,
-        fileName: body.fileName || existingRow.file_name,
-        agencyId,
-        createdAt: body.createdAt || existingRow.created_at,
-      }, authUser, agencyNames),
+      buildAuditStatement(
+        {
+          ...body,
+          id,
+          fileName: body.fileName || existingRow.file_name,
+          agencyId,
+          createdAt: body.createdAt || existingRow.created_at,
+        },
+        authUser,
+        agencyNames,
+      ),
     ]);
   } else {
     await db.execute(updateStatement);
@@ -270,7 +286,9 @@ batch.delete('/items', async (c) => {
 
   const body = await c.req.json().catch(() => null);
   const rawIds: unknown[] = Array.isArray(body?.ids) ? body.ids : [];
-  const ids: string[] = Array.from(new Set(rawIds.map((id: unknown) => String(id)).filter(Boolean)));
+  const ids: string[] = Array.from(
+    new Set(rawIds.map((id: unknown) => String(id)).filter(Boolean)),
+  );
   const db = getDb();
 
   if (ids.length === 0) {

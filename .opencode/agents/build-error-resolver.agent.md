@@ -8,7 +8,7 @@ tools:
   bash: true
   grep: true
   glob: true
-model: sonnet
+model: deepseek-v4-flash
 ---
 
 # Build Error Resolver
@@ -36,12 +36,15 @@ npx eslint . --ext .ts,.tsx,.js,.jsx
 ## Workflow
 
 ### 1. Collect All Errors
+
 - Run the relevant TypeScript/build command to get all errors.
 - Categorize errors: type inference, missing types, imports, config, dependencies.
 - Prioritize build-blocking errors first.
 
 ### 2. Fix Strategy
+
 For each error:
+
 1. Read the error message carefully.
 2. Find the minimal fix.
 3. Verify the fix does not break other code.
@@ -49,19 +52,20 @@ For each error:
 
 ## Common Fixes
 
-| Error | Fix |
-|-------|-----|
-| Implicit `any` | Add type annotation |
-| Possibly `undefined` | Add guard or optional chaining |
-| Missing property | Fix interface or usage |
-| Cannot find module | Fix import, tsconfig path, or dependency |
-| Type not assignable | Convert value or fix type |
-| Generic constraint | Add appropriate `extends` |
-| Conditional hook | Move hook to top level |
+| Error                | Fix                                      |
+| -------------------- | ---------------------------------------- |
+| Implicit `any`       | Add type annotation                      |
+| Possibly `undefined` | Add guard or optional chaining           |
+| Missing property     | Fix interface or usage                   |
+| Cannot find module   | Fix import, tsconfig path, or dependency |
+| Type not assignable  | Convert value or fix type                |
+| Generic constraint   | Add appropriate `extends`                |
+| Conditional hook     | Move hook to top level                   |
 
 ## DO and DON'T
 
 DO:
+
 - Add type annotations where missing.
 - Add null checks where needed.
 - Fix imports/exports.
@@ -69,6 +73,7 @@ DO:
 - Fix configuration files.
 
 DON'T:
+
 - Refactor unrelated code.
 - Change architecture.
 - Rename variables unless causing the error.

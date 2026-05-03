@@ -165,7 +165,7 @@ Your goal is to extract invoice data and DETECT DISCREPANCIES using strict math.
 // --------------------------
 export const buildExtractionPrompt = (format: AgentType): string => {
   const useAdvancedDistribution = format === 'AGENT_TCBV' || format === 'AGENT_GENERIC_A';
-  
+
   const sections = [
     SYSTEM_PROMPT_INTRO,
     BOX_TYPES_KNOWLEDGE_BASE,
@@ -177,9 +177,9 @@ export const buildExtractionPrompt = (format: AgentType): string => {
     `
 **OUTPUT:**
 Return the extracted data in strict JSON format following the provided schema.
-    `.trim()
+    `.trim(),
   ];
-  
+
   return sections.filter(Boolean).join('\n');
 };
 
@@ -248,9 +248,7 @@ export const getAgentConfig = (agentType: AgentType): AgentConfig => {
 };
 
 export const getActiveAgents = (): AgentConfig[] => {
-  return Object.values(AGENT_CONFIGS).filter(
-    agent => !agent.name.includes('Deshabilitado')
-  );
+  return Object.values(AGENT_CONFIGS).filter((agent) => !agent.name.includes('Deshabilitado'));
 };
 
 export const isAgentEnabled = (agentType: AgentType): boolean => {

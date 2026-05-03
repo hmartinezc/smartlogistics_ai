@@ -130,7 +130,16 @@ users.post('/', async (c) => {
   await db.execute({
     sql: `INSERT INTO users (id, email, password, name, role, is_active, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [body.id, body.email, hashPassword(body.password), body.name, body.role, body.isActive ? 1 : 0, now, now],
+    args: [
+      body.id,
+      body.email,
+      hashPassword(body.password),
+      body.name,
+      body.role,
+      body.isActive ? 1 : 0,
+      now,
+      now,
+    ],
   });
 
   // Insertar agencias
@@ -139,7 +148,7 @@ users.post('/', async (c) => {
       body.agencyIds.map((agencyId: string) => ({
         sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)',
         args: [body.id, agencyId],
-      }))
+      })),
     );
   }
 
@@ -203,7 +212,15 @@ users.put('/:id', async (c) => {
   if (body.password && body.password.length >= 4) {
     await db.execute({
       sql: `UPDATE users SET email = ?, password = ?, name = ?, role = ?, is_active = ?, updated_at = ? WHERE id = ?`,
-      args: [body.email, hashPassword(body.password), body.name, body.role, body.isActive ? 1 : 0, now, id],
+      args: [
+        body.email,
+        hashPassword(body.password),
+        body.name,
+        body.role,
+        body.isActive ? 1 : 0,
+        now,
+        id,
+      ],
     });
   } else {
     await db.execute({
@@ -219,7 +236,7 @@ users.put('/:id', async (c) => {
       body.agencyIds.map((agencyId: string) => ({
         sql: 'INSERT INTO user_agencies (user_id, agency_id) VALUES (?, ?)',
         args: [id, agencyId],
-      }))
+      })),
     );
   }
 

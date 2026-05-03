@@ -1,4 +1,3 @@
-
 export const TECHNICAL_DOCS = `
 # Smart Logistics Extractor - Documentación Técnica
 

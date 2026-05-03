@@ -26,12 +26,9 @@ function buildRowId(sourceOrder: number): string {
 }
 
 function buildRowSignature(row: Omit<ProductMatchMasterRow, 'id' | 'sourceOrder'>): string {
-  return [
-    row.product,
-    row.clientProductCode,
-    row.productMatch,
-    row.htsMatch,
-  ].map((value) => value.toLowerCase()).join('|');
+  return [row.product, row.clientProductCode, row.productMatch, row.htsMatch]
+    .map((value) => value.toLowerCase())
+    .join('|');
 }
 
 export function loadProductMatchMasterRows(): ProductMatchMasterRow[] {
@@ -45,7 +42,8 @@ export function loadProductMatchMasterRows(): ProductMatchMasterRow[] {
 
   const parsedRows = dataLines
     .map((line, index) => {
-      const [productRaw = '', clientProductCodeRaw = '', productMatchRaw = '', htsMatchRaw = ''] = line.split('\t');
+      const [productRaw = '', clientProductCodeRaw = '', productMatchRaw = '', htsMatchRaw = ''] =
+        line.split('\t');
       const sourceOrder = index + 1;
       const product = normalizeCell(productRaw);
 
@@ -81,7 +79,9 @@ export function loadProductMatchMasterRows(): ProductMatchMasterRow[] {
 }
 
 export async function ensureProductMatchMasterSeed(db: Client): Promise<void> {
-  const existingCountResult = await db.execute('SELECT COUNT(*) as count FROM product_match_master');
+  const existingCountResult = await db.execute(
+    'SELECT COUNT(*) as count FROM product_match_master',
+  );
   const existingCount = Number(existingCountResult.rows[0]?.count ?? 0);
 
   if (existingCount === 0) {
@@ -136,6 +136,8 @@ export async function ensureProductMatchMasterSeed(db: Client): Promise<void> {
 
   const removedExactDuplicates = Number(cleanupResult.rowsAffected ?? 0);
   if (removedExactDuplicates > 0) {
-    console.log(`✅ Catalogo maestro depurado: ${removedExactDuplicates} filas duplicadas exactas eliminadas.`);
+    console.log(
+      `✅ Catalogo maestro depurado: ${removedExactDuplicates} filas duplicadas exactas eliminadas.`,
+    );
   }
 }

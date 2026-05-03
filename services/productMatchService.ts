@@ -50,7 +50,7 @@ function buildAgencyLookup(items: ProductMatchCatalogItem[]): Map<string, Produc
 
 export function enrichInvoiceDataWithMatches(
   invoiceData: InvoiceData,
-  lookup?: Map<string, ProductMatchCatalogItem>
+  lookup?: Map<string, ProductMatchCatalogItem>,
 ): { data: ExportInvoiceData; missingMatches: number } {
   let missingMatches = 0;
 
@@ -81,19 +81,25 @@ export function enrichInvoiceDataWithMatches(
   };
 }
 
-export async function enrichBatchItemsForExport(batchItems: BatchItem[]): Promise<EnrichedBatchExportResult> {
-  const uniqueAgencyIds = Array.from(new Set(
-    batchItems
-      .map((item) => item.agencyId)
-      .filter((agencyId): agencyId is string => Boolean(agencyId) && agencyId !== 'GLOBAL')
-  ));
+export async function enrichBatchItemsForExport(
+  batchItems: BatchItem[],
+): Promise<EnrichedBatchExportResult> {
+  const uniqueAgencyIds = Array.from(
+    new Set(
+      batchItems
+        .map((item) => item.agencyId)
+        .filter((agencyId): agencyId is string => Boolean(agencyId) && agencyId !== 'GLOBAL'),
+    ),
+  );
 
   const lookups = new Map<string, Map<string, ProductMatchCatalogItem>>();
 
-  await Promise.all(uniqueAgencyIds.map(async (agencyId) => {
-    const catalog = await api.getProductMatches(agencyId);
-    lookups.set(agencyId, buildAgencyLookup(catalog));
-  }));
+  await Promise.all(
+    uniqueAgencyIds.map(async (agencyId) => {
+      const catalog = await api.getProductMatches(agencyId);
+      lookups.set(agencyId, buildAgencyLookup(catalog));
+    }),
+  );
 
   let missingMatches = 0;
   const items: EnrichedBatchExportItem[] = [];
@@ -112,7 +118,9 @@ export async function enrichBatchItemsForExport(batchItems: BatchItem[]): Promis
   return { items, missingMatches };
 }
 
-export function buildBatchExportDocuments(exportItems: EnrichedBatchExportItem[]): BatchExportDocument[] {
+export function buildBatchExportDocuments(
+  exportItems: EnrichedBatchExportItem[],
+): BatchExportDocument[] {
   return exportItems.map(({ item, data }) => ({
     filename: item.fileName,
     processedAt: item.processedAt,

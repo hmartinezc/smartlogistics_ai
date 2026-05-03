@@ -8,7 +8,7 @@ tools:
   bash: true
   grep: true
   glob: true
-model: sonnet
+model: deepseek-v4-pro
 ---
 
 # Security Reviewer
@@ -34,11 +34,13 @@ npx eslint . --plugin security
 ## Review Workflow
 
 ### 1. Initial Scan
+
 - Run `npm audit` when dependency changes are relevant.
 - Search for hardcoded secrets.
 - Review high-risk areas: auth, API endpoints, DB queries, file uploads, external API integrations.
 
 ### 2. OWASP Top 10 Check
+
 1. Injection: queries parameterized, inputs sanitized.
 2. Broken auth: sessions, password hashing, token handling.
 3. Sensitive data: secrets in env vars, logs sanitized.
@@ -51,16 +53,16 @@ npx eslint . --plugin security
 
 ## Patterns To Flag
 
-| Pattern | Severity | Fix |
-|---------|----------|-----|
-| Hardcoded secrets | CRITICAL | Use env vars |
-| Shell command with user input | CRITICAL | Use safe APIs or allowlists |
-| String-concatenated SQL | CRITICAL | Parameterized queries |
-| `innerHTML = userInput` | HIGH | Use text content or sanitize |
-| `fetch(userProvidedUrl)` | HIGH | Whitelist allowed domains |
-| Plaintext password comparison | CRITICAL | Use a password hash verifier |
-| No auth check on route | CRITICAL | Add authentication middleware |
-| Logging passwords/secrets | MEDIUM | Sanitize log output |
+| Pattern                       | Severity | Fix                           |
+| ----------------------------- | -------- | ----------------------------- |
+| Hardcoded secrets             | CRITICAL | Use env vars                  |
+| Shell command with user input | CRITICAL | Use safe APIs or allowlists   |
+| String-concatenated SQL       | CRITICAL | Parameterized queries         |
+| `innerHTML = userInput`       | HIGH     | Use text content or sanitize  |
+| `fetch(userProvidedUrl)`      | HIGH     | Whitelist allowed domains     |
+| Plaintext password comparison | CRITICAL | Use a password hash verifier  |
+| No auth check on route        | CRITICAL | Add authentication middleware |
+| Logging passwords/secrets     | MEDIUM   | Sanitize log output           |
 
 ## Common False Positives
 

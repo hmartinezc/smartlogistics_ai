@@ -34,10 +34,13 @@ import path from 'node:path';
 const app = new Hono();
 
 // ── CORS (solo necesario en desarrollo; en producción el SPA y la API comparten origen) ──
-app.use('/api/*', cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-  credentials: true,
-}));
+app.use(
+  '/api/*',
+  cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    credentials: true,
+  }),
+);
 
 // ── Montar rutas de API ──
 app.route('/api/auth', authRoutes);
@@ -52,7 +55,9 @@ app.route('/api/ai', aiRoutes);
 app.route('/api/audit', auditRoutes);
 
 // ── Health check ──
-app.get('/api/health', (c) => c.json({ status: 'ok', db: 'libsql', time: new Date().toISOString() }));
+app.get('/api/health', (c) =>
+  c.json({ status: 'ok', db: 'libsql', time: new Date().toISOString() }),
+);
 
 // ── Servir archivos estáticos del SPA en producción ──
 const distPath = path.resolve(process.cwd(), 'dist');
@@ -89,7 +94,9 @@ async function start() {
     console.log(`\n🚀 Smart Invoice AI — API Server`);
     console.log(`   Puerto:  ${info.port}`);
     console.log(`   BD:      ${process.env.TURSO_DATABASE_URL || 'file:./data/smart-invoice.db'}`);
-    console.log(`   Modo:    ${fs.existsSync(distPath) ? 'Producción (SPA + API)' : 'Desarrollo (solo API)'}`);
+    console.log(
+      `   Modo:    ${fs.existsSync(distPath) ? 'Producción (SPA + API)' : 'Desarrollo (solo API)'}`,
+    );
     console.log('');
   });
 }

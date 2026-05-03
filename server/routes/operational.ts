@@ -75,7 +75,7 @@ operational.get('/reconciliation', async (c) => {
 
   const reconciliation = [];
   for (const mawb of allMawbs) {
-    const b = booked.rows.find(r => String(r.mawb) === mawb);
+    const b = booked.rows.find((r) => String(r.mawb) === mawb);
     const inv = invoicedMap.get(mawb);
 
     const bookedHijas = b ? Number(b.booked_hijas) : 0;
@@ -141,7 +141,14 @@ operational.post('/booked', async (c) => {
             booked_hijas = excluded.booked_hijas,
             booked_pieces = excluded.booked_pieces,
             booked_fulls = excluded.booked_fulls`,
-    args: [body.mawb, body.bookedHijas, body.bookedPieces, body.bookedFulls, body.operationDate, body.agencyId],
+    args: [
+      body.mawb,
+      body.bookedHijas,
+      body.bookedPieces,
+      body.bookedFulls,
+      body.operationDate,
+      body.agencyId,
+    ],
   });
 
   return c.json({ ok: true }, 201);

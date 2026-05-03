@@ -1,4 +1,10 @@
-import { AwbReconciliationRow, BatchItem, BookedAwbRecord, InvoicedAwbRecord, OperationalQueryParams } from '../types';
+import {
+  AwbReconciliationRow,
+  BatchItem,
+  BookedAwbRecord,
+  InvoicedAwbRecord,
+  OperationalQueryParams,
+} from '../types';
 
 const toDateKey = (dateValue?: string | Date): string => {
   const date = dateValue instanceof Date ? dateValue : dateValue ? new Date(dateValue) : new Date();
@@ -30,17 +36,18 @@ export const getOperationDateRange = (operationDate: string, beforeDays = 1, aft
   endDate: shiftOperationDateKey(operationDate, afterDays),
 });
 
-export const isOperationDateInRange = (operationDate: string, startDate: string, endDate: string): boolean => (
-  operationDate >= startDate && operationDate <= endDate
-);
+export const isOperationDateInRange = (
+  operationDate: string,
+  startDate: string,
+  endDate: string,
+): boolean => operationDate >= startDate && operationDate <= endDate;
 
-export const getBatchItemOperationDate = (item: BatchItem): string => (
-  getOperationDateKey(item.createdAt || item.processedAt)
-);
+export const getBatchItemOperationDate = (item: BatchItem): string =>
+  getOperationDateKey(item.createdAt || item.processedAt);
 
 export const buildInvoicedAwbRecords = (
   results: BatchItem[],
-  params: OperationalQueryParams
+  params: OperationalQueryParams,
 ): InvoicedAwbRecord[] => {
   const summary = new Map<string, InvoicedAwbRecord>();
   const startDate = params.operationDateStart || params.operationDate;
@@ -72,7 +79,7 @@ export const buildInvoicedAwbRecords = (
 
 export const getMockBookedAwbs = (
   params: OperationalQueryParams,
-  invoicedRecords: InvoicedAwbRecord[]
+  invoicedRecords: InvoicedAwbRecord[],
 ): BookedAwbRecord[] => {
   const bookedRecords = invoicedRecords.map((record) => {
     const hash = buildHash(`${record.mawb}-${params.operationDate}`) % 4;
@@ -136,46 +143,50 @@ export const getMockBookedAwbs = (
 
 export const buildAwbReconciliationRows = (
   bookedRecords: BookedAwbRecord[],
-  invoicedRecords: InvoicedAwbRecord[]
+  invoicedRecords: InvoicedAwbRecord[],
 ): AwbReconciliationRow[] => {
   const bookedMap = new Map(bookedRecords.map((record) => [record.mawb, record]));
   const invoicedMap = new Map(invoicedRecords.map((record) => [record.mawb, record]));
   const awbKeys = Array.from(new Set([...bookedMap.keys(), ...invoicedMap.keys()]));
 
-  return awbKeys.map((mawb) => {
-    const booked = bookedMap.get(mawb);
-    const invoiced = invoicedMap.get(mawb);
-    const bookedMissing = !booked;
-    const invoicedMissing = !invoiced;
-    const hasIncompleteData = Boolean(booked && booked.bookedFulls === 0) || Boolean(invoiced && invoiced.invoicedFulls === 0);
-    const hasMismatch = Boolean(
-      booked && invoiced && (
-        booked.bookedHijas !== invoiced.invoicedHijas ||
-        booked.bookedPieces !== invoiced.invoicedPieces ||
-        Math.abs(booked.bookedFulls - invoiced.invoicedFulls) > 0.1
-      )
-    );
+  return awbKeys
+    .map((mawb) => {
+      const booked = bookedMap.get(mawb);
+      const invoiced = invoicedMap.get(mawb);
+      const bookedMissing = !booked;
+      const invoicedMissing = !invoiced;
+      const hasIncompleteData =
+        Boolean(booked && booked.bookedFulls === 0) ||
+        Boolean(invoiced && invoiced.invoicedFulls === 0);
+      const hasMismatch = Boolean(
+        booked &&
+        invoiced &&
+        (booked.bookedHijas !== invoiced.invoicedHijas ||
+          booked.bookedPieces !== invoiced.invoicedPieces ||
+          Math.abs(booked.bookedFulls - invoiced.invoicedFulls) > 0.1),
+      );
 
-    let status: AwbReconciliationRow['status'] = 'MATCHED';
-    if (bookedMissing || invoicedMissing) {
-      status = 'PENDING_DOCUMENTS';
-    } else if (hasIncompleteData) {
-      status = 'PARTIAL';
-    } else if (hasMismatch) {
-      status = 'DISCREPANCY';
-    }
+      let status: AwbReconciliationRow['status'] = 'MATCHED';
+      if (bookedMissing || invoicedMissing) {
+        status = 'PENDING_DOCUMENTS';
+      } else if (hasIncompleteData) {
+        status = 'PARTIAL';
+      } else if (hasMismatch) {
+        status = 'DISCREPANCY';
+      }
 
-    return {
-      mawb,
-      bookedHijas: booked?.bookedHijas || 0,
-      bookedPieces: booked?.bookedPieces || 0,
-      bookedFulls: booked?.bookedFulls || 0,
-      invoicedHijas: invoiced?.invoicedHijas || 0,
-      invoicedPieces: invoiced?.invoicedPieces || 0,
-      invoicedFulls: invoiced?.invoicedFulls || 0,
-      operationDate: booked?.operationDate || invoiced?.operationDate || toDateKey(),
-      agencyId: booked?.agencyId || invoiced?.agencyId || 'GLOBAL',
-      status,
-    };
-  }).sort((left, right) => left.mawb.localeCompare(right.mawb));
+      return {
+        mawb,
+        bookedHijas: booked?.bookedHijas || 0,
+        bookedPieces: booked?.bookedPieces || 0,
+        bookedFulls: booked?.bookedFulls || 0,
+        invoicedHijas: invoiced?.invoicedHijas || 0,
+        invoicedPieces: invoiced?.invoicedPieces || 0,
+        invoicedFulls: invoiced?.invoicedFulls || 0,
+        operationDate: booked?.operationDate || invoiced?.operationDate || toDateKey(),
+        agencyId: booked?.agencyId || invoiced?.agencyId || 'GLOBAL',
+        status,
+      };
+    })
+    .sort((left, right) => left.mawb.localeCompare(right.mawb));
 };

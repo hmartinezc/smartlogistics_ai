@@ -1,7 +1,13 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentType, AppState, BatchItem, User, Agency } from './types';
-import { useAuth, useAgencyContext, useBatchProcessor, useDarkMode, useConfirmDialog, useApiData } from './hooks';
+import {
+  useAuth,
+  useAgencyContext,
+  useBatchProcessor,
+  useDarkMode,
+  useConfirmDialog,
+  useApiData,
+} from './hooks';
 import { api, ApiError } from './services/apiClient';
 import LoginScreen from './components/LoginScreen';
 import TemplateGallery from './components/TemplateGallery';
@@ -33,12 +39,29 @@ interface AppProps {
 function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const [appState, setAppState] = useState<AppState>(AppState.LOGIN);
   const [selectedFormat, setSelectedFormat] = useState<AgentType>('AGENT_GENERIC_A');
-  
+
   // Hooks — datos cargados desde API (libSQL/Turso)
   const [isDarkMode, toggleDarkMode] = useDarkMode();
   const { currentUser, loginApi, logout, isAuthenticated, sessionReady } = useAuth();
-  const { users, setUsers, agencies, setAgencies, plans, loading: dataLoading, refresh: refreshData } = useApiData(isAuthenticated, currentUser);
-  const { batchFiles, batchResults, setBatchFiles, addResults, updateResult, removeResults, clearResults, loadResults } = useBatchProcessor();
+  const {
+    users,
+    setUsers,
+    agencies,
+    setAgencies,
+    plans,
+    loading: dataLoading,
+    refresh: refreshData,
+  } = useApiData(isAuthenticated, currentUser);
+  const {
+    batchFiles,
+    batchResults,
+    setBatchFiles,
+    addResults,
+    updateResult,
+    removeResults,
+    clearResults,
+    loadResults,
+  } = useBatchProcessor();
   const { confirm } = useConfirmDialog();
   const [isCleaningData, setIsCleaningData] = useState(false);
   const [currentBatchId, setCurrentBatchId] = useState('');
@@ -48,20 +71,24 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const PLANS = plans;
 
   // Agency Context
-  const { currentAgencyId, setCurrentAgencyId, availableAgencies, currentAgency } = useAgencyContext(currentUser, agencies);
+  const { currentAgencyId, setCurrentAgencyId, availableAgencies, currentAgency } =
+    useAgencyContext(currentUser, agencies);
 
   // Cargar resultados batch cuando cambia la agencia
   useEffect(() => {
     if (isAuthenticated && currentAgencyId) {
-      const shouldLoadAllResults = currentUser?.role === 'ADMIN' && appState === AppState.DASHBOARD_ADMIN;
-      loadResults(shouldLoadAllResults || currentAgencyId === 'GLOBAL' ? undefined : currentAgencyId);
+      const shouldLoadAllResults =
+        currentUser?.role === 'ADMIN' && appState === AppState.DASHBOARD_ADMIN;
+      loadResults(
+        shouldLoadAllResults || currentAgencyId === 'GLOBAL' ? undefined : currentAgencyId,
+      );
     }
   }, [appState, currentUser?.role, isAuthenticated, currentAgencyId, loadResults]);
 
   // Reset logic when widget opens/closes
   useEffect(() => {
     if (!isOpen && isWidgetMode) {
-        // keeping state alive is better UX
+      // keeping state alive is better UX
     }
   }, [isOpen, isWidgetMode]);
 
@@ -104,20 +131,29 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   };
 
   const handleSwitchAgencyContext = (agencyId: string) => {
-      if (!canAccessAgency(currentUser, agencyId, agencies)) {
-        return;
-      }
+    if (!canAccessAgency(currentUser, agencyId, agencies)) {
+      return;
+    }
 
-      setCurrentAgencyId(agencyId);
-      if (![AppState.DASHBOARD_OPS, AppState.DASHBOARD_ADMIN, AppState.DASHBOARD_PANEL, AppState.PRODUCT_MATCHES].includes(appState)) {
-        setAppState(currentUser?.role === 'ADMIN' ? AppState.DASHBOARD_OPS : AppState.DASHBOARD_PANEL);
-      }
+    setCurrentAgencyId(agencyId);
+    if (
+      ![
+        AppState.DASHBOARD_OPS,
+        AppState.DASHBOARD_ADMIN,
+        AppState.DASHBOARD_PANEL,
+        AppState.PRODUCT_MATCHES,
+      ].includes(appState)
+    ) {
+      setAppState(
+        currentUser?.role === 'ADMIN' ? AppState.DASHBOARD_OPS : AppState.DASHBOARD_PANEL,
+      );
+    }
   };
 
   const handleAddUser = async (newUser: User) => {
     try {
       const created = await api.createUser(newUser);
-      setUsers(prev => [...prev, created]);
+      setUsers((prev) => [...prev, created]);
       return null;
     } catch (err) {
       return err instanceof ApiError ? err.message : 'Error creando usuario.';
@@ -127,7 +163,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const handleUpdateUser = async (updatedUser: User) => {
     try {
       const updated = await api.updateUser(updatedUser);
-      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
       return null;
     } catch (err) {
       return err instanceof ApiError ? err.message : 'Error actualizando usuario.';
@@ -141,7 +177,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
 
     try {
       await api.deleteUser(id);
-      setUsers(prev => prev.filter(u => u.id !== id));
+      setUsers((prev) => prev.filter((u) => u.id !== id));
       return null;
     } catch (err) {
       return err instanceof ApiError ? err.message : 'Error eliminando usuario.';
@@ -151,7 +187,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const handleAddAgency = async (newAgency: Agency) => {
     try {
       const created = await api.createAgency(newAgency);
-      setAgencies(prev => [...prev, created]);
+      setAgencies((prev) => [...prev, created]);
       return null;
     } catch (err) {
       return err instanceof ApiError ? err.message : 'Error creando agencia.';
@@ -161,7 +197,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const handleUpdateAgency = async (updatedAgency: Agency) => {
     try {
       const updated = await api.updateAgency(updatedAgency);
-      setAgencies(prev => prev.map(a => a.id === updated.id ? updated : a));
+      setAgencies((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       return null;
     } catch (err) {
       return err instanceof ApiError ? err.message : 'Error actualizando agencia.';
@@ -176,7 +212,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     try {
       // La API ya valida integridad (usuarios asignados)
       await api.deleteAgency(id);
-      setAgencies(prev => prev.filter(a => a.id !== id));
+      setAgencies((prev) => prev.filter((a) => a.id !== id));
       return null;
     } catch (err) {
       return err instanceof ApiError ? err.message : 'Error eliminando agencia.';
@@ -185,7 +221,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
 
   const handleFilesSelected = (files: File[], format: AgentType) => {
     if (!currentAgencyId || currentAgencyId === 'GLOBAL') {
-      alert('Selecciona una agencia especifica antes de procesar facturas. La vista global es solo para consulta.');
+      alert(
+        'Selecciona una agencia especifica antes de procesar facturas. La vista global es solo para consulta.',
+      );
       return;
     }
 
@@ -197,7 +235,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
 
   // ACTUALIZACIÓN DE ÍTEM INDIVIDUAL (Sin crear nuevos)
   const handleUpdateResult = (updatedItem: BatchItem) => {
-      updateResult(updatedItem);
+    updateResult(updatedItem);
   };
 
   const handleBatchComplete = async (batchId: string, newResults: BatchItem[]) => {
@@ -207,27 +245,31 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
 
     completedBatchIdsRef.current.add(batchId);
 
-    const processedCount = newResults.filter(r => r.status === 'SUCCESS' || r.status === 'ERROR').length;
+    const processedCount = newResults.filter(
+      (r) => r.status === 'SUCCESS' || r.status === 'ERROR',
+    ).length;
     const targetAgencyId = currentAgencyId;
     if (!targetAgencyId || targetAgencyId === 'GLOBAL') {
-      alert('No se guardo el lote porque no hay una agencia especifica seleccionada. Selecciona una agencia y vuelve a procesar.');
+      alert(
+        'No se guardo el lote porque no hay una agencia especifica seleccionada. Selecciona una agencia y vuelve a procesar.',
+      );
       setAppState(AppState.PROCESS_SELECTION);
       return;
     }
 
-    const resultsWithMeta = newResults.map(item => ({
-        ...item,
-        user: currentUser?.name || 'Unknown',
-        agencyId: targetAgencyId 
+    const resultsWithMeta = newResults.map((item) => ({
+      ...item,
+      user: currentUser?.name || 'Unknown',
+      agencyId: targetAgencyId,
     }));
-    
+
     try {
       await addResults(resultsWithMeta);
 
       if (processedCount > 0) {
         try {
           const updated = await api.bumpAgencyUsage(targetAgencyId, processedCount);
-          setAgencies(prev => prev.map(a => a.id === updated.id ? updated : a));
+          setAgencies((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
         } catch (err) {
           console.error('Error actualizando uso de agencia:', err);
         }
@@ -236,13 +278,15 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       setAppState(AppState.HISTORY_RESULTS);
     } catch (err) {
       console.error('Error guardando resultados del lote:', err);
-      alert('No se pudieron guardar los resultados del lote. Intenta nuevamente antes de continuar.');
+      alert(
+        'No se pudieron guardar los resultados del lote. Intenta nuevamente antes de continuar.',
+      );
     }
   };
-  
+
   const handleClearHistory = async () => {
-    if(await confirm("¿Estás seguro de limpiar todo el historial de esta sesión?")) {
-        clearResults();
+    if (await confirm('¿Estás seguro de limpiar todo el historial de esta sesión?')) {
+      clearResults();
     }
   };
 
@@ -251,9 +295,10 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       return null;
     }
 
-    const message = ids.length === 1
-      ? '¿Eliminar este registro extraído de forma permanente?'
-      : `¿Eliminar ${ids.length} registros extraídos de forma permanente?`;
+    const message =
+      ids.length === 1
+        ? '¿Eliminar este registro extraído de forma permanente?'
+        : `¿Eliminar ${ids.length} registros extraídos de forma permanente?`;
 
     if (!(await confirm(message))) {
       return null;
@@ -285,31 +330,35 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     }
 
     if (appState === AppState.BATCH_RUNNING && target !== AppState.BATCH_RUNNING) {
-      if (!(await confirm("¿Estás seguro? El proceso actual se detendrá."))) return;
+      if (!(await confirm('¿Estás seguro? El proceso actual se detendrá.'))) return;
     }
     setAppState(target);
   };
 
-  const contextPlan = currentAgency ? PLANS.find(p => p.id === currentAgency.planId) : undefined;
+  const contextPlan = currentAgency ? PLANS.find((p) => p.id === currentAgency.planId) : undefined;
 
   // WIDGET MODE WRAPPER
-  const containerClasses = isWidgetMode 
-    ? "fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in"
-    : "h-screen w-full";
-  
+  const containerClasses = isWidgetMode
+    ? 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in'
+    : 'h-screen w-full';
+
   const innerClasses = isWidgetMode
-    ? "bg-slate-50 dark:bg-slate-900 w-full max-w-[95vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex relative"
-    : "h-full w-full flex bg-slate-50 dark:bg-slate-900 font-sans";
+    ? 'bg-slate-50 dark:bg-slate-900 w-full max-w-[95vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex relative'
+    : 'h-full w-full flex bg-slate-50 dark:bg-slate-900 font-sans';
 
   if (!isOpen) return null;
 
   // Mostrar loading mientras se restaura sesión o cargan datos
   if (!sessionReady || dataLoading) {
     return (
-      <div className={`${isDarkMode ? 'dark' : ''} h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900`}>
+      <div
+        className={`${isDarkMode ? 'dark' : ''} h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900`}
+      >
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Conectando con la base de datos...</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            Conectando con la base de datos...
+          </p>
         </div>
       </div>
     );
@@ -317,96 +366,120 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
 
   const MainContent = () => (
     <>
-         {appState === AppState.LOGIN ? (
-           <div className="w-full h-full overflow-y-auto">
-              <LoginScreen onLogin={handleLogin} />
-           </div>
-         ) : (
-           <>
-            <Sidebar 
-                currentTab={appState} 
-                onNavigate={handleNavigate} 
-                onLogout={handleLogout}
-                isDarkMode={isDarkMode}
-                onToggleTheme={toggleDarkMode}
-                userRole={currentUser?.role || 'OPERADOR'}
-                userName={currentUser?.name || 'Usuario'}
-                availableAgencies={availableAgencies}
-                currentAgencyId={currentAgencyId}
-                onSwitchAgency={handleSwitchAgencyContext}
-            />
+      {appState === AppState.LOGIN ? (
+        <div className="w-full h-full overflow-y-auto">
+          <LoginScreen onLogin={handleLogin} />
+        </div>
+      ) : (
+        <>
+          <Sidebar
+            currentTab={appState}
+            onNavigate={handleNavigate}
+            onLogout={handleLogout}
+            isDarkMode={isDarkMode}
+            onToggleTheme={toggleDarkMode}
+            userRole={currentUser?.role || 'OPERADOR'}
+            userName={currentUser?.name || 'Usuario'}
+            availableAgencies={availableAgencies}
+            currentAgencyId={currentAgencyId}
+            onSwitchAgency={handleSwitchAgencyContext}
+          />
 
-            <main className="flex-1 overflow-hidden relative flex flex-col">
-                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
-                {appState === AppState.DASHBOARD_ADMIN && currentUser?.role === 'ADMIN' && (
-                  <AdminDashboard agencies={agencies} plans={PLANS} />
-                )}
-                {appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
-                    <DashboardHome results={batchResults} currentAgencyId={currentAgencyId} currentAgency={currentAgency} currentPlan={contextPlan} />
-                )}
-                {appState === AppState.DASHBOARD_PANEL && currentUser && (
-                  <OperatorPanel results={batchResults} currentAgencyId={currentAgencyId} currentAgency={currentAgency} />
-                )}
-                {appState === AppState.USER_MANAGEMENT && currentUser?.role === 'ADMIN' && (
-                    <UserManagement users={users} agencies={agencies} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />
-                )}
-                {appState === AppState.AGENCY_CONFIG && currentUser?.role === 'ADMIN' && (
-                    <AgenciesConfiguration agencies={agencies} plans={PLANS} onAddAgency={handleAddAgency} onUpdateAgency={handleUpdateAgency} onDeleteAgency={handleDeleteAgency} />
-                )}
-                {appState === AppState.PRODUCT_MATCHES && currentUser && (
-                  <ProductMatchCatalog currentAgencyId={currentAgencyId} currentAgency={currentAgency} />
-                )}
-                {appState === AppState.PROCESS_SELECTION && (
-                    <TemplateGallery onSelectFiles={handleFilesSelected} />
-                )}
-                {appState === AppState.BATCH_RUNNING && (
-                    <div className="h-full flex flex-col justify-center">
-                        <BatchProcessor
-                            files={batchFiles}
-                            format={selectedFormat}
-                            batchId={currentBatchId}
-                            onComplete={(results) => handleBatchComplete(currentBatchId, results)}
-                        />
-                    </div>
-                )}
-                {appState === AppState.HISTORY_RESULTS && (
-                    <ResultsDashboard 
-                        results={batchResults} 
-                        onBack={() => setAppState(AppState.PROCESS_SELECTION)} 
-                        onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
-                        onUpdateItem={handleUpdateResult} 
-                    />
-                )}
-                {appState === AppState.DATA_CLEANUP && (
-                  <ExtractedDataManager
-                    results={batchResults}
-                    isBusy={isCleaningData}
-                    onRefresh={handleRefreshBatchResults}
-                    onDeleteItems={handleDeleteBatchItems}
+          <main className="flex-1 overflow-hidden relative flex flex-col">
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+              {appState === AppState.DASHBOARD_ADMIN && currentUser?.role === 'ADMIN' && (
+                <AdminDashboard agencies={agencies} plans={PLANS} />
+              )}
+              {appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
+                <DashboardHome
+                  results={batchResults}
+                  currentAgencyId={currentAgencyId}
+                  currentAgency={currentAgency}
+                  currentPlan={contextPlan}
+                />
+              )}
+              {appState === AppState.DASHBOARD_PANEL && currentUser && (
+                <OperatorPanel
+                  results={batchResults}
+                  currentAgencyId={currentAgencyId}
+                  currentAgency={currentAgency}
+                />
+              )}
+              {appState === AppState.USER_MANAGEMENT && currentUser?.role === 'ADMIN' && (
+                <UserManagement
+                  users={users}
+                  agencies={agencies}
+                  onAddUser={handleAddUser}
+                  onUpdateUser={handleUpdateUser}
+                  onDeleteUser={handleDeleteUser}
+                />
+              )}
+              {appState === AppState.AGENCY_CONFIG && currentUser?.role === 'ADMIN' && (
+                <AgenciesConfiguration
+                  agencies={agencies}
+                  plans={PLANS}
+                  onAddAgency={handleAddAgency}
+                  onUpdateAgency={handleUpdateAgency}
+                  onDeleteAgency={handleDeleteAgency}
+                />
+              )}
+              {appState === AppState.PRODUCT_MATCHES && currentUser && (
+                <ProductMatchCatalog
+                  currentAgencyId={currentAgencyId}
+                  currentAgency={currentAgency}
+                />
+              )}
+              {appState === AppState.PROCESS_SELECTION && (
+                <TemplateGallery onSelectFiles={handleFilesSelected} />
+              )}
+              {appState === AppState.BATCH_RUNNING && (
+                <div className="h-full flex flex-col justify-center">
+                  <BatchProcessor
+                    files={batchFiles}
+                    format={selectedFormat}
+                    batchId={currentBatchId}
+                    onComplete={(results) => handleBatchComplete(currentBatchId, results)}
                   />
-                )}
                 </div>
-            </main>
-           </>
-         )}
+              )}
+              {appState === AppState.HISTORY_RESULTS && (
+                <ResultsDashboard
+                  results={batchResults}
+                  onBack={() => setAppState(AppState.PROCESS_SELECTION)}
+                  onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
+                  onUpdateItem={handleUpdateResult}
+                />
+              )}
+              {appState === AppState.DATA_CLEANUP && (
+                <ExtractedDataManager
+                  results={batchResults}
+                  isBusy={isCleaningData}
+                  onRefresh={handleRefreshBatchResults}
+                  onDeleteItems={handleDeleteBatchItems}
+                />
+              )}
+            </div>
+          </main>
+        </>
+      )}
     </>
   );
 
   return (
     <div className={`${isDarkMode ? 'dark' : ''} ${containerClasses}`}>
-        {isWidgetMode && (
-            // Close Button for Widget Mode
-            <button 
-                onClick={onClose} 
-                className="absolute top-4 right-4 z-[60] bg-white text-slate-500 hover:text-red-500 p-2 rounded-full shadow-lg transition-transform hover:scale-110"
-            >
-                <X className="w-6 h-6" />
-            </button>
-        )}
-        
-        <div className={innerClasses}>
-            <MainContent />
-        </div>
+      {isWidgetMode && (
+        // Close Button for Widget Mode
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-[60] bg-white text-slate-500 hover:text-red-500 p-2 rounded-full shadow-lg transition-transform hover:scale-110"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      )}
+
+      <div className={innerClasses}>
+        <MainContent />
+      </div>
     </div>
   );
 }

@@ -1,15 +1,16 @@
 import { Agency, SubscriptionPlan, User } from '../types';
 
-const buildAgencyMap = (agencies: Agency[]) => new Map(agencies.map((agency) => [agency.id, agency]));
+const buildAgencyMap = (agencies: Agency[]) =>
+  new Map(agencies.map((agency) => [agency.id, agency]));
 
 export const validateUserIntegrity = (
   candidate: User,
   users: User[],
   agencies: Agency[],
-  editingId?: string
+  editingId?: string,
 ): string | null => {
   const emailExists = users.some(
-    (user) => user.email.toLowerCase() === candidate.email.toLowerCase() && user.id !== editingId
+    (user) => user.email.toLowerCase() === candidate.email.toLowerCase() && user.id !== editingId,
   );
 
   if (emailExists) {
@@ -25,7 +26,9 @@ export const validateUserIntegrity = (
   }
 
   const agenciesMap = buildAgencyMap(agencies);
-  const assignedAgencies = candidate.agencyIds.map((agencyId) => agenciesMap.get(agencyId)).filter(Boolean) as Agency[];
+  const assignedAgencies = candidate.agencyIds
+    .map((agencyId) => agenciesMap.get(agencyId))
+    .filter(Boolean) as Agency[];
 
   if (candidate.role !== 'ADMIN' && assignedAgencies.every((agency) => !agency.isActive)) {
     return 'El usuario debe tener al menos una agencia activa asignada.';
@@ -38,7 +41,7 @@ export const validateAgencyIntegrity = (
   candidate: Agency,
   agencies: Agency[],
   users: User[],
-  plans: SubscriptionPlan[]
+  plans: SubscriptionPlan[],
 ): string | null => {
   if (!candidate.planId || !plans.some((plan) => plan.id === candidate.planId)) {
     return 'Debe seleccionar un plan válido para la agencia.';
@@ -56,7 +59,8 @@ export const validateAgencyIntegrity = (
       }
 
       const remainingActiveAgencies = agencies.filter(
-        (agency) => user.agencyIds.includes(agency.id) && agency.id !== candidate.id && agency.isActive
+        (agency) =>
+          user.agencyIds.includes(agency.id) && agency.id !== candidate.id && agency.isActive,
       );
 
       return user.agencyIds.includes(candidate.id) && remainingActiveAgencies.length === 0;
@@ -79,7 +83,11 @@ export const validateAgencyDeletion = (agencyId: string, users: User[]): string 
   return null;
 };
 
-export const bumpAgencyUsage = (agencies: Agency[], agencyId: string, pageIncrement: number): Agency[] => {
+export const bumpAgencyUsage = (
+  agencies: Agency[],
+  agencyId: string,
+  pageIncrement: number,
+): Agency[] => {
   return agencies.map((agency) => {
     if (agency.id !== agencyId) {
       return agency;
@@ -93,7 +101,10 @@ export const bumpAgencyUsage = (agencies: Agency[], agencyId: string, pageIncrem
   });
 };
 
-export const withTimestamps = <T extends { createdAt?: string; updatedAt?: string }>(item: T, existing?: T): T => {
+export const withTimestamps = <T extends { createdAt?: string; updatedAt?: string }>(
+  item: T,
+  existing?: T,
+): T => {
   const now = new Date().toISOString();
   return {
     ...item,

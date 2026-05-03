@@ -5,9 +5,22 @@
 - Install with `npm install`; this repo uses `package-lock.json` and npm scripts, not pnpm/yarn.
 - Local dev is `npm run dev`, which starts both `tsx --watch server/index.ts` on `:3001` and Vite on `:5173` with `/api` proxied to the backend.
 - Production flow is `npm run build` then `npm run start`; `start` runs `tsx server/index.ts` and serves `dist/` when it exists.
-- `npm run build` only typechecks the root `tsconfig.json`, which excludes `server/`; run `npx tsc -p server/tsconfig.json --noEmit` after backend changes.
-- There is no configured test, lint, formatter, CI, or pre-commit suite. Use focused manual checks plus the type/build commands above.
 - `npm run db:seed` runs migrations and the idempotent seed manually, but normal server startup already runs migrations, seed, and product match master seed.
+
+## Quality Checks
+
+- `npm run typecheck` — full TypeScript check for both root and server tsconfigs.
+- `npm run format` — auto-format all source files with Prettier.
+- `npm run format:check` — verify formatting without changing files.
+- `npm run quality` — pre-commit quality check (console.log, debugger, secrets, .only() in tests).
+- `npm run scan-secrets` — full project scan for hardcoded secrets/keys.
+- `npm run check` — run all checks: typecheck + format + quality (what CI would run).
+
+## Rules (active during coding sessions)
+
+- `.opencode/rules/common/` — universal rules: coding style, testing, git workflow, security, performance.
+- `.opencode/rules/typescript/` — TypeScript-specific rules extending the common ones.
+- Rules are read by the AI during development to enforce standards. See each file for details.
 
 ## Runtime And Data
 

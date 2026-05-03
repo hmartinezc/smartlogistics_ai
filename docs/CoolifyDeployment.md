@@ -37,23 +37,23 @@ Ventajas:
 
 ### Campos clave
 
-| Campo | Valor |
-|---|---|
-| Port | `3001` |
-| Healthcheck Path | `/api/health` |
-| Restart Policy | `unless-stopped` |
-| Base Directory | `/` |
+| Campo            | Valor            |
+| ---------------- | ---------------- |
+| Port             | `3001`           |
+| Healthcheck Path | `/api/health`    |
+| Restart Policy   | `unless-stopped` |
+| Base Directory   | `/`              |
 
 ### Variables de entorno
 
 Carga estas variables en Coolify:
 
-| Variable | Requerida | Valor recomendado |
-|---|---|---|
-| `PORT` | No | `3001` |
-| `GEMINI_API_KEY` | Si | tu clave real |
-| `TURSO_DATABASE_URL` | No | `file:./data/smart-invoice.db` |
-| `TURSO_AUTH_TOKEN` | Solo si usas Turso remoto | token real |
+| Variable             | Requerida                 | Valor recomendado              |
+| -------------------- | ------------------------- | ------------------------------ |
+| `PORT`               | No                        | `3001`                         |
+| `GEMINI_API_KEY`     | Si                        | tu clave real                  |
+| `TURSO_DATABASE_URL` | No                        | `file:./data/smart-invoice.db` |
+| `TURSO_AUTH_TOKEN`   | Solo si usas Turso remoto | token real                     |
 
 Puedes partir de `.env.example`.
 

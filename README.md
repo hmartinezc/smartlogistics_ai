@@ -44,15 +44,15 @@ Esto levanta:
 
 Usa estos valores literalmente:
 
-| Campo Coolify | Valor |
-|---|---|
-| **Build Pack** | `Dockerfile` del repo |
-| **Build Command** | no aplica si usas `Dockerfile` |
-| **Start Command** | no aplica si usas `Dockerfile` |
-| **Port** | `3001` |
-| **Healthcheck Path** | `/api/health` |
-| **Persistent Volume** | `/app/data` |
-| **Node Version recomendada** | `20` |
+| Campo Coolify                | Valor                          |
+| ---------------------------- | ------------------------------ |
+| **Build Pack**               | `Dockerfile` del repo          |
+| **Build Command**            | no aplica si usas `Dockerfile` |
+| **Start Command**            | no aplica si usas `Dockerfile` |
+| **Port**                     | `3001`                         |
+| **Healthcheck Path**         | `/api/health`                  |
+| **Persistent Volume**        | `/app/data`                    |
+| **Node Version recomendada** | `20`                           |
 
 Si prefieres Nixpacks, usa como fallback:
 
@@ -61,12 +61,12 @@ Si prefieres Nixpacks, usa como fallback:
 
 ### Variables recomendadas para Coolify
 
-| Variable | Valor ejemplo | Obligatoria |
-|---|---|---|
-| `PORT` | `3001` | No |
-| `GEMINI_API_KEY` | `tu-api-key` | Sí |
-| `TURSO_DATABASE_URL` | `file:./data/smart-invoice.db` o `libsql://...` | No |
-| `TURSO_AUTH_TOKEN` | `token-remoto` | Solo si usas Turso remoto |
+| Variable             | Valor ejemplo                                   | Obligatoria               |
+| -------------------- | ----------------------------------------------- | ------------------------- |
+| `PORT`               | `3001`                                          | No                        |
+| `GEMINI_API_KEY`     | `tu-api-key`                                    | Sí                        |
+| `TURSO_DATABASE_URL` | `file:./data/smart-invoice.db` o `libsql://...` | No                        |
+| `TURSO_AUTH_TOKEN`   | `token-remoto`                                  | Solo si usas Turso remoto |
 
 ### Modo recomendado para arrancar barato
 

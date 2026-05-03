@@ -19,13 +19,13 @@ plans.get('/', async (c) => {
   const result = await db.execute('SELECT * FROM subscription_plans ORDER BY doc_limit');
 
   return c.json(
-    result.rows.map(row => ({
+    result.rows.map((row) => ({
       id: String(row.id),
       name: String(row.name),
       limit: Number(row.doc_limit),
       baseCost: Number(row.base_cost),
       extraPageCost: Number(row.extra_page_cost),
-    }))
+    })),
   );
 });
 

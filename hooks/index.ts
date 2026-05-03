@@ -7,10 +7,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { User, Agency, BatchItem, SubscriptionPlan } from '../types';
-import {
-  getAccessibleAgencies,
-  resolveDefaultAgencyContext,
-} from '../services/authService';
+import { getAccessibleAgencies, resolveDefaultAgencyContext } from '../services/authService';
 import { api, ApiError } from '../services/apiClient';
 
 // --------------------------
@@ -28,7 +25,9 @@ export function useApiData(enabled = false, currentUser: User | null = null) {
       const [a, p, u] = await Promise.all([
         api.getAgencies(),
         api.getPlans(),
-        currentUser?.role === 'ADMIN' ? api.getUsers() : Promise.resolve(currentUser ? [currentUser] : []),
+        currentUser?.role === 'ADMIN'
+          ? api.getUsers()
+          : Promise.resolve(currentUser ? [currentUser] : []),
       ]);
       setAgencies(a);
       setPlans(p);
@@ -117,7 +116,17 @@ export function useAuth(): UseAuthReturn {
   const isSupervisor = currentUser?.role === 'SUPERVISOR';
   const isAuthenticated = Boolean(currentUser);
 
-  return { currentUser, login, logout, loginApi, restoreSession, isAdmin, isSupervisor, isAuthenticated, sessionReady };
+  return {
+    currentUser,
+    login,
+    logout,
+    loginApi,
+    restoreSession,
+    isAdmin,
+    isSupervisor,
+    isAuthenticated,
+    sessionReady,
+  };
 }
 
 // --------------------------
@@ -130,10 +139,7 @@ interface UseAgencyContextReturn {
   currentAgency: Agency | undefined;
 }
 
-export function useAgencyContext(
-  user: User | null, 
-  agencies: Agency[]
-): UseAgencyContextReturn {
+export function useAgencyContext(user: User | null, agencies: Agency[]): UseAgencyContextReturn {
   const [currentAgencyId, setCurrentAgencyIdState] = useState<string>(() => {
     return localStorage.getItem('smart-invoice-ai.currentAgencyId') || '';
   });
@@ -152,18 +158,19 @@ export function useAgencyContext(
     }
 
     const defaultAgencyId = resolveDefaultAgencyContext(user, agencies);
-    const hasValidContext = currentAgencyId === 'GLOBAL'
-      ? user.role === 'ADMIN'
-      : availableAgencies.some((agency) => agency.id === currentAgencyId);
+    const hasValidContext =
+      currentAgencyId === 'GLOBAL'
+        ? user.role === 'ADMIN'
+        : availableAgencies.some((agency) => agency.id === currentAgencyId);
 
     if (!currentAgencyId || !hasValidContext) {
       setCurrentAgencyId(defaultAgencyId);
     }
   }, [agencies, availableAgencies, currentAgencyId, setCurrentAgencyId, user]);
 
-  const currentAgency = useMemo(() => 
-    agencies.find(a => a.id === currentAgencyId),
-    [agencies, currentAgencyId]
+  const currentAgency = useMemo(
+    () => agencies.find((a) => a.id === currentAgencyId),
+    [agencies, currentAgencyId],
   );
 
   return { currentAgencyId, setCurrentAgencyId, availableAgencies, currentAgency };
@@ -207,20 +214,18 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
 
     await api.saveBatchResults(serializableItems);
 
-    setBatchResults(prev => {
-      const existingIds = new Set(prev.map(item => item.id));
-      const newItems = serializableItems.filter(item => !existingIds.has(item.id));
+    setBatchResults((prev) => {
+      const existingIds = new Set(prev.map((item) => item.id));
+      const newItems = serializableItems.filter((item) => !existingIds.has(item.id));
 
       return newItems.length > 0 ? [...prev, ...newItems] : prev;
     });
   }, []);
 
   const updateResult = useCallback((updatedItem: BatchItem) => {
-    api.updateBatchItem(updatedItem).catch(err =>
-      console.error('Error actualizando item:', err)
-    );
-    setBatchResults(prev => 
-      prev.map(item => item.id === updatedItem.id ? updatedItem : item)
+    api.updateBatchItem(updatedItem).catch((err) => console.error('Error actualizando item:', err));
+    setBatchResults((prev) =>
+      prev.map((item) => (item.id === updatedItem.id ? updatedItem : item)),
     );
   }, []);
 
@@ -231,26 +236,24 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
 
     const uniqueIds = Array.from(new Set(ids));
     await api.deleteBatchItems(uniqueIds);
-    setBatchResults(prev => prev.filter(item => !uniqueIds.includes(item.id)));
+    setBatchResults((prev) => prev.filter((item) => !uniqueIds.includes(item.id)));
   }, []);
 
   const clearResults = useCallback((localOnly = false) => {
     if (!localOnly) {
-      api.clearBatchResults().catch(err =>
-        console.error('Error limpiando historial:', err)
-      );
+      api.clearBatchResults().catch((err) => console.error('Error limpiando historial:', err));
     }
     setBatchResults([]);
   }, []);
 
-  const successCount = useMemo(() => 
-    batchResults.filter(r => r.status === 'SUCCESS').length,
-    [batchResults]
+  const successCount = useMemo(
+    () => batchResults.filter((r) => r.status === 'SUCCESS').length,
+    [batchResults],
   );
 
-  const errorCount = useMemo(() => 
-    batchResults.filter(r => r.status === 'ERROR').length,
-    [batchResults]
+  const errorCount = useMemo(
+    () => batchResults.filter((r) => r.status === 'ERROR').length,
+    [batchResults],
   );
 
   return {
@@ -281,7 +284,9 @@ export function useConfirmDialog(): UseConfirmDialogReturn {
   }, []);
 
   const confirmDelete = useCallback(async (itemName: string): Promise<boolean> => {
-    return window.confirm(`¿Estás seguro de eliminar "${itemName}"? Esta acción no se puede deshacer.`);
+    return window.confirm(
+      `¿Estás seguro de eliminar "${itemName}"? Esta acción no se puede deshacer.`,
+    );
   }, []);
 
   return { confirm, confirmDelete };

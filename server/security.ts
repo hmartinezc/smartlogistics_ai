@@ -101,7 +101,11 @@ export async function requireAuth(c: Context): Promise<AuthUser | Response> {
   return user;
 }
 
-export function requireRole(c: Context, user: AuthUser, roles: AuthUser['role'][]): Response | null {
+export function requireRole(
+  c: Context,
+  user: AuthUser,
+  roles: AuthUser['role'][],
+): Response | null {
   if (!roles.includes(user.role)) {
     return c.json({ error: 'No autorizado para esta operación.' }, 403);
   }

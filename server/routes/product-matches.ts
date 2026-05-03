@@ -7,7 +7,12 @@ import { ensureAgencyAccess, requireAuth } from '../security.js';
 
 const productMatches = new Hono();
 
-const VISIBLE_TEMPLATE_HEADERS = ['Descripción Product', 'Código producto cliente', 'Descripción producto cliente', 'HTS Match'];
+const VISIBLE_TEMPLATE_HEADERS = [
+  'Descripción Product',
+  'Código producto cliente',
+  'Descripción producto cliente',
+  'HTS Match',
+];
 const VISIBLE_TEMPLATE_EXAMPLE = ['Rosa Roja', 'FLR-001', 'Rosa Roja Premium', '0603.11.00.10'];
 
 const HEADER_ALIASES: Record<string, string[]> = {
@@ -82,7 +87,11 @@ async function ensureAgencyExists(agencyId: string): Promise<boolean> {
   return result.rows.length > 0;
 }
 
-async function findDuplicateProduct(agencyId: string, product: string, excludedId?: string): Promise<boolean> {
+async function findDuplicateProduct(
+  agencyId: string,
+  product: string,
+  excludedId?: string,
+): Promise<boolean> {
   const db = getDb();
   const result = excludedId
     ? await db.execute({
@@ -166,9 +175,13 @@ productMatches.post('/bootstrap', async (c) => {
   const existingCatalogCount = Number(existingCatalogResult.rows[0]?.count ?? 0);
 
   if (existingCatalogCount > 0) {
-    return c.json({
-      error: 'La agencia ya tiene registros en Match Productos. La carga inicial solo aplica cuando el catalogo esta vacio.',
-    }, 400);
+    return c.json(
+      {
+        error:
+          'La agencia ya tiene registros en Match Productos. La carga inicial solo aplica cuando el catalogo esta vacio.',
+      },
+      400,
+    );
   }
 
   const masterResult = await db.execute({
@@ -195,9 +208,12 @@ productMatches.post('/bootstrap', async (c) => {
   const acceptedCandidates = [...resolvedCandidates.values()];
 
   if (acceptedCandidates.length === 0) {
-    return c.json({
-      error: 'La matriz base no tiene filas utilizables para copiar a la agencia.',
-    }, 409);
+    return c.json(
+      {
+        error: 'La matriz base no tiene filas utilizables para copiar a la agencia.',
+      },
+      409,
+    );
   }
 
   const now = new Date().toISOString();
@@ -223,11 +239,14 @@ productMatches.post('/bootstrap', async (c) => {
     'write',
   );
 
-  return c.json({
-    ok: true,
-    insertedCount: acceptedCandidates.length,
-    masterRowCount: masterResult.rows.length,
-  }, 201);
+  return c.json(
+    {
+      ok: true,
+      insertedCount: acceptedCandidates.length,
+      masterRowCount: masterResult.rows.length,
+    },
+    201,
+  );
 });
 
 // POST /api/product-matches
@@ -423,12 +442,7 @@ productMatches.get('/template', async (c) => {
   const worksheet = XLSX.utils.aoa_to_sheet([VISIBLE_TEMPLATE_HEADERS, VISIBLE_TEMPLATE_EXAMPLE]);
 
   // Ancho de columnas para mejor legibilidad
-  worksheet['!cols'] = [
-    { wch: 30 },
-    { wch: 26 },
-    { wch: 32 },
-    { wch: 20 },
-  ];
+  worksheet['!cols'] = [{ wch: 30 }, { wch: 26 }, { wch: 32 }, { wch: 20 }];
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Match Productos');
@@ -473,7 +487,13 @@ productMatches.post('/import', async (c) => {
   // Validar extensión
   const fileName = file.name.toLowerCase();
   if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.csv')) {
-    return c.json({ error: 'El archivo debe ser .xlsx (Excel) o .csv. Descarga la plantilla para obtener el formato correcto.' }, 400);
+    return c.json(
+      {
+        error:
+          'El archivo debe ser .xlsx (Excel) o .csv. Descarga la plantilla para obtener el formato correcto.',
+      },
+      400,
+    );
   }
 
   if (!(await ensureAgencyExists(agencyId))) {
@@ -490,9 +510,13 @@ productMatches.post('/import', async (c) => {
   const existingCount = Number(existingCountResult.rows[0]?.count ?? 0);
 
   if (existingCount > 0) {
-    return c.json({
-      error: 'La agencia ya tiene registros en Match Productos. La importación solo aplica cuando el catálogo está vacío.',
-    }, 400);
+    return c.json(
+      {
+        error:
+          'La agencia ya tiene registros en Match Productos. La importación solo aplica cuando el catálogo está vacío.',
+      },
+      400,
+    );
   }
 
   // Leer el archivo como ArrayBuffer y parsear con SheetJS
@@ -502,7 +526,10 @@ productMatches.post('/import', async (c) => {
     const buffer = Buffer.from(arrayBuffer);
     workbook = XLSX.read(buffer, { type: 'buffer' });
   } catch {
-    return c.json({ error: 'No se pudo leer el archivo. Verifica que sea un Excel (.xlsx) o CSV válido.' }, 400);
+    return c.json(
+      { error: 'No se pudo leer el archivo. Verifica que sea un Excel (.xlsx) o CSV válido.' },
+      400,
+    );
   }
 
   const sheetName = workbook.SheetNames[0];
@@ -520,7 +547,13 @@ productMatches.post('/import', async (c) => {
   });
 
   if (rawData.length < 2) {
-    return c.json({ error: 'El archivo está vacío o solo contiene la cabecera. Agrega al menos una fila de datos.' }, 400);
+    return c.json(
+      {
+        error:
+          'El archivo está vacío o solo contiene la cabecera. Agrega al menos una fila de datos.',
+      },
+      400,
+    );
   }
 
   // Primera fila como cabeceras. Solo se aceptan las 4 columnas visibles de la plantilla.
@@ -530,10 +563,18 @@ productMatches.post('/import', async (c) => {
   const productMatchIndex = findHeaderIndex(headers, 'productMatch');
   const htsMatchIndex = findHeaderIndex(headers, 'htsMatch');
 
-  if (productIndex < 0 || clientProductCodeIndex < 0 || productMatchIndex < 0 || htsMatchIndex < 0) {
-    return c.json({
-      error: `El archivo debe incluir exactamente estas columnas: ${VISIBLE_TEMPLATE_HEADERS.join(', ')}. Cabeceras encontradas: ${headers.join(', ')}. Descarga la plantilla para obtener el formato correcto.`,
-    }, 400);
+  if (
+    productIndex < 0 ||
+    clientProductCodeIndex < 0 ||
+    productMatchIndex < 0 ||
+    htsMatchIndex < 0
+  ) {
+    return c.json(
+      {
+        error: `El archivo debe incluir exactamente estas columnas: ${VISIBLE_TEMPLATE_HEADERS.join(', ')}. Cabeceras encontradas: ${headers.join(', ')}. Descarga la plantilla para obtener el formato correcto.`,
+      },
+      400,
+    );
   }
 
   // Parsear filas de datos (saltar cabecera)
@@ -575,24 +616,41 @@ productMatches.post('/import', async (c) => {
               id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [id, agencyId, category, product, clientProductCode, productMatch, hts, htsMatch, now, now],
+      args: [
+        id,
+        agencyId,
+        category,
+        product,
+        clientProductCode,
+        productMatch,
+        hts,
+        htsMatch,
+        now,
+        now,
+      ],
     });
 
     importedCount++;
   }
 
   if (importedCount === 0) {
-    return c.json({
-      error: `No se importó ningún registro.${duplicates.length > 0 ? ` ${duplicates.length} producto(s) ya existían: ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? '...' : ''}` : ' Verifica que el archivo tenga datos válidos.'}`,
-    }, 400);
+    return c.json(
+      {
+        error: `No se importó ningún registro.${duplicates.length > 0 ? ` ${duplicates.length} producto(s) ya existían: ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? '...' : ''}` : ' Verifica que el archivo tenga datos válidos.'}`,
+      },
+      400,
+    );
   }
 
-  return c.json({
-    ok: true,
-    importedCount,
-    duplicateCount: duplicates.length,
-    message: `Se importaron ${importedCount} registros correctamente.${duplicates.length > 0 ? ` ${duplicates.length} producto(s) fueron omitidos por estar duplicados.` : ''}`,
-  }, 201);
+  return c.json(
+    {
+      ok: true,
+      importedCount,
+      duplicateCount: duplicates.length,
+      message: `Se importaron ${importedCount} registros correctamente.${duplicates.length > 0 ? ` ${duplicates.length} producto(s) fueron omitidos por estar duplicados.` : ''}`,
+    },
+    201,
+  );
 });
 
 export default productMatches;

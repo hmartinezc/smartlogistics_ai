@@ -1,6 +1,6 @@
 ---
 name: warehouse-transaccional-replication
-description: "Use when: replicar la arquitectura del Smart Logistics Extractor sin IA en cualquier nuevo proyecto transaccional, crear un sistema web con React + Hono + libSQL/Turso, validar que otro repo sigue el mismo patron arquitectonico, preparar despliegue en Coolify o Hetzner."
+description: 'Use when: replicar la arquitectura del Smart Logistics Extractor sin IA en cualquier nuevo proyecto transaccional, crear un sistema web con React + Hono + libSQL/Turso, validar que otro repo sigue el mismo patron arquitectonico, preparar despliegue en Coolify o Hetzner.'
 ---
 
 # Patron Arquitectonico Reutilizable — Sistemas Transaccionales

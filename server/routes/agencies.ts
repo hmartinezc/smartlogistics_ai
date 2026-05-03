@@ -45,10 +45,11 @@ agencies.get('/', async (c) => {
   }
 
   const db = getDb();
-  const result = authUser.role === 'ADMIN'
-    ? await db.execute(`${AGENCY_SELECT} GROUP BY a.id ORDER BY a.name`)
-    : await db.execute({
-        sql: `SELECT
+  const result =
+    authUser.role === 'ADMIN'
+      ? await db.execute(`${AGENCY_SELECT} GROUP BY a.id ORDER BY a.name`)
+      : await db.execute({
+          sql: `SELECT
                 a.id,
                 a.name,
                 a.plan_id,
@@ -63,8 +64,8 @@ agencies.get('/', async (c) => {
               WHERE ua.user_id = ?
               GROUP BY a.id
               ORDER BY a.name`,
-        args: [authUser.id],
-      });
+          args: [authUser.id],
+        });
 
   return c.json(result.rows.map(buildAgency));
 });
@@ -128,7 +129,15 @@ agencies.post('/', async (c) => {
   await db.execute({
     sql: `INSERT INTO agencies (id, name, plan_id, current_usage, is_active, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    args: [body.id, body.name, body.planId, body.currentUsage || 0, body.isActive ? 1 : 0, now, now],
+    args: [
+      body.id,
+      body.name,
+      body.planId,
+      body.currentUsage || 0,
+      body.isActive ? 1 : 0,
+      now,
+      now,
+    ],
   });
 
   // Insertar emails
@@ -136,7 +145,7 @@ agencies.post('/', async (c) => {
     body.emails.map((email: string) => ({
       sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)',
       args: [body.id, email],
-    }))
+    })),
   );
 
   const result = await db.execute({ sql: 'SELECT * FROM agencies WHERE id = ?', args: [body.id] });
@@ -200,10 +209,13 @@ agencies.put('/:id', async (c) => {
     });
 
     if (affectedUsers.rows.length > 0) {
-      const names = affectedUsers.rows.map(r => String(r.name)).join(', ');
-      return c.json({
-        error: `Suspender esta agencia dejaría sin acceso a: ${names}. Reasigne primero.`,
-      }, 400);
+      const names = affectedUsers.rows.map((r) => String(r.name)).join(', ');
+      return c.json(
+        {
+          error: `Suspender esta agencia dejaría sin acceso a: ${names}. Reasigne primero.`,
+        },
+        400,
+      );
     }
   }
 
@@ -221,7 +233,7 @@ agencies.put('/:id', async (c) => {
       body.emails.map((email: string) => ({
         sql: 'INSERT INTO agency_emails (agency_id, email) VALUES (?, ?)',
         args: [id, email],
-      }))
+      })),
     );
   }
 
@@ -257,10 +269,13 @@ agencies.delete('/:id', async (c) => {
   });
 
   if (assignedUsers.rows.length > 0) {
-    const names = assignedUsers.rows.map(r => String(r.name)).join(', ');
-    return c.json({
-      error: `No se puede eliminar la agencia mientras siga asignada a: ${names}.`,
-    }, 400);
+    const names = assignedUsers.rows.map((r) => String(r.name)).join(', ');
+    return c.json(
+      {
+        error: `No se puede eliminar la agencia mientras siga asignada a: ${names}.`,
+      },
+      400,
+    );
   }
 
   await db.execute({ sql: 'DELETE FROM agency_emails WHERE agency_id = ?', args: [id] });

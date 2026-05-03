@@ -12,19 +12,19 @@ const ProcessingStep: React.FC = () => {
       </div>
       <h3 className="text-xl font-bold text-slate-800 mb-2">Analyzing Document</h3>
       <p className="text-slate-500">
-        Our AI is extracting Master Data, House Guides, and Dimensions from your file.
-        This usually takes about 5-10 seconds.
+        Our AI is extracting Master Data, House Guides, and Dimensions from your file. This usually
+        takes about 5-10 seconds.
       </p>
-      
+
       <div className="mt-8 space-y-2">
-         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-             <div className="h-full bg-indigo-600 w-2/3 animate-[pulse_2s_infinite]"></div>
-         </div>
-         <div className="flex justify-between text-xs text-slate-400 px-1">
-            <span>Reading text...</span>
-            <span>Parsing tables...</span>
-            <span>Validating...</span>
-         </div>
+        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-600 w-2/3 animate-[pulse_2s_infinite]"></div>
+        </div>
+        <div className="flex justify-between text-xs text-slate-400 px-1">
+          <span>Reading text...</span>
+          <span>Parsing tables...</span>
+          <span>Validating...</span>
+        </div>
       </div>
     </div>
   );
