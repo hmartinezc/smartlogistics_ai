@@ -26,6 +26,25 @@ Normalize the 'Box Type' using this table and apply the **MATH FACTOR** to calcu
 `;
 
 // --------------------------
+// Knowledge Base: Densidad de Tallos por Producto (Opcional — Inteligencia Adicional)
+// --------------------------
+export const PRODUCT_STEMS_KNOWLEDGE_BASE = `
+### KNOWLEDGE BASE: STEMS PER BOX TYPE BY PRODUCT (OPTIONAL REFERENCE)
+This is **supplementary intelligence** that may grow over time. Use it ONLY when the product matches exactly.
+If the product is NOT listed here, use the EQ-based proportional distribution (see Distribution section).
+
+| Product | Box Type | Stems per Box |
+| :--- | :--- | :--- |
+| Roses / Spray Roses | QB | **100** |
+| Roses / Spray Roses | HB | **250** |
+| Gypsophila / Gypso | QB | **150** |
+| Alstroemeria | QB | **150** |
+
+**HOW TO USE (when product matches):**
+- Example: Roses, 1 HB + 1 QB = 250 + 100 = 350 stems total.
+`;
+
+// --------------------------
 // Reglas de Extracción Header/Footer
 // --------------------------
 export const HEADER_FOOTER_RULES = `
@@ -64,16 +83,59 @@ If a row has valid Pieces/Type (e.g., "2 EB"), and the **NEXT ROWS** have **EMPT
 1.  **DO NOT** create new line items for these "child" rows.
 2.  **ADD** the description text of these child rows to the 'varieties' array of the PARENT row.
 3.  The Parent Row keeps the total piece count.
+
+**SCENARIO F (The "Summary Row" — Financial data only in summary/footer):**
+If detail rows have Pieces and Box Type but **NO Stems/Price/Value**, and the financial data (Total Stems, Unit Price, Total Value, Description, HTS, NANDINA) only appears in a summary/footer row:
+1.  **DO NOT** create a line item for the summary row itself.
+2.  For each detail row, copy 'productDescription', 'hts', 'nandina', and 'unitPrice' from the summary row (same values for all rows).
+3.  Distribute 'totalStems' to each row following the **DISTRIBUTION & PRORATE LOGIC** section below (product table if match, EQ-proportional if not).
+4.  Calculate each row's 'totalValue' = totalStems × unitPrice.
+5.  **VERIFY**: Sum of row.totalStems = footer.totalStems (exact). Sum of row.totalValue ≈ footer.totalValue (within 0.02).
 `;
 
 // --------------------------
-// Lógica Avanzada de Distribución (TCBV)
+// Lógica Avanzada de Distribución
 // --------------------------
 export const ADVANCED_DISTRIBUTION_LOGIC = `
-**SCENARIO D (The "Master Box" Explosion / Prorrateo):**
-If the table says "1 Box" but Footer says "4 QB":
-1.  Trust the FOOTER Box Type and Count.
-2.  DISTRIBUTE the Total Pieces into the rows based on Stems/Value ratio.
+### DISTRIBUTION & PRORATE LOGIC
+
+**HOW TO DISTRIBUTE STEMS ACROSS MULTIPLE BOX TYPES:**
+
+**STEP 1 — Product matches the knowledge base:**
+Use the EXACT per-box values from the table. These are FIXED, not ratios to scale.
+- For each box type in the table, multiply: stems = box_count × stems_per_box.
+- These values are LOCKED — do not scale them.
+- If there is a box type NOT in the table, assign the REMAINING stems to it:
+  remaining = footer.totalStems - sum(table_box_stems).
+  Put the remainder into the box type with the highest EQ (the biggest box).
+- Example: Roses, 8 QB + 1 HB, 1150 stems total.
+  - 8 QB: 8 × 100 = 800 (locked — table says QB=100).
+  - 1 HB: 1150 - 800 = 350 (remainder goes to HB).
+  - Result: QB=800, HB=350 → total=1150.
+- Example: Roses, 1 HB + 1 QB, 350 stems total.
+  - 1 QB: 1 × 100 = 100 (locked).
+  - 1 HB: 350 - 100 = 250 (matches table: HB=250 for Roses).
+
+**STEP 2 — Product NOT in the knowledge base:**
+Distribute proportionally by EQ factor. The bigger box gets more stems.
+- Example: Unknown product, 1 HB (EQ=0.50) + 1 QB (EQ=0.25), 350 stems.
+  - Ratio EQ: 0.50:0.25 = 2:1.
+  - HB = 350 × 2/3 = 233, QB = 350 × 1/3 = 117 → total = 350.
+  - Round to integers. Adjust last row so sum matches footer exactly.
+
+**STEP 3 — Single box type (simple case):**
+If all rows have the SAME box type, distribute evenly across rows:
+- totalStems / number_of_rows, rounded to integers.
+- Example: 2 rows of QB + footer says 200 stems = 100 + 100.
+
+**UNIT PRICE IS CONSTANT:**
+The 'unitPrice' is the SAME for every row within the same invoice.
+- unitPrice = footer.totalValue / footer.totalStems.
+- Each row's totalValue = row.totalStems × unitPrice.
+
+**FINAL VERIFICATION:**
+- Sum of all row.totalStems MUST equal footer.totalStems (exact integer match).
+- Sum of all row.totalValue MUST equal footer.totalValue (within 0.02 rounding tolerance).
 `;
 
 // --------------------------
@@ -103,6 +165,7 @@ export const buildExtractionPrompt = (format: AgentType): string => {
   const sections = [
     SYSTEM_PROMPT_INTRO,
     BOX_TYPES_KNOWLEDGE_BASE,
+    PRODUCT_STEMS_KNOWLEDGE_BASE,
     HEADER_FOOTER_RULES,
     TABLE_EXTRACTION_RULES,
     useAdvancedDistribution ? ADVANCED_DISTRIBUTION_LOGIC : '',

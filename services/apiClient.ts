@@ -186,6 +186,58 @@ export const api = {
     });
   },
 
+  async downloadProductMatchTemplate(agencyId: string): Promise<void> {
+    const sessionId = getSessionId();
+    const headers: Record<string, string> = {};
+    if (sessionId) {
+      headers['X-Session-Id'] = sessionId;
+    }
+
+    const response = await fetch(`${API_BASE}/product-matches/template?agencyId=${encodeURIComponent(agencyId)}`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Error al descargar la plantilla.' }));
+      throw new ApiError(body.error || response.statusText, response.status);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `plantilla-match-productos-${agencyId}.xlsx`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  },
+
+  async importProductMatches(agencyId: string, file: File): Promise<{ ok: boolean; importedCount: number; duplicateCount?: number; message?: string }> {
+    const formData = new FormData();
+    formData.append('agencyId', agencyId);
+    formData.append('file', file);
+
+    const sessionId = getSessionId();
+    const headers: Record<string, string> = {};
+    if (sessionId) {
+      headers['X-Session-Id'] = sessionId;
+    }
+
+    const response = await fetch(`${API_BASE}/product-matches/import`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Error al importar el archivo.' }));
+      throw new ApiError(body.error || response.statusText, response.status);
+    }
+
+    return response.json();
+  },
+
   // ── Plans ──
   async getPlans(): Promise<import('../types').SubscriptionPlan[]> {
     return request('/plans');

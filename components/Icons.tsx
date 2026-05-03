@@ -4,7 +4,7 @@ import {
   ArrowRight, Package, Thermometer, Plane, Moon, Sun, Lock, 
   LogOut, Eye, X, Grid, List, Download, LayoutDashboard, 
   History, BrainCircuit, ChevronRight, ChevronLeft, BarChart3, TrendingUp, Calendar,
-  Hash, Trash2, Users, Shield, User, Building, Settings, ChevronDown, FileWarning, Pencil, Plus, RefreshCw, Power, Globe, EyeOff, Mail, Zap, AlertTriangle, Search
+  Hash, Trash2, Users, Shield, User, Building, Settings, ChevronDown, FileWarning, Pencil, Plus, RefreshCw, Power, Globe, EyeOff, Mail, Zap, AlertTriangle, Search, MoreVertical
 } from 'lucide-react';
 
 export { 
@@ -12,5 +12,5 @@ export {
   ArrowRight, Package, Thermometer, Plane, Moon, Sun, Lock, 
   LogOut, Eye, X, Grid, List, Download, LayoutDashboard, 
   History, BrainCircuit, ChevronRight, ChevronLeft, BarChart3, TrendingUp, Calendar,
-  Hash, Trash2, Users, Shield, User, Building, Settings, ChevronDown, FileWarning, Pencil, Plus, RefreshCw, Power, Globe, EyeOff, Mail, Zap, AlertTriangle, Search
+  Hash, Trash2, Users, Shield, User, Building, Settings, ChevronDown, FileWarning, Pencil, Plus, RefreshCw, Power, Globe, EyeOff, Mail, Zap, AlertTriangle, Search, MoreVertical
 };

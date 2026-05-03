@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BatchItem } from '../types';
-import { AlertCircle, BrainCircuit, Calendar, CheckCircle, ChevronDown, FileText, Package, RefreshCw, Search, Trash2, X } from './Icons';
+import { AlertCircle, BrainCircuit, Calendar, CheckCircle, ChevronDown, FileText, MoreVertical, Package, RefreshCw, Search, Trash2, X } from './Icons';
 import { getConfidenceColor } from '../utils/helpers';
 
 type StatusFilter = 'ALL' | BatchItem['status'];
@@ -57,8 +57,10 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   const [isDateFiltersOpen, setIsDateFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement | null>(null);
   const dateFiltersRef = useRef<HTMLDivElement | null>(null);
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null);
 
   const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
@@ -166,6 +168,26 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDateFiltersOpen]);
+
+  useEffect(() => {
+    if (!isActionsMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!actionsMenuRef.current) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && !actionsMenuRef.current.contains(target)) {
+        setIsActionsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isActionsMenuOpen]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]);
@@ -451,50 +473,109 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 )}
               </div>
 
-              <button
-                onClick={() => onRefresh()}
-                disabled={isBusy}
-                className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${isBusy ? 'animate-spin' : ''}`} />
-                Recargar
-              </button>
+              <div className="relative" ref={actionsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsActionsMenuOpen((current) => !current)}
+                  className="relative inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                  aria-label="Acciones"
+                  aria-haspopup="menu"
+                  aria-expanded={isActionsMenuOpen}
+                  title="Acciones"
+                >
+                  <MoreVertical className="h-5 w-5" />
+                </button>
+
+                {isActionsMenuOpen && (
+                  <div className="absolute right-0 z-30 mt-2 w-[280px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
+                    <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Acciones</p>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Gestiona los datos extraídos.</p>
+                    </div>
+                    <div className="p-2 space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          onRefresh();
+                        }}
+                        disabled={isBusy}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-800"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          <RefreshCw className={`h-4 w-4 ${isBusy ? 'animate-spin' : ''}`} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Recargar</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          toggleSelectAllVisible();
+                        }}
+                        disabled={filteredResults.length === 0}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-800"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          <FileText className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                            {selectedVisibleCount === filteredResults.length && filteredResults.length > 0 ? 'Quitar selección visible' : 'Seleccionar visibles'}
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          handleDelete(filteredIds);
+                        }}
+                        disabled={!hasActiveFilters || filteredResults.length === 0 || isBusy || dateRangeInvalid}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-rose-500/10"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+                          <Trash2 className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                            Eliminar filtrados ({filteredResults.length})
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          handleDelete(selectedIds);
+                        }}
+                        disabled={selectedIds.length === 0 || isBusy}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-rose-500/10"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+                          <Trash2 className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                            Eliminar seleccionados {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Action row */}
-          <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              Mostrando <span className="font-semibold text-slate-800 dark:text-white">{filteredResults.length}</span> de {results.length} registros
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={toggleSelectAllVisible}
-                disabled={filteredResults.length === 0}
-                className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-900 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
-              >
-                {selectedVisibleCount === filteredResults.length && filteredResults.length > 0 ? 'Quitar visibles' : 'Seleccionar visibles'}
-              </button>
-
-              <button
-                onClick={() => handleDelete(filteredIds)}
-                disabled={!hasActiveFilters || filteredResults.length === 0 || isBusy || dateRangeInvalid}
-                className="px-4 py-2 rounded-lg border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700 hover:bg-rose-100 hover:border-rose-300 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Eliminar filtrados ({filteredResults.length})
-              </button>
-
-              <button
-                onClick={() => handleDelete(selectedIds)}
-                disabled={selectedIds.length === 0 || isBusy}
-                className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Eliminar seleccionados
-              </button>
-            </div>
+          {/* Info row */}
+          <div className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            Mostrando <span className="font-semibold text-slate-800 dark:text-white">{filteredResults.length}</span> de {results.length} registros
           </div>
 
           {errorMessage && (

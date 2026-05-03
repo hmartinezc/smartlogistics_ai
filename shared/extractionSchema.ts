@@ -15,9 +15,9 @@ export const invoiceExtractionSchema: Schema = {
     freightForwarder: { type: SchemaType.STRING },
     ruc: { type: SchemaType.STRING },
     dae: { type: SchemaType.STRING },
-    totalPieces: { type: SchemaType.NUMBER, description: 'The EXACT TOTAL pieces printed on the footer. If not printed, sum lines.' },
+    totalPieces: { type: SchemaType.INTEGER, description: 'The EXACT TOTAL pieces printed on the footer. MUST BE A WHOLE INTEGER. If not printed, sum lines.' },
     totalEq: { type: SchemaType.NUMBER, description: 'The EXACT value printed for Full Boxes or EQ in the footer. Do NOT auto-correct based on lines.' },
-    totalStems: { type: SchemaType.NUMBER },
+    totalStems: { type: SchemaType.INTEGER, description: 'Total stems across all rows. MUST BE A WHOLE INTEGER (e.g. 350, 600, 1000).' },
     totalValue: { type: SchemaType.NUMBER },
     confidenceScore: { type: SchemaType.NUMBER, description: 'Calculated reliability score (0-100). Subtract points if Math mismatches.' },
     lineItems: {
@@ -26,7 +26,7 @@ export const invoiceExtractionSchema: Schema = {
         type: SchemaType.OBJECT,
         properties: {
           boxType: { type: SchemaType.STRING, description: 'Extract the REAL box type (e.g. QB). If table says Box but footer says QB, use QB.' },
-          totalPieces: { type: SchemaType.NUMBER, description: 'The calculated number of pieces for this row.' },
+          totalPieces: { type: SchemaType.INTEGER, description: 'The calculated number of pieces for this row. MUST BE A WHOLE INTEGER.' },
           eqFull: {
             type: SchemaType.NUMBER,
             description: 'CALCULATED FIELD. Formula: Pieces * Factor. (e.g. 2 QB = 0.50)',
@@ -39,7 +39,7 @@ export const invoiceExtractionSchema: Schema = {
           },
           hts: { type: SchemaType.STRING },
           nandina: { type: SchemaType.STRING },
-          totalStems: { type: SchemaType.NUMBER },
+          totalStems: { type: SchemaType.INTEGER, description: 'Stems for this row. MUST BE A WHOLE INTEGER, NO DECIMALS.' },
           unitPrice: { type: SchemaType.NUMBER },
           totalValue: { type: SchemaType.NUMBER },
         },

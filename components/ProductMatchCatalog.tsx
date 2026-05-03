@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Agency, ProductMatchCatalogItem } from '../types';
 import { api, ApiError } from '../services/apiClient';
 import { generateId } from '../utils/helpers';
-import { AlertCircle, AlertTriangle, ArrowRight, Building, CheckCircle, Package, Pencil, RefreshCw, Save, Search, Trash2, X } from './Icons';
+import { AlertCircle, AlertTriangle, ArrowRight, Building, CheckCircle, Download, MoreVertical, Package, Pencil, RefreshCw, Save, Search, Trash2, Upload, X } from './Icons';
 
 interface ProductMatchCatalogProps {
   currentAgencyId: string;
@@ -58,9 +58,13 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   activeAgencyRef.current = currentAgencyId;
 
@@ -128,6 +132,26 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
 
     void loadCatalog();
   }, [currentAgency, currentAgencyId, loadCatalog, resetForm]);
+
+  useEffect(() => {
+    if (!isActionsMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!actionsMenuRef.current) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && !actionsMenuRef.current.contains(target)) {
+        setIsActionsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isActionsMenuOpen]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -307,6 +331,71 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    if (!currentAgency || currentAgencyId === 'GLOBAL') {
+      return;
+    }
+
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      await api.downloadProductMatchTemplate(currentAgencyId);
+      setInfoMessage('Plantilla descargada correctamente. Ábrela en Excel, llénala y luego impórtala con el botón "Importar Excel".');
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'No fue posible descargar la plantilla.');
+    }
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentAgency || currentAgencyId === 'GLOBAL') {
+      // Reset input para permitir re-seleccionar el mismo archivo
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Validar extensión
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.csv')) {
+      setErrorMessage('El archivo debe ser un Excel (.xlsx) o CSV. Descarga la plantilla para obtener el formato correcto.');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    setIsImporting(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const result = await api.importProductMatches(currentAgencyId, file);
+      await loadCatalog({ force: true });
+      resetForm();
+
+      const dupMessage = result.duplicateCount && result.duplicateCount > 0
+        ? ` ${result.duplicateCount} producto(s) fueron omitidos por estar duplicados.`
+        : '';
+
+      setInfoMessage(`Se importaron ${result.importedCount} registros correctamente.${dupMessage}`);
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'No fue posible importar el archivo.');
+    } finally {
+      setIsImporting(false);
+      // Reset input para permitir re-seleccionar el mismo archivo
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const triggerFileImport = () => {
+    fileInputRef.current?.click();
+  };
+
   if (currentAgencyId === 'GLOBAL') {
     return (
       <div className="p-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -374,47 +463,130 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
 
         <div className="px-8 py-6 space-y-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="relative max-w-xl flex-1">
-              <Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por descripción product, código cliente, descripción cliente o HTS Match"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm text-slate-600 outline-none transition focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                placeholder="Buscar por descripción, código cliente o HTS Match..."
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-10 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               />
               {query.trim().length > 0 && (
                 <button
                   type="button"
                   onClick={() => setQuery('')}
                   aria-label="Limpiar búsqueda"
-                  className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+                  className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="relative" ref={actionsMenuRef}>
               <button
                 type="button"
-                onClick={() => void loadCatalog({ force: true })}
-                disabled={isLoading || isSaving || isBootstrapping}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                onClick={() => setIsActionsMenuOpen((current) => !current)}
+                className="relative inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                aria-label="Acciones del catálogo"
+                aria-haspopup="menu"
+                aria-expanded={isActionsMenuOpen}
+                title="Acciones del catálogo"
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Refrescar catálogo
+                <MoreVertical className="h-5 w-5" />
               </button>
-              {items.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => void handleBootstrapFromMaster()}
-                  disabled={isLoading || isSaving || isBootstrapping}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  {isBootstrapping ? 'Cargando base...' : 'Cargar catálogo base'}
-                </button>
+
+              {isActionsMenuOpen && (
+                <div className="absolute right-0 z-30 mt-2 w-[280px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
+                  <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Acciones</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Gestiona el catálogo de equivalencias.</p>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        void loadCatalog({ force: true });
+                      }}
+                      disabled={isLoading || isSaving || isBootstrapping || isImporting}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-800"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Refrescar catálogo</p>
+                      </div>
+                    </button>
+
+                    {items.length === 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsActionsMenuOpen(false);
+                            void handleDownloadTemplate();
+                          }}
+                          disabled={isLoading || isSaving || isBootstrapping || isImporting}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-indigo-500/10"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            <Download className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Descargar plantilla</p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsActionsMenuOpen(false);
+                            triggerFileImport();
+                          }}
+                          disabled={isLoading || isSaving || isBootstrapping || isImporting}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-800"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            <Upload className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Importar Excel</p>
+                          </div>
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".xlsx,.csv"
+                          onChange={(e) => { void handleImportFile(e); }}
+                          className="hidden"
+                          aria-label="Seleccionar archivo Excel para importar"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsActionsMenuOpen(false);
+                            void handleBootstrapFromMaster();
+                          }}
+                          disabled={isLoading || isSaving || isBootstrapping || isImporting}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-emerald-500/10"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+                            <CheckCircle className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                              {isBootstrapping ? 'Cargando catálogo base...' : 'Cargar catálogo base'}
+                            </p>
+                          </div>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -545,20 +717,9 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({ currentAgency
                               {items.length === 0 ? 'Puedes crear el primer match manualmente o cargar una base inicial desde la tabla maestra del sistema.' : 'Ajusta la búsqueda o limpia el filtro actual para ver más resultados.'}
                             </p>
                             {items.length === 0 && (
-                              <div className="mt-6 space-y-3">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleBootstrapFromMaster()}
-                                  disabled={isBootstrapping || isSaving || isLoading}
-                                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                  {isBootstrapping ? 'Cargando catálogo base...' : 'Cargar catálogo base'}
-                                </button>
-                                <p className="text-xs leading-5 text-slate-400 dark:text-slate-500">
-                                  La importación inicial usa la tabla maestra ya depurada. Si una descripción aparece más de una vez, se conserva una sola equivalencia final para evitar duplicados en la agencia.
-                                </p>
-                              </div>
+                              <p className="mt-4 text-xs leading-5 text-slate-400 dark:text-slate-500">
+                                Usa los botones de la barra superior para descargar la plantilla, importar un Excel o cargar el catálogo base desde la matriz maestra del sistema.
+                              </p>
                             )}
                           </div>
                         </td>
