@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 import { getDb } from '../db.js';
 import { ensureAgencyAccess, requireAuth } from '../security.js';
@@ -438,16 +438,20 @@ productMatches.get('/template', async (c) => {
     return accessError;
   }
 
-  // Construir el workbook con SheetJS usando solo los campos visibles en la UI.
-  const worksheet = XLSX.utils.aoa_to_sheet([VISIBLE_TEMPLATE_HEADERS, VISIBLE_TEMPLATE_EXAMPLE]);
+  // Construir el workbook con ExcelJS usando solo los campos visibles en la UI.
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Match Productos');
 
-  // Ancho de columnas para mejor legibilidad
-  worksheet['!cols'] = [{ wch: 30 }, { wch: 26 }, { wch: 32 }, { wch: 20 }];
+  worksheet.columns = [
+    { header: VISIBLE_TEMPLATE_HEADERS[0], key: 'product', width: 30 },
+    { header: VISIBLE_TEMPLATE_HEADERS[1], key: 'clientProductCode', width: 26 },
+    { header: VISIBLE_TEMPLATE_HEADERS[2], key: 'productMatch', width: 32 },
+    { header: VISIBLE_TEMPLATE_HEADERS[3], key: 'htsMatch', width: 20 },
+  ];
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Match Productos');
+  worksheet.addRow(VISIBLE_TEMPLATE_EXAMPLE);
 
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  const buffer = await workbook.xlsx.writeBuffer();
 
   return new Response(buffer, {
     status: 200,
@@ -519,12 +523,17 @@ productMatches.post('/import', async (c) => {
     );
   }
 
-  // Leer el archivo como ArrayBuffer y parsear con SheetJS
-  let workbook: XLSX.WorkBook;
+  // Leer el archivo como ArrayBuffer y parsear con ExcelJS
+  const workbook = new ExcelJS.Workbook();
   try {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    workbook = XLSX.read(buffer, { type: 'buffer' });
+
+    if (fileName.endsWith('.csv')) {
+      await workbook.csv.read(buffer as any);
+    } else {
+      await workbook.xlsx.load(buffer as any);
+    }
   } catch {
     return c.json(
       { error: 'No se pudo leer el archivo. Verifica que sea un Excel (.xlsx) o CSV válido.' },
@@ -532,18 +541,17 @@ productMatches.post('/import', async (c) => {
     );
   }
 
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) {
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) {
     return c.json({ error: 'El archivo no contiene ninguna hoja de datos.' }, 400);
   }
 
-  const worksheet = workbook.Sheets[sheetName];
-
-  // Convertir a array de arrays (SheetJS)
-  const rawData: (string | number | boolean | null)[][] = XLSX.utils.sheet_to_json(worksheet, {
-    header: 1,
-    defval: '',
-    blankrows: false,
+  // Convertir a array de arrays (ExcelJS row.values es 1-based: [undefined, col1, col2, ...])
+  const rawData: (string | number | boolean | null)[][] = [];
+  worksheet.eachRow({ includeEmpty: false }, (row) => {
+    if (row.values && Array.isArray(row.values)) {
+      rawData.push(row.values.slice(1) as (string | number | boolean | null)[]);
+    }
   });
 
   if (rawData.length < 2) {

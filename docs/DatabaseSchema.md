@@ -29,6 +29,8 @@ subscription_plans ────< agencies ────< agency_emails
                               │
                               ├────< booked_awb_records
                               │
+                              ├────< product_matches ────< (product_match_master) (referencia lógica por producto)
+                              │
                               └──── user_agencies >──── users ────< auth_sessions
 
 Leyenda:
@@ -209,7 +211,48 @@ Registros de AWBs reservados para la conciliación operativa.
 
 ---
 
-### 10. `app_settings` — Configuración de la App
+### 10. `product_matches` — Match de Productos por Agencia
+
+Permite a cada agencia mapear sus códigos de producto internos a los del catálogo maestro.
+
+| Columna               | Tipo | Restricción                                        | Descripción            |
+| --------------------- | ---- | -------------------------------------------------- | ---------------------- |
+| `id`                  | TEXT | **PRIMARY KEY**                                    | ID único               |
+| `agency_id`           | TEXT | NOT NULL, **FK** → `agencies.id` ON DELETE CASCADE | Agencia propietaria    |
+| `category`            | TEXT | NOT NULL, DEFAULT ''                               | Categoría del producto |
+| `product`             | TEXT | NOT NULL                                           | Nombre del producto    |
+| `client_product_code` | TEXT | NOT NULL, DEFAULT ''                               | Código del cliente     |
+| `product_match`       | TEXT | NOT NULL, DEFAULT ''                               | Producto equivalente   |
+| `hts`                 | TEXT | NOT NULL, DEFAULT ''                               | Código HTS original    |
+| `hts_match`           | TEXT | NOT NULL, DEFAULT ''                               | Código HTS equivalente |
+| `created_at`          | TEXT | DEFAULT now                                        | Fecha de creación      |
+| `updated_at`          | TEXT | DEFAULT now                                        | Última modificación    |
+
+**Constraint UNIQUE:** `(agency_id, product)`  
+**Índices:** `idx_product_matches_agency`, `idx_product_matches_agency_product`
+
+---
+
+### 11. `product_match_master` — Catálogo Maestro de Match de Productos
+
+Catálogo global de productos con sus equivalencias estándar, usado como referencia para el matching por agencia.
+
+| Columna               | Tipo    | Restricción          | Descripción                 |
+| --------------------- | ------- | -------------------- | --------------------------- |
+| `id`                  | TEXT    | **PRIMARY KEY**      | ID único                    |
+| `product`             | TEXT    | NOT NULL             | Nombre del producto         |
+| `client_product_code` | TEXT    | NOT NULL, DEFAULT '' | Código del cliente          |
+| `product_match`       | TEXT    | NOT NULL, DEFAULT '' | Producto equivalente        |
+| `hts_match`           | TEXT    | NOT NULL, DEFAULT '' | Código HTS equivalente      |
+| `source_order`        | INTEGER | NOT NULL             | Orden de prioridad (fuente) |
+| `created_at`          | TEXT    | DEFAULT now          | Fecha de creación           |
+| `updated_at`          | TEXT    | DEFAULT now          | Última modificación         |
+
+**Índice:** `idx_product_match_master_product`
+
+---
+
+### 12. `app_settings` — Configuración de la App
 
 Almacén key-value para configuraciones generales.
 
