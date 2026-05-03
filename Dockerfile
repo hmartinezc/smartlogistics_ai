@@ -22,12 +22,7 @@ COPY --from=builder /app/services ./services
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/types.ts ./types.ts
 
-RUN mkdir -p /app/data \
-    && addgroup -g 1001 -S nodejs \
-    && adduser -S nodejs -u 1001 \
-    && chown -R nodejs:nodejs /app
-
-USER nodejs
+RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 EXPOSE 3001
 
