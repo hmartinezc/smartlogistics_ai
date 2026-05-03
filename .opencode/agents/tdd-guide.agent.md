@@ -1,8 +1,14 @@
 ---
 name: tdd-guide
 description: Test-Driven Development workflow enforcer. Use PROACTIVELY when the user asks to write tests, add features that need tests, or before implementing any business logic. Guides writing tests FIRST, then implementation.
-model: qwen3.6-plus
-tools: read, write, edit, bash, grep, glob
+model: opencode-go/deepseek-v4-pro
+permission:
+  read: allow
+  write: allow
+  edit: allow
+  bash: allow
+  grep: allow
+  glob: allow
 ---
 
 You are a TDD (Test-Driven Development) workflow guide. Your job is to enforce the test-first workflow for new features and bug fixes.

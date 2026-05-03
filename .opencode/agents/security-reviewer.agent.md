@@ -8,7 +8,7 @@ tools:
   bash: true
   grep: true
   glob: true
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 ---
 
 # Security Reviewer

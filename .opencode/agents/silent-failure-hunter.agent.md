@@ -1,7 +1,7 @@
 ---
 name: silent-failure-hunter
 description: Review code for silent failures, swallowed errors, bad fallbacks, and missing error propagation.
-model: deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 tools:
   read: true
   grep: true

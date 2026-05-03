@@ -80,18 +80,20 @@ npm run check        # All checks combined
 
 ## Agent Model Assignment (Current)
 
-| Agent                 | Model             | Use                    |
-| --------------------- | ----------------- | ---------------------- |
-| planner               | deepseek-v4-pro   | Feature planning       |
-| database-reviewer     | deepseek-v4-flash | Schema/query review    |
-| tdd-guide             | qwen3.6-plus      | Test-first development |
-| code-explorer         | deepseek-v4-flash | Codebase exploration   |
-| build-error-resolver  | deepseek-v4-flash | Fix build errors       |
-| security-reviewer     | deepseek-v4-pro   | Security audit         |
-| silent-failure-hunter | deepseek-v4-flash | Find silent failures   |
-| typescript-reviewer   | deepseek-v4-pro   | Code review            |
-| doc-updater           | deepseek-v4-flash | Documentation          |
-| a11y-architect        | deepseek-v4-pro   | Accessibility          |
+| Agent                 | Model                         | Use                    |
+| --------------------- | ----------------------------- | ---------------------- |
+| planner               | opencode-go/deepseek-v4-pro   | Feature planning       |
+| database-reviewer     | opencode-go/deepseek-v4-flash | Schema/query review    |
+| tdd-guide             | opencode-go/deepseek-v4-pro   | Test-first development |
+| code-explorer         | opencode-go/deepseek-v4-flash | Codebase exploration   |
+| general               | opencode-go/deepseek-v4-flash | General-purpose tasks  |
+| explore               | opencode-go/deepseek-v4-flash | Fast codebase search   |
+| build-error-resolver  | opencode-go/deepseek-v4-flash | Fix build errors       |
+| security-reviewer     | opencode-go/deepseek-v4-pro   | Security audit         |
+| silent-failure-hunter | opencode-go/deepseek-v4-flash | Find silent failures   |
+| typescript-reviewer   | opencode-go/deepseek-v4-pro   | Code review            |
+| doc-updater           | opencode-go/deepseek-v4-flash | Documentation          |
+| a11y-architect        | opencode-go/deepseek-v4-pro   | Accessibility          |
 
 ## Session Notes
 

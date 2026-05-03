@@ -26,7 +26,8 @@
 ### Module Structure
 
 - One exported component/class/function per file as the primary export.
-- Co-locate types with their primary consumer, not in a separate `types.ts` dump.
+- Co-locate types with their primary consumer when the type is used by a single module.
+- Centralized `types.ts` is acceptable for cross-cutting domain types shared across many modules (e.g. `InvoiceData`, `User`, `Agency`, `BatchItem`). Avoid dumping unrelated utility types here.
 - Barrel exports (`index.ts` re-exporting everything) are acceptable for libraries, not application code.
 
 ### React-Specific

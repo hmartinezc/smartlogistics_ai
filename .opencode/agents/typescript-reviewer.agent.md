@@ -6,7 +6,7 @@ tools:
   grep: true
   glob: true
   bash: true
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 ---
 
 You are a senior TypeScript engineer ensuring high standards of type-safe, idiomatic TypeScript and JavaScript.

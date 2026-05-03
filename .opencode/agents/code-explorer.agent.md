@@ -1,7 +1,7 @@
 ---
 name: code-explorer
 description: Deeply analyzes existing codebase features by tracing execution paths, mapping architecture layers, and documenting dependencies to inform new development.
-model: deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 tools:
   read: true
   grep: true
