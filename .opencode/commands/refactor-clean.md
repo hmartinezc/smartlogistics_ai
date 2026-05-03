@@ -1,5 +1,7 @@
 ---
 description: Safely detect and remove dead code — unused imports, exports, dependencies, and duplicated logic
+agent: build
+subtask: true
 ---
 
 # /refactor-clean [scope]

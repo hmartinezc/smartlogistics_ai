@@ -1,6 +1,7 @@
 ---
 name: planner
 description: Feature implementation planning specialist. Use PROACTIVELY when starting new features, breaking down complex work, or before writing code. Plans phases, dependencies, and execution order.
+mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
   read: allow

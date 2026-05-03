@@ -1,5 +1,7 @@
 ---
 description: Analyze git history to extract coding patterns and generate reusable SKILL.md files for .opencode/skills/
+agent: build
+subtask: true
 ---
 
 # /skill-create [scope] [--instincts]
@@ -38,6 +40,8 @@ Formato:
 ---
 name: skill-name
 description: One-line description of when to use this skill
+agent: build
+subtask: true
 ---
 
 # Skill Title

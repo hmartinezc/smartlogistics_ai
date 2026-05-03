@@ -1,5 +1,7 @@
 ---
 description: Plan implementation of a feature — break down into phases, dependencies, risks, and verification steps before writing code
+agent: build
+subtask: true
 ---
 
 # /plan <feature-description>

@@ -1,6 +1,7 @@
 ---
 name: refactor-cleaner
 description: Dead code detection and safe removal. Finds unused imports, exports, dependencies, and duplicated logic. One removal at a time with verification.
+mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
   read: allow

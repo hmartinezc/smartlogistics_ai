@@ -1,5 +1,7 @@
 ---
 description: Extract reusable patterns from the current session and save them as skills for future use
+agent: build
+subtask: true
 ---
 
 # /learn [pattern-name]

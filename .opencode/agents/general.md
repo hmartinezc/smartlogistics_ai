@@ -1,6 +1,7 @@
 ---
 name: general
 description: General-purpose agent for researching complex questions and executing multi-step tasks in this project. Use for tasks that don't fit a specialized agent.
+mode: subagent
 model: opencode-go/deepseek-v4-flash
 tools:
   read: true

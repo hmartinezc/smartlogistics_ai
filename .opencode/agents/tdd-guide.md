@@ -1,6 +1,7 @@
 ---
 name: tdd-guide
 description: Test-Driven Development workflow enforcer. Use PROACTIVELY when the user asks to write tests, add features that need tests, or before implementing any business logic. Guides writing tests FIRST, then implementation.
+mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
   read: allow

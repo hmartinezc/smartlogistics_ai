@@ -1,5 +1,7 @@
 ---
 description: Fix TypeScript build errors incrementally — one error at a time with re-build verification
+agent: build
+subtask: true
 ---
 
 # /build-fix [scope]

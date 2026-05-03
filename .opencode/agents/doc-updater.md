@@ -1,6 +1,7 @@
 ---
 name: doc-updater
 description: Documentation and codemap specialist. Use PROACTIVELY for updating codemaps and documentation. Updates READMEs and guides from the actual codebase.
+mode: subagent
 tools:
   read: true
   write: true

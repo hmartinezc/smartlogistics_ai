@@ -1,5 +1,7 @@
 ---
 description: Sync project documentation from source-of-truth files — schema, env vars, API endpoints, and deployment config
+agent: build
+subtask: true
 ---
 
 # /update-docs [scope]

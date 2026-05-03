@@ -1,5 +1,7 @@
 ---
 description: Run quality pipeline on demand — typecheck, format, lint, and security scan for a file or project scope
+agent: build
+subtask: true
 ---
 
 # /quality-gate [path|.] [--fix] [--strict]

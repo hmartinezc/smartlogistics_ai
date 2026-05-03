@@ -1,5 +1,7 @@
 ---
 description: Recommend the best AI model for a task based on complexity and cost budget
+agent: build
+subtask: true
 ---
 
 # /model-route [task-description] [--budget low|med|high]

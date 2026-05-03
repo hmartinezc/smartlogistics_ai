@@ -1,6 +1,7 @@
 ---
 name: e2e-runner
 description: End-to-end test agent for Playwright. Tests critical user flows: login, invoice upload, AI extraction, batch processing, results review.
+mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
   read: allow

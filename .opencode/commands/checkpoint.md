@@ -1,5 +1,7 @@
 ---
 description: Save, verify, or list git-based workflow checkpoints for complex multi-step changes
+agent: build
+subtask: true
 ---
 
 # /checkpoint <create|verify|list|clear> [name]

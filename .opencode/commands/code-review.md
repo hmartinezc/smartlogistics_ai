@@ -1,5 +1,7 @@
 ---
 description: Code review for local changes or PR — security, type safety, patterns, performance, and maintainability
+agent: build
+subtask: true
 ---
 
 # /code-review [local|pr]

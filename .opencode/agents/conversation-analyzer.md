@@ -1,6 +1,7 @@
 ---
 name: conversation-analyzer
 description: Analyze agent session transcripts to extract reusable patterns, detect repeated mistakes, and identify behaviors worth codifying as skills or rules.
+mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
@@ -72,6 +73,7 @@ severity: high
 suggested_rule:
   name: 'schema-docs-sync'
   description: 'When server/schema.ts is modified, verify docs/DatabaseSchema.md is updated'
+mode: subagent
   trigger: 'post-edit on server/schema.ts'
   check: 'git diff docs/DatabaseSchema.md shows corresponding changes'
   action: warn
@@ -82,6 +84,7 @@ suggested_rule:
 ```yaml
 pattern: 'Effective Gemini extraction debugging'
 description: 'When extraction quality drops, the AI successfully: 1) checked agentPrompts.ts for ambiguity, 2) validated schema alignment, 3) tested with a known-good PDF, 4) compared field-by-field'
+mode: subagent
 frequency: 2 successful resolutions
 confidence: 0.85
 suggested_skill: 'gemini-extraction-debugging'

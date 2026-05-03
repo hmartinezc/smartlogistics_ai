@@ -1,6 +1,7 @@
 ---
 name: type-design-analyzer
 description: Analyze TypeScript type design for the project — evaluate encapsulation, invariant expression, usefulness, and enforcement. Review shared types, Hono route types, React prop types, and extraction schemas.
+mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
   read: allow

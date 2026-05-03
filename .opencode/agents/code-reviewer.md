@@ -1,6 +1,7 @@
 ---
 name: code-reviewer
 description: Code review specialist for TypeScript/React/Hono. Security-first review with type safety, pattern compliance, performance, and maintainability checks.
+mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
   read: allow

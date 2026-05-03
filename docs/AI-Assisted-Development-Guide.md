@@ -137,7 +137,7 @@ Los comandos son workflows completos. Se ejecutan con `/comando`.
 
 | Comando          | Propósito                               | Ejemplo de uso                                                                     |
 | ---------------- | --------------------------------------- | ---------------------------------------------------------------------------------- |
-| **/feature-dev** | Feature completo en 7 fases con agentes | `/feature-dev agregar exportación de facturas a Excel con impuestos discriminados` |
+| **/feature-dev** | Feature completo en 7 fases (discovery → explore → design → implement → quality → security → summary) con agentes condicionales: @database-reviewer si toca schema, @security-reviewer si toca auth/rutas, @ai-regression-testing si toca AI pipeline | `/feature-dev agregar exportación de facturas a Excel con impuestos discriminados` |
 | **/plan**        | Planificar sin escribir código          | `/plan agregar filtro por rango de fechas en batch history`                        |
 | **/build-fix**   | Corregir type errors incrementalmente   | `/build-fix server/routes/ai.ts`                                                   |
 
@@ -246,13 +246,20 @@ Paso 2: /checkpoint create feature-cost-dashboard
         → Guarda SHA actual como punto de restauración
 
 Paso 3: /feature-dev "agregar dashboard de costos por agencia"
-        → Fase 1: Discovery — entiende req, identifica subsystems
+        → Fase 1: Discovery — entiende req, identifica subsystems, constraints, acceptance criteria
         → Fase 2: @code-explorer analiza server/routes/agencies.ts, hooks/index.ts
         → Fase 3: Preguntas clarificadoras (¿gráfico o tabla? ¿filtros?)
-        → Fase 4: @architect diseña — ADR con nueva ruta /api/agencies/:id/costs
-        → Fase 5: @tdd-guide implementa con tests primero
-        → Fase 6: @code-reviewer revisa cambios staged
-        → Fase 7: @doc-updater actualiza docs
+        → Fase 4a: @architect diseña — ADR con nueva ruta /api/agencies/:id/costs
+        → Fase 4b: @database-reviewer (CONDICIONAL — si toca schema) revisa migraciones
+        → Fase 5: Implementación en mini-ciclos (implementar → typecheck → corregir → repetir)
+        → Fase 5c: @tdd-guide (CONDICIONAL — si hay lógica testeable) escribe tests
+        → Fase 6a: npm run typecheck && npm run build → si falla @build-error-resolver
+        → Fase 6b: npm run quality && npm run scan-secrets
+        → Fase 6c: @typescript-reviewer revisa type safety
+        → Fase 6d: @code-reviewer revisa cambios staged (6 categorías)
+        → Fase 6e: @security-reviewer (CONDICIONAL — si toca auth/rutas) audita OWASP Top 10
+        → Fase 6f: ai-regression-testing (CONDICIONAL — si toca AI pipeline) valida extracciones
+        → Fase 7: Resumen ejecutivo + @doc-updater actualiza docs
 
 Paso 4: /quality-gate
         → npm run check (typecheck + format + quality)
@@ -634,10 +641,10 @@ Escenario: Crear endpoint GET /api/agencies/:id/stats
 | "No sé cómo funciona el batch processing"       | @code-explorer         | Traza el flujo completo batch.ts → ai.ts → Gemini |
 | "Quiero agregar filtro por fecha en invoices"   | @planner               | Planifica fases: schema, ruta, UI                 |
 | "¿Debo usar SQLite o Turso para esto?"          | @architect             | Evalúa trade-off local-first vs cloud             |
-| "El typecheck falla con 23 errores"             | @build-error-resolver  | Corrige uno a uno, solo cambios mínimos           |
-| "Escribí 200 líneas, ¿está bien?"               | @code-reviewer         | Revisa seguridad, tipos, patrones, rendimiento    |
-| "Toqué server/schema.ts"                        | @database-reviewer     | Idempotencia, índices, FK, Documentación sync     |
-| "Agregué un endpoint nuevo"                     | @security-reviewer     | Zod validation, auth check, injection             |
+| "El typecheck falla con 23 errores"             | @build-error-resolver  | Corrige uno a uno, solo cambios mínimos (úsalo en Fase 6a de /feature-dev si falla)           |
+| "Escribí 200 líneas, ¿está bien?"               | @code-reviewer         | Revisa seguridad, tipos, patrones, rendimiento. /feature-dev lo usa en Fase 6d                |
+| "Toqué server/schema.ts"                        | @database-reviewer     | Idempotencia, índices, FK, Documentación sync. /feature-dev lo usa en Fase 4b (condicional)   |
+| "Agregué un endpoint nuevo"                     | @security-reviewer     | Zod validation, auth check, injection. /feature-dev lo usa en Fase 6e (condicional)           |
 | "Los tipos de extractionSchema son un desastre" | @type-design-analyzer  | Score 0-5, sugerencias concretas                  |
 | "La extracción de facturas falla a veces"       | @loop-operator         | Ciclo iterativo de mejora de prompts              |
 | "Hay mucho código comentado"                    | @refactor-cleaner      | Eliminación segura con verificación               |
@@ -723,7 +730,7 @@ npm run check            # typecheck + format:check + quality (todo junto)
 
 ```
 /plan <descripción>          Planificar feature sin escribir código
-/feature-dev <descripción>   Feature completo en 7 fases con agentes
+/feature-dev <descripción>   Feature completo en 7 fases (discovery→explore→design→implement→quality→security→summary) con 6 agentes condicionales (@database-reviewer, @tdd-guide, @build-error-resolver, @typescript-reviewer, @security-reviewer, @ai-regression-testing)
 /build-fix [scope]           Corregir type errors incrementalmente
 /quality-gate [--fix] [--strict]  Pipeline typecheck+format+quality+secrets+build
 /code-review [local|pr]      Revisión en 6 categorías
@@ -785,5 +792,5 @@ server/
 > **Mantenimiento:** Actualizar este documento cuando se agreguen/quiten agentes, comandos, skills o reglas.
 > Usar `@doc-updater` para mantenerlo sincronizado. La fuente de verdad son los archivos en `.opencode/`.
 >
-> **Última actualización:** 2026-05-03
+> **Última actualización:** 2026-05-03 (v1.1 — /feature-dev optimizado con agentes condicionales)
 > **Validado contra:** AGENTS.md, session-context.md, package.json, Dockerfile, server/schema.ts
