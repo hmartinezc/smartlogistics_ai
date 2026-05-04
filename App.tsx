@@ -339,6 +339,11 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     ? 'bg-slate-50 dark:bg-slate-900 w-full max-w-[95vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex relative'
     : 'h-full w-full flex bg-slate-50 dark:bg-slate-900 font-sans';
 
+  const handleBackToProcessSelection = useCallback(
+    () => setAppState(AppState.PROCESS_SELECTION),
+    [],
+  );
+
   if (!isOpen) return null;
 
   // Mostrar loading mientras se restaura sesión o cargan datos
@@ -356,11 +361,6 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       </div>
     );
   }
-
-  const handleBackToProcessSelection = useCallback(
-    () => setAppState(AppState.PROCESS_SELECTION),
-    [],
-  );
 
   return (
     <div className={`${isDarkMode ? 'dark' : ''} ${containerClasses}`}>
