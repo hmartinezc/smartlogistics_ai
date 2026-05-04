@@ -11,6 +11,8 @@ metadata:
 
 Performance optimization guide adapted for Vite + React 18 single-page applications. No SSR, no RSC, no Next.js.
 
+Note: `vercel-react-best-practices` is only the internal skill name/origin. This project does not deploy to Vercel; production deployment is Docker + Coolify.
+
 ## When to Apply
 
 - Writing new React components

@@ -8,10 +8,8 @@ import { SubscriptionPlan, Agency, User } from './types';
 // Configuración de Gemini AI
 // --------------------------
 export const AI_CONFIG = {
-  // Modelos disponibles de Gemini:
-  // - 'gemini-2.0-flash' → Más rápido, ideal para extracción (RECOMENDADO)
-  // - 'gemini-2.0-flash-lite' → Aún más rápido, menos preciso
-  // - 'gemini-1.5-pro' → Más potente, más lento y costoso
+  // Modelo bloqueado para extracción de facturas PDF. No cambiar sin regresión
+  // controlada contra facturas conocidas y aprobación explícita.
   MODEL_ID: 'gemini-3-flash-preview',
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,

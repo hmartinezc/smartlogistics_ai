@@ -114,7 +114,7 @@ suggestion: 'Cache extraction results by file hash during development sessions'
 
 ## Red Flags (Flag Immediately)
 
-- AI suggesting to change `gemini-2.5-flash-preview` model (LOCKED)
+- AI suggesting to change `gemini-3-flash-preview` model (LOCKED)
 - AI committing secrets or `data/smart-invoice.db`
 - AI bypassing extraction validation step
 - AI dropping database tables without migration

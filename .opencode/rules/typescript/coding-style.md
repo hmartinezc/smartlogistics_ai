@@ -32,7 +32,7 @@
 
 ### React-Specific
 
-See `.agents/skills/react-best-practices/SKILL.md` for detailed React rules. Key highlights:
+See `.opencode/skills/react-best-practices/SKILL.md` (internal skill name `vercel-react-best-practices`; this does not mean the project uses Vercel) for detailed React rules. Key highlights:
 
 - Components should be functions, not classes.
 - Props should be typed with explicit interfaces.
@@ -41,7 +41,7 @@ See `.agents/skills/react-best-practices/SKILL.md` for detailed React rules. Key
 
 ### Hono-Specific
 
-See `.agents/skills/hono/SKILL.md` for detailed Hono patterns. Key highlights:
+See `.opencode/skills/hono/SKILL.md` for detailed Hono patterns. Key highlights:
 
 - Route handlers should return typed responses.
 - Use Hono's built-in validation (zod integration) for request validation.

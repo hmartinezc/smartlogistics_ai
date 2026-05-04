@@ -9,7 +9,7 @@
 
 1. [Visión General del Sistema](#1-visión-general-del-sistema)
 2. [Agentes (20)](#2-agentes-20)
-3. [Comandos (11)](#3-comandos-11)
+3. [Comandos (12)](#3-comandos-12)
 4. [Skills de Proyecto (8)](#4-skills-de-proyecto-8)
 5. [Skills de Stack (5)](#5-skills-de-stack-5)
 6. [Reglas (8)](#6-reglas-8)
@@ -35,7 +35,7 @@ El sistema de desarrollo asistido tiene 4 capas que trabajan en conjunto:
 │  Especialistas que ejecutan tareas específicas             │
 │  Ej: @architect, @code-explorer, @database-reviewer      │
 ├──────────────────────────────────────────────────────────┤
-│  SKILLS (cargados automáticamente según contexto)         │
+│  SKILLS (carga explícita según contexto)                  │
 │  Conocimiento profundo de dominio/stack                   │
 │  Ej: cost-aware-llm-pipeline, hono, database-migrations  │
 ├──────────────────────────────────────────────────────────┤
@@ -53,8 +53,8 @@ El sistema de desarrollo asistido tiene 4 capas que trabajan en conjunto:
 | -------- | -------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Frontend | React 18 + Vite 5 + Tailwind CSS 3     | `App.tsx`, `hooks/index.ts`, `components/*`                                                  |
 | Backend  | Hono 4 (Node.js adapter)               | `server/index.ts`, `server/routes/*.ts` (10 rutas)                                           |
-| Database | libSQL/SQLite (local) + Turso (remoto) | `server/schema.ts` (234 líneas, 10 tablas), `server/seed.ts`                                 |
-| AI       | Gemini 2.5 Flash Preview (LOCKED)      | `services/agentPrompts.ts` (257 líneas), `shared/extractionSchema.ts`, `server/routes/ai.ts` |
+| Database | libSQL/SQLite (local) + Turso (remoto) | `server/schema.ts` (236 líneas, 12 tablas), `server/seed.ts`                                 |
+| AI       | Gemini Flash 3 (LOCKED)                | `services/agentPrompts.ts` (257 líneas), `shared/extractionSchema.ts`, `server/routes/ai.ts` |
 | Auth     | Sesiones via `X-Session-Id` header     | `server/security.ts`, `services/apiClient.ts`                                                |
 | Deploy   | Docker multi-stage + Coolify           | `Dockerfile` (33 líneas), `docs/CoolifyDeployment.md`                                        |
 
@@ -64,13 +64,15 @@ El sistema de desarrollo asistido tiene 4 capas que trabajan en conjunto:
 | ---------- | ------------------------------- | ------------------------------------------------------------------------- | ----------------------- |
 | **Pro**    | `opencode-go/deepseek-v4-pro`   | Arquitectura, planning, code review, seguridad, tipos, TDD, accesibilidad | Alto (contexto grande)  |
 | **Flash**  | `opencode-go/deepseek-v4-flash` | Exploración, build fixes, docs, refactors mecánicos, E2E                  | Bajo (contexto pequeño) |
-| **Locked** | `gemini-2.5-flash-preview`      | Extracción AI de facturas PDF                                             | Medio (API paga)        |
+| **Locked** | `gemini-3-flash-preview`        | Extracción AI de facturas PDF                                             | Medio (API paga)        |
+
+**Leyenda de modelos OpenCode:** `v4-pro` = `opencode-go/deepseek-v4-pro`; `v4-flash` = `opencode-go/deepseek-v4-flash`. El modelo de extracción de facturas es `gemini-3-flash-preview` y no debe cambiarse sin validación explícita.
 
 ---
 
 ## 2. Agentes (20)
 
-Cada agente es un especialista con scope definido. Se invocan con `@nombre-agente`.
+Cada agente es un especialista con scope definido. En esta guía, `@nombre-agente` es una convención para identificar qué especialista usar. En OpenCode, estos agentes se ejecutan como subagentes desde comandos o mediante el enrutamiento de agente disponible en la sesión; no asumas que `@nombre-agente` es un comando shell o slash command independiente.
 
 ### Agentes de Diseño y Planificación
 
@@ -129,17 +131,17 @@ Cada agente es un especialista con scope definido. Se invocan con `@nombre-agent
 
 ---
 
-## 3. Comandos (11)
+## 3. Comandos (12)
 
 Los comandos son workflows completos. Se ejecutan con `/comando`.
 
 ### Desarrollo
 
-| Comando          | Propósito                               | Ejemplo de uso                                                                     |
-| ---------------- | --------------------------------------- | ---------------------------------------------------------------------------------- |
+| Comando          | Propósito                                                                                                                                                                                                                                             | Ejemplo de uso                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | **/feature-dev** | Feature completo en 7 fases (discovery → explore → design → implement → quality → security → summary) con agentes condicionales: @database-reviewer si toca schema, @security-reviewer si toca auth/rutas, @ai-regression-testing si toca AI pipeline | `/feature-dev agregar exportación de facturas a Excel con impuestos discriminados` |
-| **/plan**        | Planificar sin escribir código          | `/plan agregar filtro por rango de fechas en batch history`                        |
-| **/build-fix**   | Corregir type errors incrementalmente   | `/build-fix server/routes/ai.ts`                                                   |
+| **/plan**        | Planificar sin escribir código                                                                                                                                                                                                                        | `/plan agregar filtro por rango de fechas en batch history`                        |
+| **/build-fix**   | Corregir type errors incrementalmente                                                                                                                                                                                                                 | `/build-fix server/routes/ai.ts`                                                   |
 
 ### Calidad
 
@@ -164,7 +166,7 @@ Los comandos son workflows completos. Se ejecutan con `/comando`.
 
 ## 4. Skills de Proyecto (8)
 
-Se cargan automáticamente cuando el contexto coincide con su descripción.
+No se debe asumir carga automática. En OpenCode, los skills deben cargarse explícitamente con la herramienta `skill` cuando el contexto coincide con su descripción, o quedar declarados en el comando/agente que los necesita.
 
 ### Extracción AI
 
@@ -172,7 +174,7 @@ Se cargan automáticamente cuando el contexto coincide con su descripción.
 | ---------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | **cost-aware-llm-pipeline**  | Pipeline AI, batch processing, costos subiendo        | File-hash caching, prompt optimization, batching con rate limiting, exponential backoff, cost tracking por extracción, validación pre-API call |
 | **ai-regression-testing**    | Modificar agentPrompts.ts, extractionSchema.ts, ai.ts | Golden test sets con .expected.json, baseline recording, diff testing, confidence score regression >85%, schema compatibility                  |
-| **customs-trade-compliance** | Features de aduanas, freight docs, HS codes           | HS Capítulo 06 flores (0603.11-0603.19), Incoterms 2020, phytosanitary certificates, AWB números, valoración aduanera, AGENT_CUSTOMS           |
+| **customs-trade-compliance** | Features de aduanas, freight docs, HS codes           | HS Capítulo 06 flores (0603.11-0603.19), Incoterms 2020, phytosanitary certificates, AWB números, valoración aduanera, compliance documental   |
 
 ### Base de Datos
 
@@ -198,15 +200,15 @@ Se cargan automáticamente cuando el contexto coincide con su descripción.
 
 ## 5. Skills de Stack (5)
 
-Se cargan cuando el código importa/usa la tecnología correspondiente.
+Se cargan explícitamente cuando el código importa/usa la tecnología correspondiente o cuando el comando/agente lo declara como conocimiento requerido.
 
-| Skill                     | Stack          | Se activa con...                                                                  |
-| ------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| **hono**                  | Backend API    | `import { Hono } from 'hono'`, rutas, middleware, Zod validation, `c.req.valid()` |
-| **react-best-practices**  | Frontend React | Componentes, hooks, `useMemo`, `useCallback`, `React.memo`, data fetching         |
-| **tailwind-css-patterns** | Estilos        | `className="..."`, responsive design, layout, dark mode                           |
-| **turso-libsql**          | Base de datos  | `@libsql/client`, `createClient()`, queries parameterized, Turso remote           |
-| **vite**                  | Build tool     | `vite.config.ts`, plugins, env variables, build optimization                      |
+| Skill                     | Stack          | Se activa con...                                                                                                                                       |
+| ------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **hono**                  | Backend API    | `import { Hono } from 'hono'`, rutas, middleware, Zod validation, `c.req.valid()`                                                                      |
+| **React best practices**  | Frontend React | Skill interno: `vercel-react-best-practices` en `.opencode/skills/react-best-practices`. No implica uso de Vercel; el deploy real es Docker + Coolify. |
+| **tailwind-css-patterns** | Estilos        | `className="..."`, responsive design, layout, dark mode                                                                                                |
+| **turso-libsql**          | Base de datos  | `@libsql/client`, `createClient()`, queries parameterized, Turso remote                                                                                |
+| **vite**                  | Build tool     | `vite.config.ts`, plugins, env variables, build optimization                                                                                           |
 
 ---
 
@@ -311,7 +313,7 @@ Paso 5: /check-deploy
    a. Grabar baseline: node scripts/regression/baseline.js
    b. Hacer cambios en agentPrompts.ts / extractionSchema.ts
    c. Validar consistencia entre ambos archivos (co-change)
-   d. Correr regresión: npx vitest run tests/regression/
+   d. Correr regresión automatizada cuando Vitest esté instalado; mientras tanto, validar manualmente contra facturas conocidas
    e. Verificar confidence scores >85% en todos los agents
 5. @code-reviewer revisa diff completo
 6. /quality-gate --strict
@@ -464,7 +466,7 @@ Busca:
 
 ### Fase 9: Commit y Push
 
-Solo si TODAS las fases anteriores pasaron:
+Solo si TODAS las fases anteriores pasaron y el usuario pidió explícitamente crear commit/push:
 
 ```bash
 # Agregar archivos (NUNCA data/smart-invoice.db ni .env)
@@ -513,7 +515,7 @@ npm run build             ← tsc + vite build
     ↓ (¿pasó?)
 @silent-failure-hunter    ← catch{} vacíos, fallbacks peligrosos
     ↓ (¿pasó?)
-git add && git commit && git push
+git add && git commit && git push (solo con autorización explícita del usuario)
     ↓
 Coolify auto-deploy (si main) → healthcheck /api/health
 ```
@@ -547,7 +549,7 @@ Usa skill ai-regression-testing para validar.
 
 ```
 Archivos en el grupo Database:
-├── server/schema.ts              (234 líneas, 10 tablas) — Migraciones
+├── server/schema.ts              (236 líneas, 12 tablas) — Migraciones
 ├── server/seed.ts                — Datos iniciales idempotentes
 └── docs/DatabaseSchema.md        — Documentación del schema
 
@@ -636,22 +638,22 @@ Escenario: Crear endpoint GET /api/agencies/:id/stats
 
 ### 9.6 Tabla de Decisiones: ¿Qué Agente Uso?
 
-| Me encuentro con...                             | Agente correcto        | Por qué                                           |
-| ----------------------------------------------- | ---------------------- | ------------------------------------------------- |
-| "No sé cómo funciona el batch processing"       | @code-explorer         | Traza el flujo completo batch.ts → ai.ts → Gemini |
-| "Quiero agregar filtro por fecha en invoices"   | @planner               | Planifica fases: schema, ruta, UI                 |
-| "¿Debo usar SQLite o Turso para esto?"          | @architect             | Evalúa trade-off local-first vs cloud             |
-| "El typecheck falla con 23 errores"             | @build-error-resolver  | Corrige uno a uno, solo cambios mínimos (úsalo en Fase 6a de /feature-dev si falla)           |
-| "Escribí 200 líneas, ¿está bien?"               | @code-reviewer         | Revisa seguridad, tipos, patrones, rendimiento. /feature-dev lo usa en Fase 6d                |
-| "Toqué server/schema.ts"                        | @database-reviewer     | Idempotencia, índices, FK, Documentación sync. /feature-dev lo usa en Fase 4b (condicional)   |
-| "Agregué un endpoint nuevo"                     | @security-reviewer     | Zod validation, auth check, injection. /feature-dev lo usa en Fase 6e (condicional)           |
-| "Los tipos de extractionSchema son un desastre" | @type-design-analyzer  | Score 0-5, sugerencias concretas                  |
-| "La extracción de facturas falla a veces"       | @loop-operator         | Ciclo iterativo de mejora de prompts              |
-| "Hay mucho código comentado"                    | @refactor-cleaner      | Eliminación segura con verificación               |
-| "Los docs están desactualizados"                | @doc-updater           | Sincroniza desde código fuente                    |
-| "El bundle de React pesa 2MB"                   | @performance-optimizer | Profiling, code splitting, lazy loading           |
-| "El dropdown no es accesible con teclado"       | @a11y-architect        | ARIA roles, focus management, keyboard nav        |
-| "No sé qué modelo usar para esta tarea"         | /model-route           | Recomienda pro vs flash según complejidad         |
+| Me encuentro con...                             | Agente correcto        | Por qué                                                                                     |
+| ----------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------- |
+| "No sé cómo funciona el batch processing"       | @code-explorer         | Traza el flujo completo batch.ts → ai.ts → Gemini                                           |
+| "Quiero agregar filtro por fecha en invoices"   | @planner               | Planifica fases: schema, ruta, UI                                                           |
+| "¿Debo usar SQLite o Turso para esto?"          | @architect             | Evalúa trade-off local-first vs cloud                                                       |
+| "El typecheck falla con 23 errores"             | @build-error-resolver  | Corrige uno a uno, solo cambios mínimos (úsalo en Fase 6a de /feature-dev si falla)         |
+| "Escribí 200 líneas, ¿está bien?"               | @code-reviewer         | Revisa seguridad, tipos, patrones, rendimiento. /feature-dev lo usa en Fase 6d              |
+| "Toqué server/schema.ts"                        | @database-reviewer     | Idempotencia, índices, FK, Documentación sync. /feature-dev lo usa en Fase 4b (condicional) |
+| "Agregué un endpoint nuevo"                     | @security-reviewer     | Zod validation, auth check, injection. /feature-dev lo usa en Fase 6e (condicional)         |
+| "Los tipos de extractionSchema son un desastre" | @type-design-analyzer  | Score 0-5, sugerencias concretas                                                            |
+| "La extracción de facturas falla a veces"       | @loop-operator         | Ciclo iterativo de mejora de prompts                                                        |
+| "Hay mucho código comentado"                    | @refactor-cleaner      | Eliminación segura con verificación                                                         |
+| "Los docs están desactualizados"                | @doc-updater           | Sincroniza desde código fuente                                                              |
+| "El bundle de React pesa 2MB"                   | @performance-optimizer | Profiling, code splitting, lazy loading                                                     |
+| "El dropdown no es accesible con teclado"       | @a11y-architect        | ARIA roles, focus management, keyboard nav                                                  |
+| "No sé qué modelo usar para esta tarea"         | /model-route           | Recomienda pro vs flash según complejidad                                                   |
 
 ---
 
@@ -663,7 +665,7 @@ Escenario: Crear endpoint GET /api/agencies/:id/stats
 | --- | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
 | 1   | NUNCA saltes diseño para features que tocan schema, AI pipeline o auth | Feature mal diseñado, refactor costoso después               |
 | 2   | NUNCA merges sin quality review                                        | Bugs en producción, secrets expuestos, tipos rotos           |
-| 3   | NUNCA cambies `gemini-2.5-flash-preview`                               | Degradación de extracción en facturas — el core del producto |
+| 3   | NUNCA cambies `gemini-3-flash-preview`                                 | Degradación de extracción en facturas — el core del producto |
 | 4   | NUNCA modifiques `server/schema.ts` sin `docs/DatabaseSchema.md`       | Documentación falsa, equipo desinformado                     |
 | 5   | NUNCA deploy sin `/check-deploy`                                       | Podrías pushear secrets, builds rotos, healthcheck fallido   |
 | 6   | SIEMPRE usa `/checkpoint` antes de cambios de alto riesgo              | Sin checkpoint = sin rollback fácil                          |
@@ -673,14 +675,14 @@ Escenario: Crear endpoint GET /api/agencies/:id/stats
 
 Estos archivos DEBEN modificarse juntos. Si tocas uno, tocas todos:
 
-| Grupo              | Archivos                                                                          | Skill de referencia                  |
-| ------------------ | --------------------------------------------------------------------------------- | ------------------------------------ |
-| **AI Pipeline**    | `services/agentPrompts.ts` ↔ `shared/extractionSchema.ts` ↔ `server/routes/ai.ts` | ai-regression-testing                |
-| **Database**       | `server/schema.ts` ↔ `server/seed.ts` ↔ `docs/DatabaseSchema.md`                  | database-migrations                  |
-| **Frontend State** | `App.tsx` ↔ `hooks/index.ts`                                                      | react-best-practices                 |
-| **Auth**           | `server/security.ts` ↔ `services/apiClient.ts`                                    | (reglas security.md)                 |
-| **Config**         | `config.ts` ↔ `.env.example`                                                      | (reglas security.md)                 |
-| **Deploy**         | `Dockerfile` ↔ `docs/CoolifyDeployment.md` ↔ `README.md`                          | docker-patterns, deployment-patterns |
+| Grupo              | Archivos                                                                          | Skill de referencia                                                                 |
+| ------------------ | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **AI Pipeline**    | `services/agentPrompts.ts` ↔ `shared/extractionSchema.ts` ↔ `server/routes/ai.ts` | ai-regression-testing                                                               |
+| **Database**       | `server/schema.ts` ↔ `server/seed.ts` ↔ `docs/DatabaseSchema.md`                  | database-migrations                                                                 |
+| **Frontend State** | `App.tsx` ↔ `hooks/index.ts`                                                      | React best practices (`vercel-react-best-practices`, solo nombre interno del skill) |
+| **Auth**           | `server/security.ts` ↔ `services/apiClient.ts`                                    | (reglas security.md)                                                                |
+| **Config**         | `config.ts` ↔ `.env.example`                                                      | (reglas security.md)                                                                |
+| **Deploy**         | `Dockerfile` ↔ `docs/CoolifyDeployment.md` ↔ `README.md`                          | docker-patterns, deployment-patterns                                                |
 
 ### 10.3 Costo de Contexto por Agente
 
@@ -715,6 +717,7 @@ npm run dev:server       # Solo backend con hot reload (tsx --watch)
 npm run dev:client       # Solo frontend con HMR (vite)
 npm run build            # tsc --noEmit + vite build → dist/
 npm run start            # Producción: tsx server/index.ts
+npm run preview          # Previsualizar dist/ con Vite
 npm run db:seed          # Migraciones + seed manual (tsx server/seed-cli.ts)
 npm run typecheck        # tsc --noEmit (root + server/tsconfig.json)
 npm run typecheck:root   # Solo root
@@ -763,7 +766,7 @@ npm run check            # typecheck + format:check + quality (todo junto)
 ```
 .opencode/
 ├── agents/           ← 20 definiciones de agentes (.agent.md)
-├── commands/         ← 11 definiciones de comandos (.md)
+├── commands/         ← 12 definiciones de comandos (.md)
 ├── skills/           ← 8 skills de proyecto + 5 de stack
 ├── rules/            ← 8 reglas (5 common + 3 typescript)
 ├── session-context.md ← Estado actual del proyecto
@@ -779,7 +782,7 @@ docs/
 └── GuiaEvolucionArquitecturaIA.md    ← Guía de evolución de arquitectura IA
 
 server/
-├── schema.ts         ← Migraciones (234 líneas, 10 tablas)
+├── schema.ts         ← Migraciones (236 líneas, 12 tablas)
 ├── seed.ts           ← Datos iniciales idempotentes
 ├── security.ts       ← Auth, password hashing
 ├── db.ts             ← Conexión libSQL + migraciones
@@ -792,5 +795,5 @@ server/
 > **Mantenimiento:** Actualizar este documento cuando se agreguen/quiten agentes, comandos, skills o reglas.
 > Usar `@doc-updater` para mantenerlo sincronizado. La fuente de verdad son los archivos en `.opencode/`.
 >
-> **Última actualización:** 2026-05-03 (v1.1 — /feature-dev optimizado con agentes condicionales)
+> **Última actualización:** 2026-05-03 (v1.2 — sincronización con OpenCode runtime y modelo Gemini Flash 3)
 > **Validado contra:** AGENTS.md, session-context.md, package.json, Dockerfile, server/schema.ts

@@ -31,7 +31,7 @@ El proceso comienza antes de subir el archivo. El usuario selecciona un **Perfil
 
 ## 3. Fase de Ejecución (AI Vision)
 Se envía a Google Cloud:
-*   **Modelo**: \`gemini-2.5-flash\`
+*   **Modelo**: \`gemini-3-flash-preview\`
 *   **Payload**: [Imagen del PDF] + [Prompt Genérico] + [Prompt Específico Inyectado]
 *   **Configuración**: \`thinkingBudget: 1024\` (Le da tiempo a la IA para razonar matemáticas y tablas complejas).
 

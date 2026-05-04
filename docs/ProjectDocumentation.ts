@@ -6,8 +6,8 @@ Esta aplicación utiliza Inteligencia Artificial Generativa (Multimodal) para ex
 
 ## 2. Tecnologías Clave
 - **Frontend**: React + TypeScript.
-- **AI Model**: Google Gemini 2.5 Flash (Confirmado en \`geminiService.ts\`).
-- **SDK**: @google/genai (Oficial de Google).
+- **AI Model**: Google Gemini Flash 3 \`gemini-3-flash-preview\` (configurado en \`config.ts\`).
+- **SDK**: @google/generative-ai (Oficial de Google).
 
 ## 3. Flujo de Datos (Paso a Paso)
 
@@ -21,7 +21,7 @@ Esta aplicación utiliza Inteligencia Artificial Generativa (Multimodal) para ex
     - La petición viaja segura a los servidores de Google con el PDF y el Prompt.
     
 3.  **Procesamiento (Vision Reasoning)**:
-    - El modelo Gemini 2.5 Flash "mira" el documento (no usa OCR tradicional, usa visión cognitiva).
+    - El modelo Gemini Flash 3 "mira" el documento (no usa OCR tradicional, usa visión cognitiva).
     - Identifica tablas, columnas y relaciones visuales.
     - Aplica reglas de corrección (ej. "OFL" empieza con la letra O, no cero).
 
@@ -33,7 +33,7 @@ Esta aplicación utiliza Inteligencia Artificial Generativa (Multimodal) para ex
 
 ## 4. Costos y Gratuidad (Free Tier)
 
-El proyecto utiliza el modelo **Gemini 2.5 Flash**, que ofrece una capa gratuita generosa:
+El proyecto utiliza el modelo **Gemini Flash 3** (\`gemini-3-flash-preview\`), bloqueado por calidad de extracción en facturas PDF:
 
 ### A. Capa Gratuita (Free Tier)
 - **Costo**: $0 USD.

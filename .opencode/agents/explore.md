@@ -24,7 +24,7 @@ shared/          → Shared code (extractionSchema.ts)
 hooks/           → React hooks (index.ts — centralized state/logic)
 utils/           → Utility functions (helpers.ts)
 docs/            → Documentation (DatabaseSchema.md, deployment guides, etc.)
-.agents/skills/  → Project-specific AI skills (19 skills)
+.opencode/skills/ → Project and stack skills (13 skills)
 .opencode/       → Agent definitions, rules, session context
 config.ts        → App-wide configuration (AI, plans, agencies, UI)
 types.ts         → Cross-cutting TypeScript types

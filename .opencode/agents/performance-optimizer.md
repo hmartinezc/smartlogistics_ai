@@ -29,7 +29,7 @@ grep -rn "gemini\|Gemini\|generateContent\|GenerativeModel" --include="*.ts" ser
 
 - Cache extraction results by file hash (see `cost-aware-llm-pipeline` skill)
 - Batch multiple invoices in one Gemini call where schema allows
-- Use `gemini-2.5-flash-preview` (LOCKED — proven for PDF invoices)
+- Use `gemini-3-flash-preview` (LOCKED — proven for PDF invoices)
 - Set appropriate `maxOutputTokens` — don't request more than needed
 - Implement retry with exponential backoff (429 rate limits)
 - Track token usage per extraction for cost monitoring
@@ -44,7 +44,7 @@ grep -rn "useEffect" --include="*.tsx" src/
 grep -rn "useState\|useMemo\|useCallback" --include="*.tsx" src/
 ```
 
-**Optimize (from `react-best-practices` skill):**
+**Optimize (from React best practices skill `vercel-react-best-practices` in `.opencode/skills/react-best-practices`; name only, not Vercel deploy):**
 
 - Extract expensive subtrees into `React.memo` components
 - Use `useDeferredValue` for search/filter inputs

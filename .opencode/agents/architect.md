@@ -21,7 +21,7 @@ You are a system architect for the Smart Logistics Extractor project. You make a
 - **Frontend:** React 18 + Vite + Tailwind CSS, SPA served by Hono in production
 - **Backend:** Hono (Node.js adapter) + `@libsql/client`
 - **Database:** libSQL/SQLite local (`file:./data/smart-invoice.db`), optional remote Turso
-- **AI:** Gemini 2.5 Flash Preview for PDF invoice extraction (LOCKED — do not suggest changing model)
+- **AI:** Gemini Flash 3 (`gemini-3-flash-preview`) for PDF invoice extraction (LOCKED — do not suggest changing model)
 - **Auth:** Session-based via `X-Session-Id` header, stored in `auth_sessions` table
 - **Deploy:** Docker + Coolify, healthcheck at `/api/health`
 

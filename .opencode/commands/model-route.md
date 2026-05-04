@@ -12,18 +12,18 @@ Recomienda qué modelo usar para una tarea. Contexto del proyecto: Gemini Flash 
 
 | Modelo                          | Para                                                         | Costo           |
 | ------------------------------- | ------------------------------------------------------------ | --------------- |
-| `gemini-2.5-flash-preview`      | Extracción AI de facturas PDF (LOCKED — probado excelente)   | Medio           |
+| `gemini-3-flash-preview`        | Extracción AI de facturas PDF (LOCKED — probado excelente)   | Medio           |
 | `opencode-go/deepseek-v4-pro`   | Arquitectura, planning, code review profundo, security audit | Alto (contexto) |
 | `opencode-go/deepseek-v4-flash` | Build fixes, exploración, refactors mecánicos, docs          | Bajo (contexto) |
 
 ## Categorías de tareas
 
-| Complejidad        | Tarea típica                                                    | Recomendación                       |
-| ------------------ | --------------------------------------------------------------- | ----------------------------------- |
-| **Mecánica**       | Fix type errors, format, dead code removal                      | `deepseek-v4-flash`                 |
-| **Implementación** | Nuevas rutas API, componentes React, cambios en schema          | `deepseek-v4-pro`                   |
-| **Arquitectura**   | Decisiones de diseño, pipeline AI, seguridad, refactors grandes | `deepseek-v4-pro`                   |
-| **Extracción AI**  | Procesar PDFs de facturas con Gemini                            | `gemini-2.5-flash-preview` (LOCKED) |
+| Complejidad        | Tarea típica                                                    | Recomendación                     |
+| ------------------ | --------------------------------------------------------------- | --------------------------------- |
+| **Mecánica**       | Fix type errors, format, dead code removal                      | `deepseek-v4-flash`               |
+| **Implementación** | Nuevas rutas API, componentes React, cambios en schema          | `deepseek-v4-pro`                 |
+| **Arquitectura**   | Decisiones de diseño, pipeline AI, seguridad, refactors grandes | `deepseek-v4-pro`                 |
+| **Extracción AI**  | Procesar PDFs de facturas con Gemini                            | `gemini-3-flash-preview` (LOCKED) |
 
 ## Output
 

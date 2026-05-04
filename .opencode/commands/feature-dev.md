@@ -9,6 +9,7 @@ subtask: true
 Workflow completo de desarrollo de features para Smart Logistics Extractor. 7 fases con agentes especializados en cada una. El agente `build` orquesta el pipeline completo.
 
 **Antes de empezar:** Carga los skills relevantes según el tipo de feature:
+
 - Si toca DB → `skill: database-migrations`
 - Si toca AI pipeline → `skill: cost-aware-llm-pipeline`
 - Si toca customs → `skill: customs-trade-compliance`
@@ -185,15 +186,15 @@ Tests mínimos requeridos:
 
 #### Reglas de implementación:
 
-| Área | Convención |
-|------|-----------|
-| Frontend API calls | `services/apiClient.ts` con `X-Session-Id` |
-| Frontend state | `hooks/index.ts` centraliza lógica reutilizable |
-| Backend rutas | `app.route()` para montar módulos bajo `/api/*` |
-| Backend validación | Zod schemas en inputs (c.req.valid()) |
-| DB migraciones | Idempotentes con `IF NOT EXISTS` |
-| AI pipeline | `agentPrompts.ts → extractionSchema.ts → ai.ts` |
-| Auth | Verificar sesión con `X-Session-Id` donde se requiera |
+| Área               | Convención                                            |
+| ------------------ | ----------------------------------------------------- |
+| Frontend API calls | `services/apiClient.ts` con `X-Session-Id`            |
+| Frontend state     | `hooks/index.ts` centraliza lógica reutilizable       |
+| Backend rutas      | `app.route()` para montar módulos bajo `/api/*`       |
+| Backend validación | Zod schemas en inputs (c.req.valid())                 |
+| DB migraciones     | Idempotentes con `IF NOT EXISTS`                      |
+| AI pipeline        | `agentPrompts.ts → extractionSchema.ts → ai.ts`       |
+| Auth               | Verificar sesión con `X-Session-Id` donde se requiera |
 
 ---
 
@@ -295,22 +296,27 @@ Produce un resumen ejecutivo y delega actualización de docs:
 ## Feature Complete: [Nombre del Feature]
 
 ### Qué se construyó
+
 [2-3 frases explicando el feature y su propósito]
 
 ### Archivos modificados
+
 - [CREATE] path/to/new/file.ts — propósito
 - [MODIFY] path/to/existing/file.ts — qué cambió
 - [DELETE] path/to/removed/file.ts — por qué
 
 ### Cómo probar
+
 1. [Paso concreto 1]
 2. [Paso concreto 2]
 3. [Resultado esperado]
 
 ### Limitaciones conocidas
+
 - [Limitación 1 — si aplica]
 
 ### Requiere
+
 - [ ] Deploy
 - [ ] Migración de base de datos
 - [ ] Nuevas variables de entorno
@@ -330,30 +336,30 @@ Verifica: README.md, docs/, y cualquier archivo .md relevante.
 
 ## Reglas de Hierro
 
-| # | Regla | Consecuencia si se ignora |
-|---|-------|--------------------------|
-| 1 | NUNCA saltes Fase 4 (diseño) para features que tocan schema, AI pipeline, o auth | Diseño frágil, refactors costosos |
-| 2 | NUNCA merges sin pasar todas las capas de Fase 6 | Bugs en producción, regresiones |
-| 3 | Si typecheck falla en cualquier punto → corrige ANTES de seguir | Errores acumulados, debugging difícil |
-| 4 | Si tocas `shared/extractionSchema.ts` → actualiza `services/agentPrompts.ts` para consistencia | Extracciones inconsistentes, datos perdidos |
-| 5 | Si tocas `server/schema.ts` → actualiza `docs/DatabaseSchema.md` | Documentación desactualizada, onboarding roto |
-| 6 | Si agregas variables de entorno → actualiza `.env.example` | Deploys fallidos por variables faltantes |
-| 7 | Si la feature tiene lógica testeable → escribe tests (Fase 5c) | Regresiones no detectadas |
-| 8 | Espera confirmación EXPLÍCITA del usuario en Fase 3 y Fase 4 | Implementar algo que el usuario no quiere |
-| 9 | NUNCA commits sin que el usuario lo pida explícitamente | Pérdida de control del usuario sobre git |
+| #   | Regla                                                                                          | Consecuencia si se ignora                     |
+| --- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 1   | NUNCA saltes Fase 4 (diseño) para features que tocan schema, AI pipeline, o auth               | Diseño frágil, refactors costosos             |
+| 2   | NUNCA merges sin pasar todas las capas de Fase 6                                               | Bugs en producción, regresiones               |
+| 3   | Si typecheck falla en cualquier punto → corrige ANTES de seguir                                | Errores acumulados, debugging difícil         |
+| 4   | Si tocas `shared/extractionSchema.ts` → actualiza `services/agentPrompts.ts` para consistencia | Extracciones inconsistentes, datos perdidos   |
+| 5   | Si tocas `server/schema.ts` → actualiza `docs/DatabaseSchema.md`                               | Documentación desactualizada, onboarding roto |
+| 6   | Si agregas variables de entorno → actualiza `.env.example`                                     | Deploys fallidos por variables faltantes      |
+| 7   | Si la feature tiene lógica testeable → escribe tests (Fase 5c)                                 | Regresiones no detectadas                     |
+| 8   | Espera confirmación EXPLÍCITA del usuario en Fase 3 y Fase 4                                   | Implementar algo que el usuario no quiere     |
+| 9   | NUNCA commits sin que el usuario lo pida explícitamente                                        | Pérdida de control del usuario sobre git      |
 
 ---
 
 ## Quick Reference: Qué agente usar y cuándo
 
-| Gatillo | Agente | Fase |
-|---------|--------|------|
-| Explorar codebase | `@code-explorer` | 2 |
-| Diseñar arquitectura | `@architect` | 4a |
-| Revisar schema DB | `@database-reviewer` | 4b |
-| Escribir tests | `@tdd-guide` | 5c |
-| Corregir type errors | `@build-error-resolver` | 6a |
-| Revisar types | `@typescript-reviewer` | 6c |
-| Revisar código | `@code-reviewer` | 6d |
-| Auditar seguridad | `@security-reviewer` | 6e |
-| Actualizar docs | `@doc-updater` | 6g, 7 |
+| Gatillo              | Agente                  | Fase  |
+| -------------------- | ----------------------- | ----- |
+| Explorar codebase    | `@code-explorer`        | 2     |
+| Diseñar arquitectura | `@architect`            | 4a    |
+| Revisar schema DB    | `@database-reviewer`    | 4b    |
+| Escribir tests       | `@tdd-guide`            | 5c    |
+| Corregir type errors | `@build-error-resolver` | 6a    |
+| Revisar types        | `@typescript-reviewer`  | 6c    |
+| Revisar código       | `@code-reviewer`        | 6d    |
+| Auditar seguridad    | `@security-reviewer`    | 6e    |
+| Actualizar docs      | `@doc-updater`          | 6g, 7 |

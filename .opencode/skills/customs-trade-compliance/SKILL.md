@@ -20,7 +20,7 @@ This skill is activated when working on:
 - HS (Harmonized System) code classification
 - Import/export duty calculations
 - Trade compliance validation
-- The `AGENT_CUSTOMS` extraction agent in this project
+- Customs-related extraction features when the currently disabled customs agent is reactivated
 
 ## Core Customs Concepts
 
@@ -77,9 +77,9 @@ Total Landed Cost = Customs Value + Duty + VAT + Other Fees
 
 ## Relevant to This Project
 
-### AGENT_CUSTOMS (Currently Disabled)
+### Customs Extraction Agent (Currently Disabled)
 
-The `AGENT_CUSTOMS` agent in `services/agentPrompts.ts` is designed for extracting customs-related data. When reactivated, it should handle:
+The customs extraction configuration in `services/agentPrompts.ts` is currently disabled. When reactivated, it should handle:
 
 1. **Customs-specific fields to extract:**
    - HS Code(s) per product line
@@ -99,7 +99,7 @@ The `AGENT_CUSTOMS` agent in `services/agentPrompts.ts` is designed for extracti
 
 ### Prompt Knowledge Base Extension
 
-When building the `AGENT_CUSTOMS` prompt section in `agentPrompts.ts`:
+When building the customs prompt section in `agentPrompts.ts`:
 
 ```typescript
 export const CUSTOMS_KNOWLEDGE_BASE = `

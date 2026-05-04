@@ -26,7 +26,7 @@
 
 - `.opencode/skills/` — 13 specialized skill documents loaded by agents as needed.
 - Project-specific: `cost-aware-llm-pipeline`, `database-migrations`, `customs-trade-compliance`, `deployment-patterns`, `docker-patterns`, `ai-regression-testing`, `continuous-learning`, `e2e-testing`.
-- Stack-specific: `hono` (backend API), `react-best-practices` (frontend Vite+React), `tailwind-css-patterns`, `turso-libsql`, `vite`.
+- Stack-specific: `hono` (backend API), React best practices via internal skill `vercel-react-best-practices` in `.opencode/skills/react-best-practices` (name only; this project deploys with Docker + Coolify, not Vercel), `tailwind-css-patterns`, `turso-libsql`, `vite`.
 
 ## Runtime And Data
 

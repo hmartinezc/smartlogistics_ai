@@ -110,7 +110,7 @@ Track in `.opencode/loop-state.json`:
 ## Guardrails
 
 - Max 10 iterations per session (cost control)
-- Never change the Gemini model (LOCKED — `gemini-2.5-flash-preview`)
+- Never change the Gemini model (LOCKED — `gemini-3-flash-preview`)
 - Log all prompt changes with before/after for regression testing
 - If score regresses, revert immediately
 - Report final state: scores, changes made, remaining issues

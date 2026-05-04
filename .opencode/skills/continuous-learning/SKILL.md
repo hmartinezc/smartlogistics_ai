@@ -17,7 +17,7 @@ Every session teaches something. Without capture, those lessons are lost. This s
 
 1. **Identify patterns** — What worked well? What failed repeatedly?
 2. **Document decisions** — Why was X chosen over Y?
-3. **Create reusable skills** — Turn session insights into permanent `.agents/skills/`
+3. **Create reusable skills** — Turn session insights into permanent `.opencode/skills/`
 4. **Update rules** — Refine `.opencode/rules/` based on real experience
 
 ## When to Use
@@ -50,7 +50,7 @@ Answer these questions:
    - If yes → Update the agent's `.agent.md` file with clarifications
 
 3. **Was there a workflow that should be standardized?**
-   - If yes → Create or update a skill in `.agents/skills/`
+   - If yes → Create or update a skill in `.opencode/skills/`
 
 4. **Did any decision need justification for future reference?**
    - If yes → Add to `.opencode/session-context.md` under Architecture Decisions
@@ -79,7 +79,7 @@ If a rule was violated or unclear:
 If a reusable workflow was discovered:
 
 ```markdown
-# .agents/skills/new-pattern/SKILL.md
+# .opencode/skills/new-pattern/SKILL.md
 
 ---
 

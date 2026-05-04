@@ -71,4 +71,4 @@ Formato exacto:
 - Stack del proyecto: React + Vite frontend, Hono + libSQL backend, Gemini API para extracción AI, auth via X-Session-Id.
 - Arquitectura: `App.tsx` maneja workflow state, `hooks/index.ts` centraliza lógica, `services/apiClient.ts` maneja llamadas API, `server/routes/` monta bajo `/api/*`.
 - Pipeline AI: `File → Agent Selection → buildExtractionPrompt() → Gemini API → Validation → Storage`.
-- Skills disponibles en `.opencode/skills/`: `hono`, `react-best-practices`, `turso-libsql`, `tailwind-css-patterns`, `vite`, `cost-aware-llm-pipeline`, `database-migrations`.
+- Skills disponibles en `.opencode/skills/`: `hono`, React best practices (`vercel-react-best-practices` en `.opencode/skills/react-best-practices`; no implica deploy en Vercel), `turso-libsql`, `tailwind-css-patterns`, `vite`, `cost-aware-llm-pipeline`, `database-migrations`, `customs-trade-compliance`, `deployment-patterns`, `docker-patterns`, `ai-regression-testing`, `continuous-learning`, `e2e-testing`.
