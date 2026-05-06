@@ -1,0 +1,6 @@
+# Solo para desarrollo local — expone consola MinIO
+# Este archivo NO se despliega en Coolify (solo se usa en máquina local)
+services:
+  minio:
+    ports:
+      - '9001:9001'

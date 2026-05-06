@@ -45,6 +45,7 @@ import {
   Mail,
   Zap,
   AlertTriangle,
+  HardDrive,
   Search,
   MoreVertical,
 } from 'lucide-react';
@@ -95,6 +96,7 @@ export {
   Mail,
   Zap,
   AlertTriangle,
+  HardDrive,
   Search,
   MoreVertical,
 };

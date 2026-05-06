@@ -86,6 +86,79 @@ export interface DocumentProcessingAuditQuery {
   to?: string;
 }
 
+export type DocumentJobStatus =
+  | 'UPLOADED'
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'SUCCESS'
+  | 'ERROR'
+  | 'CANCELLED';
+
+export interface DocumentJob {
+  id: string;
+  batchId: string;
+  agencyId: string;
+  status: DocumentJobStatus;
+  originalFileName: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  extractionFormat: AgentType;
+  retryCount: number;
+  maxRetries: number;
+  result: InvoiceData | null;
+  error: string | null;
+  queuedAt: string | null;
+  startedAt: string | null;
+  processedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  user: {
+    id: string | null;
+    email: string | null;
+    name: string | null;
+  };
+}
+
+export type DocumentJobSummary = Record<DocumentJobStatus, number>;
+
+export interface DocumentListResponse {
+  jobs: DocumentJob[];
+  summary: DocumentJobSummary;
+  limit: number;
+  offset: number;
+  total: number;
+}
+
+export interface DocumentUploadResponse {
+  batchId: string;
+  count: number;
+  jobs: DocumentJob[];
+  errors: Array<{ fileName: string; error: string; errorId?: string }>;
+}
+
+export interface DocumentProcessResponse {
+  queuedCount: number;
+  skippedCount: number;
+  jobs: DocumentJob[];
+}
+
+export interface DocumentDeleteResponse {
+  deletedCount: number;
+  deletedIds: string[];
+  freedBytes: number;
+  errors: Array<{ id: string; fileName: string; error: string; errorId?: string }>;
+}
+
+export interface DocumentListQuery {
+  agencyId?: string;
+  status?: DocumentJobStatus;
+  batchId?: string;
+  limit?: number;
+  offset?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export type UserRole = 'ADMIN' | 'OPERADOR' | 'SUPERVISOR';
 
 export interface SubscriptionPlan {

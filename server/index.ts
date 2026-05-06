@@ -15,6 +15,7 @@ import { getDb, closeDb } from './db.js';
 import { ensureProductMatchMasterSeed } from './productMatchMasterSeed.js';
 import { runMigrations } from './schema.js';
 import { runSeed } from './seed.js';
+import { startDocumentWorker, type DocumentWorkerHandle } from './workers/documentWorker.js';
 
 // Rutas
 import authRoutes from './routes/auth.js';
@@ -27,11 +28,13 @@ import settingsRoutes from './routes/settings.js';
 import plansRoutes from './routes/plans.js';
 import aiRoutes from './routes/ai.js';
 import auditRoutes from './routes/audit.js';
+import documentsRoutes from './routes/documents.js';
 
 import fs from 'node:fs';
 import path from 'node:path';
 
 const app = new Hono();
+let documentWorker: DocumentWorkerHandle | null = null;
 
 // ── CORS (solo necesario en desarrollo; en producción el SPA y la API comparten origen) ──
 app.use(
@@ -53,6 +56,7 @@ app.route('/api/settings', settingsRoutes);
 app.route('/api/plans', plansRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/audit', auditRoutes);
+app.route('/api/documents', documentsRoutes);
 
 // ── Health check ──
 app.get('/api/health', (c) =>
@@ -87,6 +91,7 @@ async function start() {
   await runMigrations(db);
   await runSeed(db);
   await ensureProductMatchMasterSeed(db);
+  documentWorker = await startDocumentWorker();
 
   const port = Number(process.env.PORT) || 3001;
 
@@ -104,11 +109,13 @@ async function start() {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n⏹  Cerrando...');
+  await documentWorker?.stop();
   await closeDb();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
+  await documentWorker?.stop();
   await closeDb();
   process.exit(0);
 });

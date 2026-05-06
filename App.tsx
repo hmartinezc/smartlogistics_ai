@@ -10,8 +10,8 @@ import {
 } from './hooks';
 import { api, ApiError } from './services/apiClient';
 import LoginScreen from './components/LoginScreen';
-import TemplateGallery from './components/TemplateGallery';
 import BatchProcessor from './components/BatchProcessor';
+import DocumentProcessingWorkspace from './components/DocumentProcessingWorkspace';
 import ResultsDashboard from './components/ResultsDashboard';
 import ExtractedDataManager from './components/ExtractedDataManager';
 import DashboardHome from './components/DashboardHome';
@@ -135,6 +135,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
         AppState.DASHBOARD_ADMIN,
         AppState.DASHBOARD_PANEL,
         AppState.PRODUCT_MATCHES,
+        AppState.PROCESS_SELECTION,
       ].includes(appState)
     ) {
       setAppState(
@@ -317,6 +318,11 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     }
   };
 
+  const handleOpenHistoryResults = () => {
+    void handleRefreshBatchResults();
+    setAppState(AppState.HISTORY_RESULTS);
+  };
+
   const handleNavigate = async (target: AppState) => {
     if (!canAccessAppState(currentUser, target)) {
       return;
@@ -439,7 +445,14 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                   />
                 )}
                 {appState === AppState.PROCESS_SELECTION && (
-                  <TemplateGallery onSelectFiles={handleFilesSelected} />
+                  <DocumentProcessingWorkspace
+                    currentAgencyId={currentAgencyId}
+                    currentAgency={currentAgency}
+                    userRole={currentUser?.role}
+                    onViewHistory={handleOpenHistoryResults}
+                    onResultsUpdated={handleRefreshBatchResults}
+                    onConfirm={confirm}
+                  />
                 )}
                 {appState === AppState.BATCH_RUNNING && (
                   <div className="h-full flex flex-col justify-center">

@@ -19,6 +19,14 @@ Aplicación React + Hono con base local libSQL/SQLite para procesar facturas, ad
 - `PORT`: opcional, por defecto `3001`
 - `TURSO_DATABASE_URL`: opcional, si quieres usar Turso remoto en lugar de archivo local
 - `TURSO_AUTH_TOKEN`: opcional, requerido si `TURSO_DATABASE_URL` apunta a Turso remoto
+- `MINIO_ROOT_USER`: requerida cuando despliegas con MinIO en Docker Compose
+- `MINIO_ROOT_PASSWORD`: requerida cuando despliegas con MinIO en Docker Compose
+- `DOCUMENT_UPLOAD_MAX_BYTES`: opcional, tamaño máximo por PDF cargado a MinIO
+- `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`: opcional, tamaño máximo por request de carga
+- `DOCUMENT_WORKER_ENABLED`: opcional, activa/desactiva el worker de procesamiento IA
+- `DOCUMENT_WORKER_POLL_MS`: opcional, intervalo de polling del worker
+- `DOCUMENT_WORKER_CONCURRENCY`: opcional, documentos procesados por ciclo
+- `DOCUMENT_WORKER_STALE_PROCESSING_MS`: opcional, tiempo para reencolar jobs interrumpidos
 
 ## Desarrollo local
 
@@ -36,23 +44,25 @@ Esto levanta:
 - Build: `npm run build`
 - Start: `npm run start`
 - La app sirve SPA + API desde el mismo proceso
+- El worker backend procesa jobs `QUEUED` desde MinIO sin depender del navegador
 - Monta persistencia en `/app/data` si usas la BD local
-- El repositorio incluye `Dockerfile`, `.dockerignore` y `.env.example`
+- El repositorio incluye `Dockerfile`, `docker-compose.yml`, `.dockerignore` y `.env.example`
 - La receta operativa completa está en `docs/CoolifyDeployment.md`
 
 ### Configuración Exacta en Coolify
 
 Usa estos valores literalmente:
 
-| Campo Coolify                | Valor                          |
-| ---------------------------- | ------------------------------ |
-| **Build Pack**               | `Dockerfile` del repo          |
-| **Build Command**            | no aplica si usas `Dockerfile` |
-| **Start Command**            | no aplica si usas `Dockerfile` |
-| **Port**                     | `3001`                         |
-| **Healthcheck Path**         | `/api/health`                  |
-| **Persistent Volume**        | `/app/data`                    |
-| **Node Version recomendada** | `20`                           |
+| Campo Coolify                | Valor                     |
+| ---------------------------- | ------------------------- |
+| **Build Pack**               | `Docker Compose`          |
+| **Compose File**             | `./docker-compose.yml`    |
+| **Build Command**            | no aplica si usas Compose |
+| **Start Command**            | no aplica si usas Compose |
+| **Port**                     | `3001`                    |
+| **Healthcheck Path**         | `/api/health`             |
+| **Persistent Volume**        | `/app/data`               |
+| **Node Version recomendada** | `20`                      |
 
 Si prefieres Nixpacks, usa como fallback:
 
@@ -61,12 +71,20 @@ Si prefieres Nixpacks, usa como fallback:
 
 ### Variables recomendadas para Coolify
 
-| Variable             | Valor ejemplo                                   | Obligatoria               |
-| -------------------- | ----------------------------------------------- | ------------------------- |
-| `PORT`               | `3001`                                          | No                        |
-| `GEMINI_API_KEY`     | `tu-api-key`                                    | Sí                        |
-| `TURSO_DATABASE_URL` | `file:./data/smart-invoice.db` o `libsql://...` | No                        |
-| `TURSO_AUTH_TOKEN`   | `token-remoto`                                  | Solo si usas Turso remoto |
+| Variable                              | Valor ejemplo                                   | Obligatoria               |
+| ------------------------------------- | ----------------------------------------------- | ------------------------- |
+| `PORT`                                | `3001`                                          | No                        |
+| `GEMINI_API_KEY`                      | `tu-api-key`                                    | Sí                        |
+| `TURSO_DATABASE_URL`                  | `file:./data/smart-invoice.db` o `libsql://...` | No                        |
+| `TURSO_AUTH_TOKEN`                    | `token-remoto`                                  | Solo si usas Turso remoto |
+| `MINIO_ROOT_USER`                     | `usuario-minio-interno`                         | Sí con Docker Compose     |
+| `MINIO_ROOT_PASSWORD`                 | `password-fuerte`                               | Sí con Docker Compose     |
+| `DOCUMENT_UPLOAD_MAX_BYTES`           | `26214400`                                      | No                        |
+| `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`     | `104857600`                                     | No                        |
+| `DOCUMENT_WORKER_ENABLED`             | `true`                                          | No                        |
+| `DOCUMENT_WORKER_POLL_MS`             | `5000`                                          | No                        |
+| `DOCUMENT_WORKER_CONCURRENCY`         | `1`                                             | No                        |
+| `DOCUMENT_WORKER_STALE_PROCESSING_MS` | `1800000`                                       | No                        |
 
 ### Modo recomendado para arrancar barato
 
@@ -79,8 +97,8 @@ Si prefieres Nixpacks, usa como fallback:
 1. Crea un volumen persistente y móntalo en `/app/data`
 2. Define `GEMINI_API_KEY` en variables del servicio
 3. Si usarás Turso remoto, define también `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`
-4. Usa el `Dockerfile` incluido como método de despliegue preferido
-5. Si no usas `Dockerfile`, entonces sí usa `npm run build` y `npm run start`
+4. Usa `Docker Compose` para levantar la app y MinIO juntos
+5. No expongas los puertos de MinIO públicamente salvo que necesites administrar la consola
 6. Expón el puerto `3001` o configura `PORT` explícitamente
 7. Verifica el healthcheck en `/api/health`
 8. Ejecuta `npm run db:seed` solo si necesitas rehidratar una base nueva
@@ -91,7 +109,7 @@ Si prefieres Nixpacks, usa como fallback:
 
 1. Copia los valores de `.env.example` a las variables del servicio en Coolify.
 2. Monta un volumen persistente en `/app/data`.
-3. Despliega usando el `Dockerfile` del repo.
+3. Despliega usando `docker-compose.yml`.
 4. Confirma `200 OK` en `/api/health`.
 5. Valida login, agencias y extracción IA.
 

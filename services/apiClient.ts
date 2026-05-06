@@ -309,6 +309,67 @@ export const api = {
     return request(`/audit/document-processing${query ? `?${query}` : ''}`);
   },
 
+  // ── Documents / Background AI queue ──
+  async getDocuments(
+    params: import('../types').DocumentListQuery = {},
+  ): Promise<import('../types').DocumentListResponse> {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        search.set(key, String(value));
+      }
+    });
+
+    const query = search.toString();
+    return request(`/documents${query ? `?${query}` : ''}`);
+  },
+
+  async getDocumentStatus(id: string): Promise<import('../types').DocumentJob> {
+    return request(`/documents/status/${encodeURIComponent(id)}`);
+  },
+
+  async uploadDocuments(input: {
+    files: File[];
+    agencyId: string;
+    format: import('../types').AgentType;
+    batchId?: string;
+  }): Promise<import('../types').DocumentUploadResponse> {
+    const formData = new FormData();
+    formData.append('agencyId', input.agencyId);
+    formData.append('format', input.format);
+    if (input.batchId) {
+      formData.append('batchId', input.batchId);
+    }
+
+    input.files.forEach((file) => formData.append('files', file));
+
+    return request('/documents/upload', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  async processDocuments(input: {
+    jobIds?: string[];
+    batchId?: string;
+    agencyId: string;
+  }): Promise<import('../types').DocumentProcessResponse> {
+    return request('/documents/process', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async deleteDocuments(input: {
+    jobIds: string[];
+    agencyId: string;
+  }): Promise<import('../types').DocumentDeleteResponse> {
+    return request('/documents', {
+      method: 'DELETE',
+      body: JSON.stringify(input),
+    });
+  },
+
   // ── Operational ──
   async getReconciliation(
     agencyId: string,

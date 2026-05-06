@@ -17,6 +17,7 @@ import type { Client } from '@libsql/client';
  * user_agencies        → Asignación usuario ↔ agencia (M:N)
  * auth_sessions        → Sesiones de autenticación activas
  * batch_items          → Resultados de procesamiento de facturas
+ * document_jobs        → Cola de PDFs almacenados en MinIO para procesamiento asíncrono
  * document_processing_audit → Auditoría contable de PDFs procesados
  * booked_awb_records   → Registros de AWBs reservados (operacional)
  * app_settings         → Configuración de la app (key-value)
@@ -89,6 +90,34 @@ const SCHEMA_STATEMENTS: string[] = [
     user_email     TEXT,
     agency_id      TEXT REFERENCES agencies(id),
     created_at     TEXT DEFAULT (datetime('now'))
+  )`,
+
+  // ── Jobs de Documentos (PDFs en MinIO para procesamiento asíncrono) ──
+  `CREATE TABLE IF NOT EXISTS document_jobs (
+    id                 TEXT PRIMARY KEY,
+    batch_id           TEXT NOT NULL,
+    agency_id          TEXT NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+    user_id            TEXT REFERENCES users(id) ON DELETE SET NULL,
+    user_email         TEXT,
+    user_name          TEXT,
+    status             TEXT NOT NULL DEFAULT 'UPLOADED' CHECK(status IN ('UPLOADED', 'QUEUED', 'PROCESSING', 'SUCCESS', 'ERROR', 'CANCELLED')),
+    storage_bucket     TEXT NOT NULL,
+    object_key         TEXT NOT NULL UNIQUE,
+    original_file_name TEXT NOT NULL,
+    file_size_bytes    INTEGER NOT NULL DEFAULT 0,
+    mime_type          TEXT NOT NULL DEFAULT 'application/pdf',
+    extraction_format  TEXT NOT NULL DEFAULT 'AGENT_GENERIC_A',
+    result_json        TEXT,
+    error              TEXT,
+    retry_count        INTEGER NOT NULL DEFAULT 0,
+    max_retries        INTEGER NOT NULL DEFAULT 3,
+    locked_by          TEXT,
+    lock_expires_at    TEXT,
+    queued_at          TEXT,
+    started_at         TEXT,
+    processed_at       TEXT,
+    created_at         TEXT DEFAULT (datetime('now')),
+    updated_at         TEXT DEFAULT (datetime('now'))
   )`,
 
   // ── Auditoría Contable de Procesamiento de Documentos ──
@@ -166,6 +195,11 @@ const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_batch_items_status ON batch_items(status)`,
   `CREATE INDEX IF NOT EXISTS idx_batch_items_agency_created ON batch_items(agency_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_batch_items_agency_status_processed ON batch_items(agency_id, status, processed_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_jobs_batch ON document_jobs(batch_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_jobs_agency_status ON document_jobs(agency_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_jobs_status_created ON document_jobs(status, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_jobs_status_lock ON document_jobs(status, lock_expires_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_document_jobs_user_created ON document_jobs(user_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_document_audit_agency_date ON document_processing_audit(agency_id, processed_date)`,
   `CREATE INDEX IF NOT EXISTS idx_document_audit_date ON document_processing_audit(processed_date)`,
   `CREATE INDEX IF NOT EXISTS idx_document_audit_status ON document_processing_audit(status)`,
@@ -186,9 +220,26 @@ export async function runMigrations(db: Client): Promise<void> {
     await db.execute(sql);
   }
 
+  await ensureColumn(db, 'document_jobs', 'locked_by', 'TEXT');
+  await ensureColumn(db, 'document_jobs', 'lock_expires_at', 'TEXT');
+
   await backfillDocumentProcessingAudit(db);
 
   console.log(`✅ Migraciones ejecutadas: ${SCHEMA_STATEMENTS.length} statements`);
+}
+
+async function ensureColumn(
+  db: Client,
+  tableName: string,
+  columnName: string,
+  columnDefinition: string,
+): Promise<void> {
+  const result = await db.execute(`PRAGMA table_info(${tableName})`);
+  const hasColumn = result.rows.some((row) => String(row.name) === columnName);
+
+  if (!hasColumn) {
+    await db.execute(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
+  }
 }
 
 async function backfillDocumentProcessingAudit(db: Client): Promise<void> {

@@ -1,10 +1,11 @@
 # Receta final de despliegue en Coolify
 
-Esta aplicacion se despliega como un solo servicio Node.js que sirve:
+Esta aplicacion se despliega con Docker Compose cuando se usa MinIO local/S3-compatible. El servicio `app` sirve:
 
 - la SPA compilada desde `dist/`
 - la API Hono en `/api/*`
 - la base local libSQL/SQLite en `data/smart-invoice.db` cuando no se usa Turso remoto
+- MinIO queda como servicio interno para almacenar PDFs fuera de SQLite
 
 ## Estrategia recomendada
 
@@ -16,15 +17,16 @@ Pasa a Turso remoto solo si necesitas:
 - mejores backups gestionados
 - replicas o acceso externo a la base
 
-## Opcion recomendada: Dockerfile del repo
+## Opcion recomendada: Docker Compose del repo
 
-El repositorio ya incluye un `Dockerfile` multi-stage y `.dockerignore`.
+El repositorio incluye un `docker-compose.yml` que levanta la aplicacion y MinIO. La aplicacion sigue usando el `Dockerfile` multi-stage del repo para construir la imagen del servicio `app`.
 
 Ventajas:
 
 - fija Node 20
 - separa build y runtime
 - evita depender del autodetect de Nixpacks
+- crea MinIO junto a la aplicacion en la misma red interna
 - deja un arranque consistente entre local, Coolify y Hetzner
 
 ## Configuracion exacta en Coolify
@@ -32,8 +34,8 @@ Ventajas:
 ### Crear servicio
 
 1. Crea un nuevo servicio desde este repositorio.
-2. Selecciona `Dockerfile` como metodo de build.
-3. Deja el `Dockerfile` de la raiz del proyecto.
+2. Selecciona `Docker Compose` como metodo de despliegue.
+3. Usa `./docker-compose.yml` como compose file.
 
 ### Campos clave
 
@@ -48,12 +50,20 @@ Ventajas:
 
 Carga estas variables en Coolify:
 
-| Variable             | Requerida                 | Valor recomendado              |
-| -------------------- | ------------------------- | ------------------------------ |
-| `PORT`               | No                        | `3001`                         |
-| `GEMINI_API_KEY`     | Si                        | tu clave real                  |
-| `TURSO_DATABASE_URL` | No                        | `file:./data/smart-invoice.db` |
-| `TURSO_AUTH_TOKEN`   | Solo si usas Turso remoto | token real                     |
+| Variable                              | Requerida                 | Valor recomendado              |
+| ------------------------------------- | ------------------------- | ------------------------------ |
+| `PORT`                                | No                        | `3001`                         |
+| `GEMINI_API_KEY`                      | Si                        | tu clave real                  |
+| `TURSO_DATABASE_URL`                  | No                        | `file:./data/smart-invoice.db` |
+| `TURSO_AUTH_TOKEN`                    | Solo si usas Turso remoto | token real                     |
+| `MINIO_ROOT_USER`                     | Si, con Docker Compose    | usuario interno de MinIO       |
+| `MINIO_ROOT_PASSWORD`                 | Si, con Docker Compose    | password fuerte de MinIO       |
+| `DOCUMENT_UPLOAD_MAX_BYTES`           | No                        | `26214400`                     |
+| `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`     | No                        | `104857600`                    |
+| `DOCUMENT_WORKER_ENABLED`             | No                        | `true`                         |
+| `DOCUMENT_WORKER_POLL_MS`             | No                        | `5000`                         |
+| `DOCUMENT_WORKER_CONCURRENCY`         | No                        | `1`                            |
+| `DOCUMENT_WORKER_STALE_PROCESSING_MS` | No                        | `1800000`                      |
 
 Puedes partir de `.env.example`.
 
@@ -68,6 +78,8 @@ Eso conserva:
 - `smart-invoice.db`
 - `smart-invoice.db-wal`
 - `smart-invoice.db-shm`
+
+MinIO usa su propio volumen Docker llamado `minio_data`, definido en `docker-compose.yml`, para conservar los PDFs entre redeploys.
 
 Sin ese volumen perderas la base al recrear el contenedor.
 
@@ -99,7 +111,8 @@ El servidor ya ejecuta migraciones y seed idempotente al arrancar. Usa `npm run 
 3. `admin@smart.com / 1234` entra si la base fue creada desde cero.
 4. Puedes listar agencias y planes.
 5. La extraccion IA funciona con `GEMINI_API_KEY` valida.
-6. Tras reiniciar el servicio, los datos siguen presentes si montaste `/app/data`.
+6. Los documentos puestos en cola pasan de `QUEUED` a `PROCESSING` y luego a `SUCCESS` o `ERROR`.
+7. Tras reiniciar el servicio, los datos siguen presentes si montaste `/app/data`.
 
 ## Troubleshooting rapido
 

@@ -8,6 +8,7 @@
 | **Backend API**   | Hono (Node.js)          | API REST ligera montada en `/api/*` |
 | **Base de datos** | libSQL (Turso local)    | SQLite fork con WAL + foreign keys  |
 | **Archivo DB**    | `data/smart-invoice.db` | Se crea al iniciar el servidor      |
+| **Storage PDFs**  | MinIO / S3-compatible   | PDFs fuera de SQLite                |
 
 ### Modos de Base de Datos
 
@@ -26,6 +27,8 @@ subscription_plans ────< agencies ────< agency_emails
                               │
                               ├────< batch_items
                               │       └──── document_processing_audit (referencia lógica por batch_item_id)
+                              │
+                              ├────< document_jobs (PDFs en MinIO, cola async)
                               │
                               ├────< booked_awb_records
                               │
@@ -163,7 +166,42 @@ Cada fila es un documento procesado. El campo `result_json` guarda el `InvoiceDa
 
 ---
 
-### 8. `document_processing_audit` — Auditoría de Procesamiento de PDFs
+### 8. `document_jobs` — Cola de Documentos PDF en MinIO
+
+Cada fila representa un PDF cargado fuera de SQLite y preparado para procesamiento asíncrono. `object_key` apunta al archivo en MinIO; SQLite solo guarda metadatos, estado y resultado JSON.
+
+| Columna              | Tipo    | Restricción                                                                | Descripción                                |
+| -------------------- | ------- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| `id`                 | TEXT    | **PRIMARY KEY**                                                            | UUID del job/documento                     |
+| `batch_id`           | TEXT    | NOT NULL                                                                   | ID del lote de carga                       |
+| `agency_id`          | TEXT    | NOT NULL, **FK** → `agencies.id` ON DELETE CASCADE                         | Agencia propietaria                        |
+| `user_id`            | TEXT    | **FK** → `users.id` ON DELETE SET NULL                                     | Usuario que cargó el PDF                   |
+| `user_email`         | TEXT    | nullable                                                                   | Email capturado al cargar                  |
+| `user_name`          | TEXT    | nullable                                                                   | Nombre capturado al cargar                 |
+| `status`             | TEXT    | CHECK(`UPLOADED`, `QUEUED`, `PROCESSING`, `SUCCESS`, `ERROR`, `CANCELLED`) | Estado del job                             |
+| `storage_bucket`     | TEXT    | NOT NULL                                                                   | Bucket MinIO usado                         |
+| `object_key`         | TEXT    | NOT NULL, **UNIQUE**                                                       | Ruta interna del PDF en MinIO              |
+| `original_file_name` | TEXT    | NOT NULL                                                                   | Nombre original del archivo                |
+| `file_size_bytes`    | INTEGER | NOT NULL, DEFAULT 0                                                        | Tamaño del PDF                             |
+| `mime_type`          | TEXT    | NOT NULL, DEFAULT `application/pdf`                                        | MIME recibido                              |
+| `extraction_format`  | TEXT    | NOT NULL, DEFAULT `AGENT_GENERIC_A`                                        | Formato/prompt de extracción               |
+| `result_json`        | TEXT    | nullable                                                                   | JSON extraído cuando termina correctamente |
+| `error`              | TEXT    | nullable                                                                   | Mensaje de error                           |
+| `retry_count`        | INTEGER | NOT NULL, DEFAULT 0                                                        | Reintentos consumidos                      |
+| `max_retries`        | INTEGER | NOT NULL, DEFAULT 3                                                        | Límite de reintentos                       |
+| `locked_by`          | TEXT    | nullable                                                                   | ID interno del worker que reclamó el job   |
+| `lock_expires_at`    | TEXT    | nullable                                                                   | Vencimiento del lease del worker           |
+| `queued_at`          | TEXT    | nullable                                                                   | Fecha en que se puso en cola               |
+| `started_at`         | TEXT    | nullable                                                                   | Fecha en que el worker inició              |
+| `processed_at`       | TEXT    | nullable                                                                   | Fecha final de procesamiento               |
+| `created_at`         | TEXT    | DEFAULT now                                                                | Fecha de carga                             |
+| `updated_at`         | TEXT    | DEFAULT now                                                                | Última actualización                       |
+
+**Índices:** `idx_document_jobs_batch`, `idx_document_jobs_agency_status`, `idx_document_jobs_status_created`, `idx_document_jobs_status_lock`, `idx_document_jobs_user_created`
+
+---
+
+### 9. `document_processing_audit` — Auditoría de Procesamiento de PDFs
 
 Cada fila representa un documento PDF terminado (`SUCCESS` o `ERROR`) para fines de auditoría, métricas y facturación. Esta tabla es independiente de `batch_items`: si se limpian los datos extraídos, el histórico contable permanece.
 
@@ -192,7 +230,7 @@ Cada fila representa un documento PDF terminado (`SUCCESS` o `ERROR`) para fines
 
 ---
 
-### 9. `booked_awb_records` — AWBs Reservados (Panel Operativo)
+### 10. `booked_awb_records` — AWBs Reservados (Panel Operativo)
 
 Registros de AWBs reservados para la conciliación operativa.
 
@@ -211,7 +249,7 @@ Registros de AWBs reservados para la conciliación operativa.
 
 ---
 
-### 10. `product_matches` — Match de Productos por Agencia
+### 11. `product_matches` — Match de Productos por Agencia
 
 Permite a cada agencia mapear sus códigos de producto internos a los del catálogo maestro.
 
@@ -233,7 +271,7 @@ Permite a cada agencia mapear sus códigos de producto internos a los del catál
 
 ---
 
-### 11. `product_match_master` — Catálogo Maestro de Match de Productos
+### 12. `product_match_master` — Catálogo Maestro de Match de Productos
 
 Catálogo global de productos con sus equivalencias estándar, usado como referencia para el matching por agencia.
 
@@ -252,7 +290,7 @@ Catálogo global de productos con sus equivalencias estándar, usado como refere
 
 ---
 
-### 12. `app_settings` — Configuración de la App
+### 13. `app_settings` — Configuración de la App
 
 Almacén key-value para configuraciones generales.
 
@@ -315,6 +353,23 @@ Almacén key-value para configuraciones generales.
 | DELETE | `/api/batch`     | Limpiar todos los items             |
 
 **Autorización:** cada sesión solo puede leer o modificar batches de sus agencias; `ADMIN` puede ver todo.
+
+### Documentos / Cola IA (`/api/documents`)
+
+| Método | Ruta                        | Descripción                                     |
+| ------ | --------------------------- | ----------------------------------------------- |
+| GET    | `/api/documents`            | Listar documentos cargados y resumen por estado |
+| GET    | `/api/documents/status/:id` | Consultar estado de un documento                |
+| POST   | `/api/documents/upload`     | Cargar uno o varios PDFs a MinIO y crear jobs   |
+| POST   | `/api/documents/process`    | Poner jobs `UPLOADED`/`ERROR` en cola `QUEUED`  |
+| DELETE | `/api/documents`            | Eliminar PDFs inactivos de MinIO y sus jobs     |
+
+**Filtros de listado:** `agencyId`, `status`, `batchId`, `limit`  
+**Upload:** `multipart/form-data` con `file` o `files`, `agencyId`, `batchId` opcional, `format` opcional.  
+**Process:** JSON con `jobIds` o `batchId` + `agencyId`.  
+**Delete:** JSON con `jobIds` y `agencyId`; solo elimina estados `UPLOADED`, `SUCCESS`, `ERROR` o `CANCELLED` para no interrumpir documentos `QUEUED`/`PROCESSING`.  
+**Worker:** procesa jobs `QUEUED` en backend, lee el PDF desde MinIO, llama a Gemini y actualiza `document_jobs`, `batch_items` y `document_processing_audit`.  
+**Autorización:** acceso restringido por agencia; `ADMIN` puede consultar global.
 
 ### Auditoría (`/api/audit`)
 
@@ -383,6 +438,8 @@ Almacén key-value para configuraciones generales.
 10. **Autorización API** — todas las rutas salvo `/api/health` y `/api/auth/login` requieren sesión válida
 11. **Aislamiento por rol/agencia** — operador y supervisor no pueden consultar datos administrativos globales
 12. **Auditoría de PDFs** — cada batch terminado persiste un registro independiente de `batch_items`; Admin Metrics usa esta tabla como fuente de verdad
+13. **Carga asíncrona de PDFs** — los archivos se guardan en MinIO y SQLite conserva solo metadatos/estado en `document_jobs`
+14. **Worker de documentos** — procesa jobs `QUEUED` en backend y refleja resultados en `batch_items` para conservar compatibilidad con vistas existentes
 
 ---
 
@@ -413,12 +470,21 @@ PORT=8080 npm run start
 
 ### Variables de Entorno
 
-| Variable             | Requerida | Descripción                                  |
-| -------------------- | --------- | -------------------------------------------- |
-| `PORT`               | No        | Puerto del servidor (default: 3001)          |
-| `TURSO_DATABASE_URL` | No        | URL de Turso remoto (default: archivo local) |
-| `TURSO_AUTH_TOKEN`   | No        | Token de auth de Turso (si es remoto)        |
-| `GEMINI_API_KEY`     | Sí        | API key de Google Gemini para IA             |
+| Variable                              | Requerida | Descripción                                                   |
+| ------------------------------------- | --------- | ------------------------------------------------------------- |
+| `PORT`                                | No        | Puerto del servidor (default: 3001)                           |
+| `TURSO_DATABASE_URL`                  | No        | URL de Turso remoto (default: archivo local)                  |
+| `TURSO_AUTH_TOKEN`                    | No        | Token de auth de Turso (si es remoto)                         |
+| `GEMINI_API_KEY`                      | Sí        | API key de Google Gemini para IA                              |
+| `MINIO_ROOT_USER`                     | Sí        | Usuario interno de MinIO en Docker Compose                    |
+| `MINIO_ROOT_PASSWORD`                 | Sí        | Password interno de MinIO en Docker Compose                   |
+| `MINIO_BUCKET`                        | No        | Bucket de PDFs (default: `smart-invoices`)                    |
+| `DOCUMENT_UPLOAD_MAX_BYTES`           | No        | Tamaño máximo por PDF (default: 25 MB)                        |
+| `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`     | No        | Tamaño máximo total por carga (default: 100 MB)               |
+| `DOCUMENT_WORKER_ENABLED`             | No        | Activa/desactiva el worker (default: `true`)                  |
+| `DOCUMENT_WORKER_POLL_MS`             | No        | Intervalo de polling del worker (default: 5000)               |
+| `DOCUMENT_WORKER_CONCURRENCY`         | No        | Jobs procesados por ciclo (default: 1, max: 5)                |
+| `DOCUMENT_WORKER_STALE_PROCESSING_MS` | No        | Tiempo para reencolar `PROCESSING` vencidos (default: 30 min) |
 
 ### Artefactos de despliegue incluidos
 
@@ -429,8 +495,8 @@ PORT=8080 npm run start
 
 ### Notas para Coolify
 
-- **Método recomendado:** usar el `Dockerfile` del repo
-- **Fallback con Nixpacks:** `npm run build` y `npm run start`
+- **Método recomendado:** usar `Docker Compose` del repo para levantar app + MinIO
+- **Fallback sin MinIO:** `Dockerfile` o Nixpacks con `npm run build` y `npm run start`
 - **Port:** `3001`
 - **Healthcheck:** `/api/health`
 - La base de datos local se guarda en `data/smart-invoice.db`
