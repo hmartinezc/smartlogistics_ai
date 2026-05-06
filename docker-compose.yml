@@ -54,7 +54,4 @@ services:
 
 volumes:
   app_data:
-    external: true
-    name: ac84i5hzm816z6527w5oxjx7-smartlogistics-data
   minio_data:
-    name: smartlogistics-minio-data
