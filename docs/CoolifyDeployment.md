@@ -146,3 +146,5 @@ En ese modo el volumen local deja de ser obligatorio para la base.
 - Para empezar en Hetzner: SQLite local + backup del volumen.
 - Para crecimiento: Turso remoto + mismo contenedor de aplicacion.
 - Para cambios de codigo: mantén `README.md` y este archivo sincronizados cuando cambien puertos, healthcheck o variables.
+
+<!-- redeploy-check: Coolify Docker Compose + MinIO -->
