@@ -4,7 +4,7 @@
 
 import { Hono } from 'hono';
 import { getDb } from '../db.js';
-import { requireAuth } from '../security.js';
+import { requireAuth, requireRole } from '../security.js';
 
 const settings = new Hono();
 
@@ -14,6 +14,9 @@ settings.get('/:key', async (c) => {
   if (authUser instanceof Response) {
     return authUser;
   }
+
+  const roleError = requireRole(c, authUser, ['ADMIN']);
+  if (roleError) return roleError;
 
   const db = getDb();
   const result = await db.execute({
@@ -34,6 +37,9 @@ settings.put('/:key', async (c) => {
   if (authUser instanceof Response) {
     return authUser;
   }
+
+  const roleError = requireRole(c, authUser, ['ADMIN']);
+  if (roleError) return roleError;
 
   const { value } = await c.req.json();
   const db = getDb();
