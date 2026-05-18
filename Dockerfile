@@ -26,10 +26,6 @@ RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 EXPOSE 3001
 
-RUN chown -R node:node /app
-
-USER node
-
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
 
