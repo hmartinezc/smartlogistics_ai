@@ -15,6 +15,18 @@ Best practices for containerizing this Node.js TypeScript application.
 
 The project has a Dockerfile (Node 20 Alpine). Here are improvements and rules to follow.
 
+## Project-Specific Production Constraint
+
+Do **not** add `USER node`, `USER nodejs`, or any other non-root runtime user to this repo's production `Dockerfile` without an explicit user request and a tested volume-permission migration plan.
+
+Why: production Coolify deployments persist local libSQL/SQLite at `/app/data`. Existing database files and mounted volumes may be owned by `root`. Changing the runtime user to `node` caused startup failures with:
+
+```text
+SQLITE_READONLY: attempt to write a readonly database
+```
+
+Current production-compatible behavior is to keep the runtime stage without a `USER` directive so the app can write existing `/app/data/smart-invoice.db`, `*.db-wal`, and `*.db-shm` files. If non-root execution is requested later, first validate ownership of the mounted Coolify volume and perform a safe migration (`chown` on the host/volume, backup DB, redeploy, healthcheck).
+
 ## Dockerfile Rules
 
 ### 1. Use Specific Node Version
@@ -53,10 +65,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
 COPY --from=builder /app/data ./data
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-USER nodejs
+# Project note: do not add USER node/nodejs in this repo unless the
+# /app/data SQLite volume permissions have been migrated and tested.
 
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -68,11 +78,8 @@ CMD ["npm", "run", "start"]
 ### 3. Security Hardening
 
 ```dockerfile
-# Run as non-root user
-USER nodejs
-
-# Don't run as root
-# Avoid: USER root
+# General best practice is non-root, but this repo has a production exception:
+# do not add USER node/nodejs while Coolify uses the existing /app/data SQLite volume.
 
 # Use distroless for extreme minimalism (advanced)
 # FROM gcr.io/distroless/nodejs20-debian11
@@ -233,10 +240,10 @@ services:
 **Cause:** Using cached image layers.
 **Fix:** Run `docker build --no-cache` or update a file earlier in Dockerfile.
 
-### Issue: Permission denied on /app/data
+### Issue: `SQLITE_READONLY` or Permission denied on `/app/data`
 
-**Cause:** Running as non-root but directory owned by root.
-**Fix:** Ensure `mkdir -p /app/data` runs before `USER` directive, or chown the directory.
+**Cause:** Running as non-root while the mounted Coolify SQLite volume or existing DB files are owned by `root`.
+**Fix for this repo:** revert/remove `USER node` or `USER nodejs` from the production `Dockerfile` unless a volume ownership migration has been explicitly planned and tested. Keeping only `RUN mkdir -p /app/data` plus `VOLUME ["/app/data"]` is the current production-compatible setup.
 
 ### Issue: Image too large
 
