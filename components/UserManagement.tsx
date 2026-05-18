@@ -19,6 +19,7 @@ import {
   Building,
   Users,
 } from './Icons';
+import PageHeader from './PageHeader';
 
 interface UserManagementProps {
   users: User[];
@@ -290,17 +291,13 @@ const UserManagement: React.FC<UserManagementProps> = ({
   );
 
   return (
-    <div className="p-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-3">
-          <Shield className="w-8 h-8 text-indigo-600" />
-          Gestión de Usuarios y Accesos
-        </h2>
-        <p className="text-slate-500 dark:text-slate-400 text-lg">
-          Administre quién tiene acceso a la plataforma. Los IDs únicos permiten identificar cuentas
-          multi-agencia.
-        </p>
-      </div>
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PageHeader
+        icon={<Users className="h-3.5 w-3.5" />}
+        badge="Administración"
+        title="Gestión de Usuarios y Accesos"
+        subtitle="Administre quién tiene acceso a la plataforma. Los IDs únicos permiten identificar cuentas multi-agencia."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Formulario de Creación / Edición */}
@@ -325,7 +322,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm flex items-center gap-2">
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg text-sm flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 {error}
               </div>
@@ -340,7 +337,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   placeholder="Ej. Juan Pérez"
                   required
                 />
@@ -353,7 +350,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   placeholder="usuario@empresa.com"
                   required
                 />
@@ -370,7 +367,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all pr-10"
+                      className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all pr-10"
                       placeholder={editingId ? 'Actualizar...' : 'Generar ->'}
                       required
                     />
@@ -403,7 +400,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
-                    className="w-full appearance-none px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none pr-8 cursor-pointer transition-all"
+                    className="w-full appearance-none px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none pr-8 cursor-pointer transition-all"
                   >
                     <option value="OPERADOR">OPERADOR</option>
                     <option value="SUPERVISOR">SUPERVISOR</option>
@@ -423,7 +420,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     <select
                       value={selectedAgencyToAdd}
                       onChange={(e) => setSelectedAgencyToAdd(e.target.value)}
-                      className="w-full appearance-none px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none pr-8 cursor-pointer transition-all"
+                      className="w-full appearance-none px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none pr-8 cursor-pointer transition-all"
                     >
                       <option value="" disabled>
                         Seleccionar Agencia...
@@ -439,7 +436,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                   <button
                     type="button"
                     onClick={handleAddAgency}
-                    className="p-2 bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 transition-colors"
+                    className="p-2 bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 dark:hover:bg-indigo-500/20 transition-colors"
                   >
                     <Plus className="w-5 h-5" />
                   </button>
@@ -583,7 +580,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-xs text-slate-500 uppercase bg-white dark:bg-slate-800 border-b border-slate-100">
+                <thead className="text-xs text-slate-500 uppercase bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
                   <tr>
                     <th className="px-6 py-3">Usuario (ID)</th>
                     <th className="px-6 py-3">Rol / Accesos</th>

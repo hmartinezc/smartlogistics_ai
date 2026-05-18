@@ -52,8 +52,9 @@ If the product is NOT listed here, use the EQ-based proportional distribution (s
 // --------------------------
 export const HEADER_FOOTER_RULES = `
 ### HEADER/FOOTER EXTRACTION (CRITICAL):
-- **FOOTER TOTALS:** Extract 'TOTAL PIECES' and 'TOTAL EQ/FULLS' **EXACTLY AS PRINTED** on the image. 
+- **FOOTER TOTALS:** Extract 'TOTAL PIECES', 'TOTAL EQ/FULLS', and the invoice 'TOTAL VALUE' **EXACTLY AS PRINTED** on the image.
 - **DO NOT FIX OR AUTO-CORRECT THE FOOTER.** If the image says Total=10 but lines sum to 8, YOU MUST RETURN 10. I need to detect the error.
+- **INVOICE TOTAL VALUE:** Keep \`invoice.totalValue\` as the printed invoice total, even if line-item math shows the document total is wrong.
 `;
 
 // --------------------------
@@ -70,6 +71,7 @@ For every line extracted:
 1. Extract 'Total Stems' (e.g., 260) and 'Unit Price' (e.g., 0.79).
 2. PERFORM CALCULATION: \`CalculatedTotal = Total Stems * Unit Price\`.
 3. **OVERRIDE RULE**: If the printed total on the image is different from your calculation, **USE YOUR CALCULATION**.
+4. This override applies only to each line item's \`totalValue\`. Do NOT overwrite the invoice-level \`invoice.totalValue\`, which must remain the printed total from the document.
 
 **SPECIFIC ERROR CORRECTION:**
 - If you see: Stems=260, Price=0.79
@@ -150,6 +152,7 @@ export const CONFIDENCE_SCORE_ALGORITHM = `
 Start with 100.
 1. **MATH DISCREPANCY (-50 pts):** Calculate Sum(LineItems.TotalPieces). If it differs from Footer, subtract 50.
 2. **EQ DISCREPANCY (-40 pts):** Calculate Sum(LineItems.EqFull). If it differs from Footer, subtract 40.
+3. **VALUE DISCREPANCY (-50 pts):** Calculate Sum(LineItems.TotalValue). If it differs from invoice.totalValue by more than 0.02, subtract 50.
 `;
 
 // --------------------------

@@ -4,6 +4,10 @@
 
 import { Hono } from 'hono';
 import type { InValue } from '@libsql/client';
+import {
+  maybeNormalizeInvoiceDataAirwaybills,
+  sanitizeHawbFormatPattern,
+} from '../../shared/airwaybillFormat.js';
 import { getDb } from '../db.js';
 import type { AuthUser } from '../security.js';
 import { ensureAgencyAccess, requireAuth } from '../security.js';
@@ -166,33 +170,48 @@ batch.post('/', async (c) => {
     ),
   );
   const agencyNames = new Map<string, string>();
+  const agencyHawbPatterns = new Map<string, string | null>();
   if (agencyIds.length > 0) {
     const agencyRows = await db.execute({
-      sql: `SELECT id, name FROM agencies WHERE id IN (${agencyIds.map(() => '?').join(',')})`,
+      sql: `SELECT id, name, hawb_format_pattern FROM agencies WHERE id IN (${agencyIds.map(() => '?').join(',')})`,
       args: agencyIds,
     });
 
     for (const row of agencyRows.rows) {
-      agencyNames.set(String(row.id), String(row.name));
+      const agencyId = String(row.id);
+      agencyNames.set(agencyId, String(row.name));
+      agencyHawbPatterns.set(
+        agencyId,
+        sanitizeHawbFormatPattern(row.hawb_format_pattern ? String(row.hawb_format_pattern) : null),
+      );
     }
   }
 
-  const batchItemStatements = items.map((item: Record<string, unknown>) => ({
-    sql: `INSERT INTO batch_items (id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
-        ON CONFLICT(id) DO NOTHING`,
-    args: [
-      item.id,
-      item.fileName,
-      item.status,
-      item.result ? JSON.stringify(item.result) : null,
-      item.error || null,
-      item.processedAt || null,
-      item.user || null,
-      item.agencyId || null,
-      item.createdAt || null,
-    ] as InValue[],
-  }));
+  const batchItemStatements = items.map((item: Record<string, unknown>) => {
+    const agencyId = String(item.agencyId || '');
+    const normalizedResult = item.result
+      ? maybeNormalizeInvoiceDataAirwaybills(item.result, {
+          hawbPattern: agencyHawbPatterns.get(agencyId) ?? null,
+        })
+      : null;
+
+    return {
+      sql: `INSERT INTO batch_items (id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
+          ON CONFLICT(id) DO NOTHING`,
+      args: [
+        item.id,
+        item.fileName,
+        item.status,
+        normalizedResult ? JSON.stringify(normalizedResult) : null,
+        item.error || null,
+        item.processedAt || null,
+        item.user || null,
+        item.agencyId || null,
+        item.createdAt || null,
+      ] as InValue[],
+    };
+  });
 
   const auditStatements = (items as Array<Record<string, unknown>>)
     .filter((item) => AUDITABLE_STATUSES.has(String(item.status || '')))

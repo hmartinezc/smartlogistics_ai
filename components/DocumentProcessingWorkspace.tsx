@@ -23,6 +23,7 @@ import {
   Zap,
 } from './Icons';
 import DocumentStorageManager from './DocumentStorageManager';
+import PageHeader from './PageHeader';
 
 interface DocumentProcessingWorkspaceProps {
   currentAgencyId: string;
@@ -487,40 +488,30 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-6 lg:p-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200">
-            <BrainCircuit className="h-3.5 w-3.5" />
-            Agentes IA
-          </div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Procesamiento de facturas
-          </h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {currentAgency?.name || 'Selecciona una agencia'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void loadDocuments({ batchId: activeBatchId, silent: false })}
-            disabled={!isAgencyReady || isRefreshing}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Actualizar
-          </button>
-          <button
-            type="button"
-            onClick={onViewHistory}
-            className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400"
-          >
-            <History className="h-4 w-4" />
-            Historial
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon={<BrainCircuit className="h-3.5 w-3.5" />}
+        badge="Agentes IA"
+        title="Procesamiento de facturas"
+        subtitle={currentAgency?.name || 'Selecciona una agencia'}
+      >
+        <button
+          type="button"
+          onClick={() => void loadDocuments({ batchId: activeBatchId, silent: false })}
+          disabled={!isAgencyReady || isRefreshing}
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Actualizar
+        </button>
+        <button
+          type="button"
+          onClick={onViewHistory}
+          className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400"
+        >
+          <History className="h-4 w-4" />
+          Historial
+        </button>
+      </PageHeader>
 
       {!isAgencyReady && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">

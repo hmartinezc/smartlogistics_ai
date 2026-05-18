@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Agency, BatchItem } from '../types';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Agency, BatchItem, BatchExportDocument } from '../types';
 import {
   buildInvoicedAwbRecords,
   getBatchItemOperationDate,
@@ -17,22 +17,35 @@ import {
   ChevronRight,
   Download,
   FileText,
+  Globe,
   Hash,
   Package,
   Plane,
+  X,
 } from './Icons';
+import PageHeader from './PageHeader';
 import {
   buildAwbExportFilename,
   buildBatchExportDocuments,
   enrichBatchItemsForExport,
 } from '../services/productMatchService';
 import { ApiError } from '../services/apiClient';
+import { hasClientFieldMappings } from '../shared/integrationConfig';
+import { executeIntegrationExport } from '../services/integrationExportService';
 
 interface OperatorPanelProps {
   results: BatchItem[];
   currentAgencyId: string;
   currentAgency?: Agency;
 }
+
+type ExportMode = 'native' | 'client';
+
+type ExportModalState = {
+  mawb: string;
+  documents: BatchExportDocument[];
+  missingMatches: number;
+};
 
 const LOW_CONFIDENCE_THRESHOLD = 75;
 
@@ -84,6 +97,8 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
     tone: 'error' | 'warning' | 'success';
     message: string;
   } | null>(null);
+  const [exportModal, setExportModal] = useState<ExportModalState | null>(null);
+  const [selectedExportMode, setSelectedExportMode] = useState<ExportMode>('native');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
@@ -240,6 +255,62 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
     );
   }, [awbRows]);
 
+  const hasClientMapping = hasClientFieldMappings(currentAgency?.integrationConfig);
+
+  const finalizeDownload = useCallback(
+    async ({
+      mawb,
+      documents,
+      missingMatches,
+      useClientMapping,
+    }: {
+      mawb: string;
+      documents: BatchExportDocument[];
+      missingMatches: number;
+      useClientMapping: boolean;
+    }) => {
+      const filename = buildAwbExportFilename(mawb);
+      const exportResult = await executeIntegrationExport({
+        agency: currentAgency,
+        documents,
+        useClientMapping,
+        source: 'operator_panel',
+        exportReference: mawb,
+        exportFilename: filename,
+      });
+
+      downloadAsJSON(exportResult.exportedDocuments, filename);
+
+      const mappingMessage = exportResult.usedClientMapping
+        ? ' usando el mapping del cliente'
+        : ' usando el mapping nativo';
+      const deliveryMessage = exportResult.deliveryResult
+        ? exportResult.deliveryResult.ok
+          ? ' También se envió al endpoint del cliente.'
+          : ` El envío al endpoint del cliente falló: ${exportResult.deliveryResult.error || exportResult.deliveryResult.statusCode || 'sin detalle'}.`
+        : '';
+
+      setExportNotice(
+        missingMatches > 0
+          ? {
+              tone:
+                exportResult.deliveryResult && !exportResult.deliveryResult.ok
+                  ? 'error'
+                  : 'warning',
+              message: `La AWB ${mawb === 'UNKNOWN' ? 'SIN MAWB' : mawb} se exportó${mappingMessage} con ${missingMatches} line item(s) sin equivalencia.${deliveryMessage}`,
+            }
+          : {
+              tone:
+                exportResult.deliveryResult && !exportResult.deliveryResult.ok
+                  ? 'error'
+                  : 'success',
+              message: `La AWB ${mawb === 'UNKNOWN' ? 'SIN MAWB' : mawb} se exportó${mappingMessage} con el catálogo vigente aplicado.${deliveryMessage}`,
+            },
+      );
+    },
+    [currentAgency],
+  );
+
   const handleDownloadAwb = async (mawb: string) => {
     const sourceItems = awbDocuments.get(mawb) || [];
 
@@ -254,19 +325,18 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
       const { items: exportItems, missingMatches } = await enrichBatchItemsForExport(sourceItems);
       const documents = buildBatchExportDocuments(exportItems);
 
-      downloadAsJSON(documents, buildAwbExportFilename(mawb));
+      if (hasClientMapping) {
+        setSelectedExportMode('native');
+        setExportModal({ mawb, documents, missingMatches });
+        return;
+      }
 
-      setExportNotice(
-        missingMatches > 0
-          ? {
-              tone: 'warning',
-              message: `La AWB ${mawb === 'UNKNOWN' ? 'SIN MAWB' : mawb} se exportó con ${missingMatches} line item(s) sin equivalencia.`,
-            }
-          : {
-              tone: 'success',
-              message: `La AWB ${mawb === 'UNKNOWN' ? 'SIN MAWB' : mawb} se exportó con el catálogo vigente aplicado.`,
-            },
-      );
+      await finalizeDownload({
+        mawb,
+        documents,
+        missingMatches,
+        useClientMapping: false,
+      });
     } catch (error) {
       setExportNotice({
         tone: 'error',
@@ -282,137 +352,131 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
 
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-            <Plane className="w-3 h-3" />
-            Panel Diario
-          </div>
-          <h1 className="mt-4 text-3xl font-bold text-slate-800 dark:text-white">Panel</h1>
-          <p className="mt-1 text-slate-500 dark:text-slate-400">
-            {currentAgency?.name
-              ? `Consolidado facturado por Master AWB para ${currentAgency.name}.`
-              : 'Consolidado facturado por Master AWB a partir del historial procesado.'}
+      <PageHeader
+        icon={<Plane className="h-3.5 w-3.5" />}
+        badge="Panel Diario"
+        title="Panel"
+        subtitle={
+          currentAgency?.name
+            ? `Consolidado facturado por Master AWB para ${currentAgency.name}.`
+            : 'Consolidado facturado por Master AWB a partir del historial procesado.'
+        }
+      >
+        <div ref={datePickerRef} className="relative flex">
+          <button
+            type="button"
+            onClick={openDatePicker}
+            className="group flex h-full min-h-[112px] w-full cursor-pointer flex-col justify-center gap-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md active:scale-[0.99] dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 dark:hover:border-indigo-500/60 md:w-64"
+            aria-label="Seleccionar rango operativo"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Rango Operativo
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-indigo-500'}`}
+              />
+            </div>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 transition-colors group-hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:group-hover:bg-indigo-500/30">
+                <Calendar className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-sm font-bold text-slate-800 dark:text-white">
+                  {formatOperationDateDisplay(operationDate)}
+                </span>
+                <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  {operationDateRangeLabel}
+                </span>
+              </div>
+            </div>
+          </button>
+
+          {isDatePickerOpen && (
+            <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-700 dark:bg-slate-800 dark:ring-white/10">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => goToMonth(-1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-sm font-bold capitalize text-slate-800 dark:text-white">
+                  {MONTHS_ES_FULL[viewMonth]} {viewYear}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToMonth(1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-7 px-3 pt-3">
+                {DAYS_ES_MIN.map((d) => (
+                  <div
+                    key={d}
+                    className="flex h-8 items-center justify-center text-[10px] font-bold uppercase text-slate-400"
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 px-3 pb-2">
+                {Array.from({ length: calendarGrid.totalCells }, (_, i) => {
+                  const day = i - calendarGrid.firstDayOfWeek + 1;
+                  if (day < 1 || day > calendarGrid.daysInMonth) return <div key={i} />;
+                  const val = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const isSelected = val === operationDate;
+                  const isToday = val === getOperationDateKey();
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleDaySelect(day)}
+                      className={`flex h-9 items-center justify-center rounded-lg text-sm font-medium transition-all active:scale-95
+                        ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/50'
+                            : isToday
+                              ? 'border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20'
+                              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="border-t border-slate-100 px-3 py-2.5 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={handleGoToday}
+                  className="w-full rounded-lg bg-indigo-50 py-1.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                >
+                  Ir a hoy
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-h-[112px] flex-col justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-300">
+            Fuente
+          </p>
+          <p className="mt-3 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+            Historial procesado del rango operativo
+          </p>
+          <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-200/80">
+            Click en una AWB para descargar el JSON de sus facturas extraídas.
           </p>
         </div>
-
-        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-stretch">
-          <div ref={datePickerRef} className="relative flex md:self-stretch">
-            <button
-              type="button"
-              onClick={openDatePicker}
-              className="group flex h-full min-h-[112px] w-full cursor-pointer flex-col justify-center gap-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md active:scale-[0.99] dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 dark:hover:border-indigo-500/60 md:w-64"
-              aria-label="Seleccionar rango operativo"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
-                  Rango Operativo
-                </span>
-                <ChevronDown
-                  className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-indigo-500'}`}
-                />
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 transition-colors group-hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:group-hover:bg-indigo-500/30">
-                  <Calendar className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-sm font-bold text-slate-800 dark:text-white">
-                    {formatOperationDateDisplay(operationDate)}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                    {operationDateRangeLabel}
-                  </span>
-                </div>
-              </div>
-            </button>
-
-            {isDatePickerOpen && (
-              <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-700 dark:bg-slate-800 dark:ring-white/10">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => goToMonth(-1)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span className="text-sm font-bold capitalize text-slate-800 dark:text-white">
-                    {MONTHS_ES_FULL[viewMonth]} {viewYear}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => goToMonth(1)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-7 px-3 pt-3">
-                  {DAYS_ES_MIN.map((d) => (
-                    <div
-                      key={d}
-                      className="flex h-8 items-center justify-center text-[10px] font-bold uppercase text-slate-400"
-                    >
-                      {d}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7 px-3 pb-2">
-                  {Array.from({ length: calendarGrid.totalCells }, (_, i) => {
-                    const day = i - calendarGrid.firstDayOfWeek + 1;
-                    if (day < 1 || day > calendarGrid.daysInMonth) return <div key={i} />;
-                    const val = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const isSelected = val === operationDate;
-                    const isToday = val === getOperationDateKey();
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => handleDaySelect(day)}
-                        className={`flex h-9 items-center justify-center rounded-lg text-sm font-medium transition-all active:scale-95
-                          ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/50'
-                              : isToday
-                                ? 'border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20'
-                                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'
-                          }`}
-                      >
-                        {day}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="border-t border-slate-100 px-3 py-2.5 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={handleGoToday}
-                    className="w-full rounded-lg bg-indigo-50 py-1.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
-                  >
-                    Ir a hoy
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex min-h-[112px] flex-col justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-300">
-              Fuente
-            </p>
-            <p className="mt-3 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-              Historial procesado del rango operativo
-            </p>
-            <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-200/80">
-              Click en una AWB para descargar el JSON de sus facturas extraídas.
-            </p>
-          </div>
-        </div>
-      </div>
+      </PageHeader>
 
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -549,6 +613,125 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{exportNotice.message}</span>
+          </div>
+        </div>
+      )}
+
+      {exportModal && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5 dark:border-slate-800">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  Exportación JSON
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-slate-800 dark:text-white">
+                  Selecciona el mapping para esta descarga
+                </h3>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Esta agencia tiene un mapping cliente configurado. Puedes descargar con formato
+                  Smart Invoice o con formato del cliente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExportModal(null)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-6 py-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedExportMode('native')}
+                  className={`rounded-2xl border px-5 py-5 text-left transition-all ${selectedExportMode === 'native' ? 'border-indigo-300 bg-indigo-50 shadow-sm dark:border-indigo-500/40 dark:bg-indigo-500/10' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-500'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${selectedExportMode === 'native' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}
+                    >
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 dark:text-white">
+                        Usar mapping nuestro
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        Descarga el JSON con el formato nativo Smart Invoice.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedExportMode('client')}
+                  className={`rounded-2xl border px-5 py-5 text-left transition-all ${selectedExportMode === 'client' ? 'border-emerald-300 bg-emerald-50 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/10' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-500'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${selectedExportMode === 'client' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}
+                    >
+                      <Globe className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 dark:text-white">
+                        Usar mapping del cliente
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        Renombra las claves del JSON según la configuración de integración y, si el
+                        endpoint está activo, también lo envía.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-950/50">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                    MAWB: {exportModal.mawb}
+                  </span>
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                    {exportModal.documents.length} documento(s)
+                  </span>
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                    {Object.keys(currentAgency?.integrationConfig?.fieldMappings || {}).length}{' '}
+                    mapping(s)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 px-6 py-5 sm:flex-row sm:justify-end dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setExportModal(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const payload = exportModal;
+                  setExportModal(null);
+                  setExportingMawb(payload.mawb);
+                  void finalizeDownload({
+                    mawb: payload.mawb,
+                    documents: payload.documents,
+                    missingMatches: payload.missingMatches,
+                    useClientMapping: selectedExportMode === 'client',
+                  }).finally(() => setExportingMawb(null));
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+              >
+                <Download className="h-4 w-4" /> Descargar JSON
+              </button>
+            </div>
           </div>
         </div>
       )}

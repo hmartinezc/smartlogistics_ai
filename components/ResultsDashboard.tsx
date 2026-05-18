@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useDeferredValue, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { BatchItem } from '../types';
+import { Agency, BatchItem, BatchExportDocument } from '../types';
 import {
   CheckCircle,
   AlertCircle,
@@ -17,8 +17,10 @@ import {
   X,
   Grid,
   List,
+  Globe,
 } from './Icons';
 import ValidationForm from './ValidationForm';
+import PageHeader from './PageHeader';
 import {
   getConfidenceLabel,
   getConfidenceLevel,
@@ -32,13 +34,24 @@ import {
   enrichBatchItemsForExport,
 } from '../services/productMatchService';
 import { ApiError } from '../services/apiClient';
+import { hasClientFieldMappings } from '../shared/integrationConfig';
+import { executeIntegrationExport } from '../services/integrationExportService';
 
 interface ResultsDashboardProps {
   results: BatchItem[];
   onBack: () => void;
   onClearHistory?: () => void;
   onUpdateItem?: (item: BatchItem) => void; // Call back to update parent
+  currentAgency?: Agency;
 }
+
+type ExportMode = 'native' | 'client';
+
+type ExportModalState = {
+  awb: string;
+  documents: BatchExportDocument[];
+  missingMatches: number;
+};
 
 type SortKey = 'processedAt' | 'invoiceDate' | 'mawb';
 type SortDirection = 'asc' | 'desc';
@@ -330,6 +343,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   onBack,
   onClearHistory,
   onUpdateItem,
+  currentAgency,
 }) => {
   const [viewingItem, setViewingItem] = useState<BatchItem | null>(null);
   const [selectedAwb, setSelectedAwb] = useState('ALL');
@@ -354,6 +368,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     tone: 'error' | 'warning' | 'success';
     message: string;
   } | null>(null);
+  const [exportModal, setExportModal] = useState<ExportModalState | null>(null);
+  const [selectedExportMode, setSelectedExportMode] = useState<ExportMode>('native');
   const awbMenuRef = useRef<HTMLDivElement | null>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const groupMenuRef = useRef<HTMLDivElement | null>(null);
@@ -372,6 +388,61 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const errorCount = results.filter((r) => r.status === 'ERROR').length;
   const selectedGroupOption =
     GROUP_OPTIONS.find((option) => option.key === groupBy) || GROUP_OPTIONS[0];
+  const hasClientMapping = hasClientFieldMappings(currentAgency?.integrationConfig);
+
+  const finalizeDownload = useCallback(
+    async ({
+      awb,
+      documents,
+      missingMatches,
+      useClientMapping,
+    }: {
+      awb: string;
+      documents: BatchExportDocument[];
+      missingMatches: number;
+      useClientMapping: boolean;
+    }) => {
+      const filename = buildAwbExportFilename(awb);
+      const exportResult = await executeIntegrationExport({
+        agency: currentAgency,
+        documents,
+        useClientMapping,
+        source: 'history_results',
+        exportReference: awb,
+        exportFilename: filename,
+      });
+
+      downloadAsJSON(exportResult.exportedDocuments, filename);
+
+      const mappingMessage = exportResult.usedClientMapping
+        ? ' usando el mapping del cliente'
+        : ' usando el mapping nativo';
+      const deliveryMessage = exportResult.deliveryResult
+        ? exportResult.deliveryResult.ok
+          ? ' También se envió al endpoint del cliente.'
+          : ` El envío al endpoint del cliente falló: ${exportResult.deliveryResult.error || exportResult.deliveryResult.statusCode || 'sin detalle'}.`
+        : '';
+
+      setDownloadNotice(
+        missingMatches > 0
+          ? {
+              tone:
+                exportResult.deliveryResult && !exportResult.deliveryResult.ok
+                  ? 'error'
+                  : 'warning',
+              message: `Se exportó el JSON${mappingMessage} con ${missingMatches} line item(s) sin equivalencia en el catálogo vigente.${deliveryMessage}`,
+            }
+          : {
+              tone:
+                exportResult.deliveryResult && !exportResult.deliveryResult.ok
+                  ? 'error'
+                  : 'success',
+              message: `Se exportó el JSON${mappingMessage} con matches aplicados sobre el catálogo vigente.${deliveryMessage}`,
+            },
+      );
+    },
+    [currentAgency],
+  );
 
   const awbCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -1192,19 +1263,22 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         await enrichBatchItemsForExport(filteredSuccessResults);
       const cleanData = buildBatchExportDocuments(exportItems);
 
-      downloadAsJSON(cleanData, buildAwbExportFilename(selectedAwb));
+      if (hasClientMapping) {
+        setSelectedExportMode('native');
+        setExportModal({
+          awb: selectedAwb,
+          documents: cleanData,
+          missingMatches,
+        });
+        return;
+      }
 
-      setDownloadNotice(
-        missingMatches > 0
-          ? {
-              tone: 'warning',
-              message: `Se exportó el JSON con ${missingMatches} line item(s) sin equivalencia en el catálogo vigente.`,
-            }
-          : {
-              tone: 'success',
-              message: 'Se exportó el JSON con matches aplicados sobre el catálogo vigente.',
-            },
-      );
+      await finalizeDownload({
+        awb: selectedAwb,
+        documents: cleanData,
+        missingMatches,
+        useClientMapping: false,
+      });
     } catch (error) {
       setDownloadNotice({
         tone: 'error',
@@ -1240,7 +1314,13 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col space-y-4 p-3 sm:p-4 lg:space-y-6 lg:p-6">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col space-y-4 p-4 sm:p-6 lg:space-y-6 lg:p-8">
+      <PageHeader
+        icon={<FileText className="h-3.5 w-3.5" />}
+        badge="Historial"
+        title="Historial de extracciones"
+        subtitle="Revisa, filtra y exporta los resultados del procesamiento de facturas."
+      />
       {/* Header Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4 xl:gap-6">
         <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5 xl:p-6 xl:gap-4">
@@ -1483,6 +1563,126 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{downloadNotice.message}</span>
+          </div>
+        </div>
+      )}
+
+      {exportModal && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5 dark:border-slate-800">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  Exportación JSON
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-slate-800 dark:text-white">
+                  Selecciona el mapping para esta descarga
+                </h3>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  La agencia activa tiene un mapping cliente configurado. Puedes descargar con
+                  nuestro formato nativo o con el formato del cliente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExportModal(null)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-6 py-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedExportMode('native')}
+                  className={`rounded-2xl border px-5 py-5 text-left transition-all ${selectedExportMode === 'native' ? 'border-indigo-300 bg-indigo-50 shadow-sm dark:border-indigo-500/40 dark:bg-indigo-500/10' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-500'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${selectedExportMode === 'native' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}
+                    >
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 dark:text-white">
+                        Usar mapping nuestro
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        Descarga con nuestras claves nativas. Ideal si el equipo aún trabaja con el
+                        formato Smart Invoice.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedExportMode('client')}
+                  className={`rounded-2xl border px-5 py-5 text-left transition-all ${selectedExportMode === 'client' ? 'border-emerald-300 bg-emerald-50 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/10' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-500'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${selectedExportMode === 'client' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}
+                    >
+                      <Globe className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 dark:text-white">
+                        Usar mapping del cliente
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        Renombra las claves del JSON según la integración configurada para esta
+                        agencia. Si el endpoint está activo, también lo envía.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-950/50">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                    MAWB: {exportModal.awb}
+                  </span>
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                    {exportModal.documents.length} documento(s)
+                  </span>
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                    {Object.keys(currentAgency?.integrationConfig?.fieldMappings || {}).length}{' '}
+                    mapping(s)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 px-6 py-5 sm:flex-row sm:justify-end dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setExportModal(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const payload = exportModal;
+                  setExportModal(null);
+                  setIsExporting(true);
+                  void finalizeDownload({
+                    awb: payload.awb,
+                    documents: payload.documents,
+                    missingMatches: payload.missingMatches,
+                    useClientMapping: selectedExportMode === 'client',
+                  }).finally(() => setIsExporting(false));
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+              >
+                <Download className="h-4 w-4" /> Descargar JSON
+              </button>
+            </div>
           </div>
         </div>
       )}

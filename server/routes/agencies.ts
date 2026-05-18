@@ -3,6 +3,8 @@
 // ============================================
 
 import { Hono } from 'hono';
+import { sanitizeHawbFormatPattern } from '../../shared/airwaybillFormat.js';
+import { normalizeIntegrationConfig } from '../../shared/integrationConfig.js';
 import { getDb } from '../db.js';
 import { ensureAgencyAccess, requireAuth, requireRole } from '../security.js';
 
@@ -14,11 +16,25 @@ const AGENCY_SELECT = `SELECT
   a.plan_id,
   a.current_usage,
   a.is_active,
+  a.hawb_format_pattern,
+  a.integration_config,
   a.created_at,
   a.updated_at,
   COALESCE(GROUP_CONCAT(DISTINCT ae.email), '') AS emails
 FROM agencies a
 LEFT JOIN agency_emails ae ON ae.agency_id = a.id`;
+
+function parseIntegrationConfig(value: unknown) {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return normalizeIntegrationConfig(JSON.parse(String(value))) || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 // Helper: reconstruir Agency desde DB row
 function buildAgency(row: Record<string, unknown>) {
@@ -32,6 +48,10 @@ function buildAgency(row: Record<string, unknown>) {
       .filter(Boolean),
     currentUsage: Number(row.current_usage),
     isActive: Boolean(row.is_active),
+    hawbFormatPattern:
+      sanitizeHawbFormatPattern(row.hawb_format_pattern ? String(row.hawb_format_pattern) : null) ||
+      undefined,
+    integrationConfig: parseIntegrationConfig(row.integration_config),
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : undefined,
   };
@@ -125,16 +145,20 @@ agencies.post('/', async (c) => {
   }
 
   const now = new Date().toISOString();
+  const hawbFormatPattern = sanitizeHawbFormatPattern(body.hawbFormatPattern);
+  const integrationConfig = normalizeIntegrationConfig(body.integrationConfig);
 
   await db.execute({
-    sql: `INSERT INTO agencies (id, name, plan_id, current_usage, is_active, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO agencies (id, name, plan_id, current_usage, is_active, hawb_format_pattern, integration_config, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       body.id,
       body.name,
       body.planId,
       body.currentUsage || 0,
       body.isActive ? 1 : 0,
+      hawbFormatPattern,
+      integrationConfig ? JSON.stringify(integrationConfig) : null,
       now,
       now,
     ],
@@ -220,10 +244,21 @@ agencies.put('/:id', async (c) => {
   }
 
   const now = new Date().toISOString();
+  const hawbFormatPattern = sanitizeHawbFormatPattern(body.hawbFormatPattern);
+  const integrationConfig = normalizeIntegrationConfig(body.integrationConfig);
 
   await db.execute({
-    sql: `UPDATE agencies SET name = ?, plan_id = ?, current_usage = ?, is_active = ?, updated_at = ? WHERE id = ?`,
-    args: [body.name, body.planId, body.currentUsage || 0, body.isActive ? 1 : 0, now, id],
+    sql: `UPDATE agencies SET name = ?, plan_id = ?, current_usage = ?, is_active = ?, hawb_format_pattern = ?, integration_config = ?, updated_at = ? WHERE id = ?`,
+    args: [
+      body.name,
+      body.planId,
+      body.currentUsage || 0,
+      body.isActive ? 1 : 0,
+      hawbFormatPattern,
+      integrationConfig ? JSON.stringify(integrationConfig) : null,
+      now,
+      id,
+    ],
   });
 
   // Reemplazar emails

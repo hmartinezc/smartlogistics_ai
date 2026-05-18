@@ -19,6 +19,7 @@ import OperatorPanel from './components/OperatorPanel';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
 import AgenciesConfiguration from './components/AgenciesConfiguration';
+import IntegrationConfig from './components/IntegrationConfig';
 import ProductMatchCatalog from './components/ProductMatchCatalog';
 import Sidebar from './components/Sidebar';
 import { X } from './components/Icons';
@@ -28,6 +29,7 @@ import {
   resolveDefaultAgencyContext,
   resolveLandingState,
 } from './services/authService';
+import { normalizeInvoiceDataAirwaybills } from './shared/airwaybillFormat';
 import { generateId } from './utils/helpers';
 
 interface AppProps {
@@ -136,10 +138,11 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
         AppState.DASHBOARD_PANEL,
         AppState.PRODUCT_MATCHES,
         AppState.PROCESS_SELECTION,
+        AppState.INTEGRATION_CONFIG,
       ].includes(appState)
     ) {
       setAppState(
-        currentUser?.role === 'ADMIN' ? AppState.DASHBOARD_OPS : AppState.DASHBOARD_PANEL,
+        currentUser?.role === 'ADMIN' ? AppState.DASHBOARD_ADMIN : AppState.DASHBOARD_PANEL,
       );
     }
   };
@@ -253,6 +256,11 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
 
     const resultsWithMeta = newResults.map((item) => ({
       ...item,
+      result: item.result
+        ? normalizeInvoiceDataAirwaybills(item.result, {
+            hawbPattern: currentAgency?.hawbFormatPattern,
+          })
+        : item.result,
       user: currentUser?.name || 'Unknown',
       agencyId: targetAgencyId,
     }));
@@ -405,14 +413,15 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 {appState === AppState.DASHBOARD_ADMIN && currentUser?.role === 'ADMIN' && (
                   <AdminDashboard agencies={agencies} plans={PLANS} />
                 )}
-                {appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
+                {/* TODO: Re-enable when Conciliación y Log is ready */}
+                {/* appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
                   <DashboardHome
                     results={batchResults}
                     currentAgencyId={currentAgencyId}
                     currentAgency={currentAgency}
                     currentPlan={contextPlan}
                   />
-                )}
+                ) */}
                 {appState === AppState.DASHBOARD_PANEL && currentUser && (
                   <OperatorPanel
                     results={batchResults}
@@ -436,6 +445,13 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                     onAddAgency={handleAddAgency}
                     onUpdateAgency={handleUpdateAgency}
                     onDeleteAgency={handleDeleteAgency}
+                  />
+                )}
+                {appState === AppState.INTEGRATION_CONFIG && currentUser?.role === 'ADMIN' && (
+                  <IntegrationConfig
+                    currentAgencyId={currentAgencyId}
+                    currentAgency={currentAgency}
+                    onUpdateAgency={handleUpdateAgency}
                   />
                 )}
                 {appState === AppState.PRODUCT_MATCHES && currentUser && (
@@ -467,6 +483,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 {appState === AppState.HISTORY_RESULTS && (
                   <ResultsDashboard
                     results={batchResults}
+                    currentAgency={currentAgency}
                     onBack={handleBackToProcessSelection}
                     onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
                     onUpdateItem={handleUpdateResult}

@@ -19,6 +19,7 @@ import {
   Upload,
   X,
 } from './Icons';
+import PageHeader from './PageHeader';
 
 interface ProductMatchCatalogProps {
   currentAgencyId: string;
@@ -479,24 +480,14 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
       <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-lg shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
-        <div className="border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.18),_transparent_45%),linear-gradient(135deg,_rgba(248,250,252,0.92),_rgba(238,242,255,0.86))] px-8 py-8 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(129,140,248,0.18),_transparent_35%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(30,41,59,0.92))]">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
-                <Package className="h-3.5 w-3.5" />
-                Match Productos
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Catálogo de equivalencias por agencia
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Gestiona la relación entre la descripción de producto que llega en la factura y los
-                datos equivalentes dentro del sistema del cliente. La exportación seguirá
-                derivándose del catálogo vigente sin tocar el JSON persistido.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/60 bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-950/50">
+        <div className="px-8 py-8">
+          <PageHeader
+            icon={<Package className="h-3.5 w-3.5" />}
+            badge="Match Productos"
+            title="Catálogo de equivalencias por agencia"
+            subtitle="Gestiona la relación entre la descripción de producto que llega en la factura y los datos equivalentes dentro del sistema del cliente. La exportación seguirá derivándose del catálogo vigente sin tocar el JSON persistido."
+          >
+            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-950/50">
               <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
                 Agencia activa
               </div>
@@ -514,7 +505,7 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
                 </div>
               </div>
             </div>
-          </div>
+          </PageHeader>
         </div>
 
         <div className="grid gap-4 border-b border-slate-200 px-8 py-6 dark:border-slate-800 md:grid-cols-3">

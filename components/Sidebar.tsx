@@ -16,6 +16,7 @@ import {
   Trash2,
   Search,
   Globe,
+  Settings,
 } from './Icons';
 import { AppState, UserRole, Agency } from '../types';
 import { canRoleAccessAppState } from '../services/authService';
@@ -187,12 +188,13 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Admin Specific Items
   if (isAdmin) {
-    menuItems.unshift({
-      id: AppState.DASHBOARD_OPS,
-      label: 'Panel Operativo',
-      icon: LayoutDashboard,
-      desc: 'Conciliación y Log',
-    });
+    // TODO: Re-enable when Conciliación y Log is ready
+    // menuItems.unshift({
+    //   id: AppState.DASHBOARD_OPS,
+    //   label: 'Panel Operativo',
+    //   icon: LayoutDashboard,
+    //   desc: 'Conciliación y Log',
+    // });
 
     menuItems.unshift({
       id: AppState.DASHBOARD_ADMIN,
@@ -206,6 +208,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Config. Agencias',
       icon: Building,
       desc: 'Planes y Entidades',
+    });
+
+    menuItems.push({
+      id: AppState.INTEGRATION_CONFIG,
+      label: 'Integración',
+      icon: Settings,
+      desc: 'Mappings y endpoint',
     });
 
     menuItems.push({

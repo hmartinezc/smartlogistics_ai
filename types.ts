@@ -46,6 +46,69 @@ export interface ExportInvoiceData extends Omit<InvoiceData, 'lineItems'> {
   lineItems: ExportInvoiceItem[];
 }
 
+export interface BatchExportDocument extends ExportInvoiceData {
+  filename: string;
+  processedAt?: string;
+}
+
+export type IntegrationAuthType = 'none' | 'bearer' | 'apiKey' | 'basic';
+
+export type IntegrationHttpMethod = 'POST' | 'PUT';
+
+export interface IntegrationEndpointHeader {
+  id: string;
+  key: string;
+  value: string;
+}
+
+export interface AgencyIntegrationEndpointConfig {
+  enabled: boolean;
+  url: string;
+  method: IntegrationHttpMethod;
+  authType: IntegrationAuthType;
+  bearerToken?: string;
+  apiKeyHeader?: string;
+  apiKeyValue?: string;
+  basicUsername?: string;
+  basicPassword?: string;
+  headers: IntegrationEndpointHeader[];
+}
+
+export interface AgencyIntegrationConfig {
+  fieldMappings: Record<string, string>;
+  endpoint: AgencyIntegrationEndpointConfig;
+}
+
+export type IntegrationDeliveryEventType = 'TEST' | 'EXPORT';
+
+export type IntegrationDeliverySource = 'integration_config' | 'history_results' | 'operator_panel';
+
+export interface IntegrationDeliveryLog {
+  id: string;
+  agencyId: string;
+  eventType: IntegrationDeliveryEventType;
+  source: IntegrationDeliverySource;
+  exportReference?: string;
+  exportFilename?: string;
+  endpointUrl: string;
+  requestDocumentCount: number;
+  usedClientMapping: boolean;
+  responseStatus?: number;
+  responseBody?: string;
+  success: boolean;
+  error?: string;
+  createdAt?: string;
+}
+
+export interface IntegrationEndpointResponse {
+  ok: boolean;
+  statusCode?: number;
+  responseBody?: string;
+  error?: string;
+  usedClientMapping: boolean;
+  deliveryId?: string;
+}
+
 export interface BatchItem {
   id: string;
   file?: File;
@@ -176,6 +239,8 @@ export interface Agency {
   planId: string;
   currentUsage: number; // Pages processed this month
   isActive: boolean; // Status (Active / Suspended)
+  hawbFormatPattern?: string;
+  integrationConfig?: AgencyIntegrationConfig;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -263,6 +328,7 @@ export enum AppState {
   DASHBOARD_PANEL = 'DASHBOARD_PANEL', // Panel Facturado (Operación)
   DASHBOARD_ADMIN = 'DASHBOARD_ADMIN', // Panel Admin (Solo Admin)
   AGENCY_CONFIG = 'AGENCY_CONFIG', // Configuración Agencias (Solo Admin)
+  INTEGRATION_CONFIG = 'INTEGRATION_CONFIG', // Integración por agencia (Solo Admin)
   PRODUCT_MATCHES = 'PRODUCT_MATCHES', // Catálogo Match Productos
   PROCESS_SELECTION = 'PROCESS_SELECTION',
   BATCH_RUNNING = 'BATCH_RUNNING',

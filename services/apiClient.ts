@@ -400,6 +400,35 @@ export const api = {
     });
   },
 
+  async testIntegration(input: {
+    agencyId: string;
+    useClientMapping?: boolean;
+    documents?: import('../types').BatchExportDocument[];
+  }): Promise<import('../types').IntegrationEndpointResponse> {
+    return request('/integrate/test', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async sendToIntegration(input: {
+    agencyId: string;
+    documents: import('../types').BatchExportDocument[];
+    useClientMapping?: boolean;
+    source?: import('../types').IntegrationDeliverySource;
+    exportReference?: string;
+    exportFilename?: string;
+  }): Promise<import('../types').IntegrationEndpointResponse> {
+    return request('/integrate/send', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async getIntegrationLogs(agencyId: string): Promise<import('../types').IntegrationDeliveryLog[]> {
+    return request(`/integrate/logs/${encodeURIComponent(agencyId)}`);
+  },
+
   async extractLogisticsData(
     file: File,
     format: import('../types').AgentType,

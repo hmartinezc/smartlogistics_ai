@@ -29,7 +29,11 @@ export const invoiceExtractionSchema: Schema = {
       type: SchemaType.INTEGER,
       description: 'Total stems across all rows. MUST BE A WHOLE INTEGER (e.g. 350, 600, 1000).',
     },
-    totalValue: { type: SchemaType.NUMBER },
+    totalValue: {
+      type: SchemaType.NUMBER,
+      description:
+        'The EXACT invoice total value printed on the document. Do NOT auto-correct this field even if line-item math shows a discrepancy.',
+    },
     confidenceScore: {
       type: SchemaType.NUMBER,
       description: 'Calculated reliability score (0-100). Subtract points if Math mismatches.',

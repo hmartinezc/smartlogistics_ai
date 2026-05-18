@@ -40,8 +40,28 @@ const SCHEMA_STATEMENTS: string[] = [
     plan_id        TEXT NOT NULL REFERENCES subscription_plans(id),
     current_usage  INTEGER NOT NULL DEFAULT 0,
     is_active      INTEGER NOT NULL DEFAULT 1,
+    hawb_format_pattern TEXT,
+    integration_config TEXT,
     created_at     TEXT DEFAULT (datetime('now')),
     updated_at     TEXT DEFAULT (datetime('now'))
+  )`,
+
+  // ── Logs de Integración Externa por Agencia ──
+  `CREATE TABLE IF NOT EXISTS integration_delivery_logs (
+    id                   TEXT PRIMARY KEY,
+    agency_id            TEXT NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+    event_type           TEXT NOT NULL CHECK(event_type IN ('TEST', 'EXPORT')),
+    source               TEXT NOT NULL,
+    export_reference     TEXT,
+    export_filename      TEXT,
+    endpoint_url         TEXT NOT NULL,
+    request_document_count INTEGER NOT NULL DEFAULT 0,
+    used_client_mapping  INTEGER NOT NULL DEFAULT 0,
+    response_status      INTEGER,
+    response_body        TEXT,
+    success              INTEGER NOT NULL CHECK(success IN (0, 1)),
+    error                TEXT,
+    created_at           TEXT DEFAULT (datetime('now'))
   )`,
 
   // ── Emails de Agencia (1 agencia → N emails) ──
@@ -209,6 +229,7 @@ const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_product_matches_agency_product ON product_matches(agency_id, product)`,
   `CREATE INDEX IF NOT EXISTS idx_product_match_master_product ON product_match_master(product)`,
   `CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_integration_delivery_logs_agency_created ON integration_delivery_logs(agency_id, created_at DESC)`,
 ];
 
 export async function runMigrations(db: Client): Promise<void> {
@@ -222,6 +243,8 @@ export async function runMigrations(db: Client): Promise<void> {
 
   await ensureColumn(db, 'document_jobs', 'locked_by', 'TEXT');
   await ensureColumn(db, 'document_jobs', 'lock_expires_at', 'TEXT');
+  await ensureColumn(db, 'agencies', 'hawb_format_pattern', 'TEXT');
+  await ensureColumn(db, 'agencies', 'integration_config', 'TEXT');
 
   await backfillDocumentProcessingAudit(db);
 

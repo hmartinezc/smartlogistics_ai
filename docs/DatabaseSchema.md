@@ -30,7 +30,9 @@ subscription_plans ────< agencies ────< agency_emails
                               │
                               ├────< document_jobs (PDFs en MinIO, cola async)
                               │
-                              ├────< booked_awb_records
+                               ├────< integration_delivery_logs
+                               │
+                               ├────< booked_awb_records
                               │
                               ├────< product_matches ────< (product_match_master) (referencia lógica por producto)
                               │
@@ -65,15 +67,17 @@ Define los niveles de servicio disponibles para las agencias.
 
 Cada agencia es un "tenant" del sistema con su propio plan y uso.
 
-| Columna         | Tipo    | Restricción                                | Descripción                             |
-| --------------- | ------- | ------------------------------------------ | --------------------------------------- |
-| `id`            | TEXT    | **PRIMARY KEY**                            | ID único (ej: `AGENCY_HQ`)              |
-| `name`          | TEXT    | NOT NULL                                   | Nombre de la agencia                    |
-| `plan_id`       | TEXT    | NOT NULL, **FK** → `subscription_plans.id` | Plan asignado                           |
-| `current_usage` | INTEGER | NOT NULL, DEFAULT 0                        | Documentos procesados en período actual |
-| `is_active`     | INTEGER | NOT NULL, DEFAULT 1                        | 1=activa, 0=suspendida                  |
-| `created_at`    | TEXT    | DEFAULT now                                | Fecha de creación                       |
-| `updated_at`    | TEXT    | DEFAULT now                                | Última modificación                     |
+| Columna               | Tipo    | Restricción                                | Descripción                                                       |
+| --------------------- | ------- | ------------------------------------------ | ----------------------------------------------------------------- |
+| `id`                  | TEXT    | **PRIMARY KEY**                            | ID único (ej: `AGENCY_HQ`)                                        |
+| `name`                | TEXT    | NOT NULL                                   | Nombre de la agencia                                              |
+| `plan_id`             | TEXT    | NOT NULL, **FK** → `subscription_plans.id` | Plan asignado                                                     |
+| `current_usage`       | INTEGER | NOT NULL, DEFAULT 0                        | Documentos procesados en período actual                           |
+| `is_active`           | INTEGER | NOT NULL, DEFAULT 1                        | 1=activa, 0=suspendida                                            |
+| `hawb_format_pattern` | TEXT    | nullable                                   | Patrón opcional para normalizar HAWB al guardado inicial desde IA |
+| `integration_config`  | TEXT    | nullable                                   | Configuración JSON de integración externa (endpoint, autenticación, field mappings) |
+| `created_at`          | TEXT    | DEFAULT now                                | Fecha de creación                                                 |
+| `updated_at`          | TEXT    | DEFAULT now                                | Última modificación                                               |
 
 **Datos seed:** AGENCY_HQ (SmartLogistics HQ, Enterprise), AGENCY_CLIENT_A (Flores Del Valle, Basic), AGENCY_CLIENT_B (Cargo Express, Pro)
 
@@ -304,6 +308,31 @@ Almacén key-value para configuraciones generales.
 
 ---
 
+### 14. `integration_delivery_logs` — Logs de Envíos de Integración
+
+Cada registro documenta un envío a un endpoint externo de integración (test o exportación).
+
+| Columna                  | Tipo    | Restricción                                                               | Descripción                                      |
+| ------------------------ | ------- | ------------------------------------------------------------------------- | ------------------------------------------------ |
+| `id`                     | TEXT    | **PRIMARY KEY**                                                           | ID único                                         |
+| `agency_id`              | TEXT    | NOT NULL, **FK** → `agencies.id` ON DELETE CASCADE                        | Agencia propietaria                              |
+| `event_type`             | TEXT    | NOT NULL, CHECK(`TEST`, `EXPORT`)                                         | Tipo de evento                                   |
+| `source`                 | TEXT    | NOT NULL                                                                  | Origen del envío                                 |
+| `export_reference`       | TEXT    | nullable                                                                  | Referencia de exportación                        |
+| `export_filename`        | TEXT    | nullable                                                                  | Nombre de archivo exportado                      |
+| `endpoint_url`           | TEXT    | NOT NULL                                                                  | URL de destino                                   |
+| `request_document_count` | INTEGER | NOT NULL, DEFAULT 0                                                       | Documentos incluidos en la petición              |
+| `used_client_mapping`    | INTEGER | NOT NULL, DEFAULT 0                                                       | 1 si usó mapping de cliente, 0 si no             |
+| `response_status`        | INTEGER | nullable                                                                  | Código HTTP de respuesta                         |
+| `response_body`          | TEXT    | nullable                                                                  | Cuerpo de la respuesta                           |
+| `success`                | INTEGER | NOT NULL, CHECK(0, 1)                                                     | 1 si fue exitoso, 0 si falló                     |
+| `error`                  | TEXT    | nullable                                                                  | Mensaje de error                                 |
+| `created_at`             | TEXT    | DEFAULT now                                                               | Fecha del envío                                  |
+
+**Índice:** `idx_integration_delivery_logs_agency_created` en `(agency_id, created_at DESC)`
+
+---
+
 ## Endpoints de la API
 
 ### Autenticación (`/api/auth`)
@@ -415,6 +444,18 @@ Almacén key-value para configuraciones generales.
 | PUT    | `/api/settings/:key` | Guardar una configuración |
 
 **Autorización:** sesión requerida
+
+### Integración (`/api/integrate`)
+
+| Método | Ruta                      | Descripción                                  |
+| ------ | ------------------------- | -------------------------------------------- |
+| POST   | `/api/integrate/test`     | Probar envío a endpoint externo con docs dummy |
+| POST   | `/api/integrate/send`     | Enviar documentos transformados a endpoint externo |
+| GET    | `/api/integrate/logs/:id` | Listar historial de envíos de una agencia    |
+
+**Body (send):** `{ agencyId, documents[], useClientMapping?, source?, exportReference?, exportFilename? }`  
+**Body (test):** `{ agencyId }`  
+**Autorización:** sesión requerida + acceso a la agencia
 
 ### Utilidad
 

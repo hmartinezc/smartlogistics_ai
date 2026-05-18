@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Agency, SubscriptionPlan } from '../types';
 import { generateId } from '../utils/helpers';
 import { Building, Save, Trash2, AlertCircle, ChevronDown, Pencil, X, Plus, Power } from './Icons';
+import PageHeader from './PageHeader';
 
 interface AgenciesConfigurationProps {
   agencies: Agency[];
@@ -27,6 +28,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
   const [emailList, setEmailList] = useState<string[]>([]);
 
   const [isActive, setIsActive] = useState(true);
+  const [hawbFormatPattern, setHawbFormatPattern] = useState('');
 
   const [selectedPlan, setSelectedPlan] = useState(plans[0]?.id || '');
   const [error, setError] = useState('');
@@ -37,6 +39,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
     setCurrentEmailInput('');
     setSelectedPlan(plans[0]?.id || '');
     setIsActive(true);
+    setHawbFormatPattern('');
     setEditingId(null);
     setError('');
   };
@@ -48,6 +51,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
     setCurrentEmailInput('');
     setSelectedPlan(agency.planId);
     setIsActive(agency.isActive);
+    setHawbFormatPattern(agency.hawbFormatPattern || '');
     setError('');
   };
 
@@ -92,6 +96,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
           emails: emailList,
           planId: selectedPlan,
           isActive: isActive,
+          hawbFormatPattern: hawbFormatPattern.trim() || undefined,
         });
 
         if (submitError) {
@@ -108,6 +113,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
         planId: selectedPlan,
         currentUsage: 0,
         isActive: isActive,
+        hawbFormatPattern: hawbFormatPattern.trim() || undefined,
       };
       const submitError = await onAddAgency(newAgency);
       if (submitError) {
@@ -122,16 +128,13 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
   const getPlanDetails = (planId: string) => plans.find((p) => p.id === planId);
 
   return (
-    <div className="p-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-3">
-          <Building className="w-8 h-8 text-indigo-600" />
-          Configuración de Agencias
-        </h2>
-        <p className="text-slate-500 dark:text-slate-400 text-lg">
-          Administre las entidades comerciales, sus datos de contacto y niveles de servicio.
-        </p>
-      </div>
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PageHeader
+        icon={<Building className="h-3.5 w-3.5" />}
+        badge="Configuración"
+        title="Configuración de Agencias"
+        subtitle="Administre las entidades comerciales, sus datos de contacto y niveles de servicio."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Formulario */}
@@ -156,7 +159,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm flex items-center gap-2">
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg text-sm flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" /> {error}
               </div>
             )}
@@ -186,7 +189,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   placeholder="Ej. Flowers Cargo LLC"
                 />
               </div>
@@ -201,13 +204,13 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
                     value={currentEmailInput}
                     onChange={(e) => setCurrentEmailInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddEmail())}
-                    className="flex-1 min-w-0 h-11 px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    className="flex-1 min-w-0 h-11 px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                     placeholder="billing@agencia.com"
                   />
                   <button
                     type="button"
                     onClick={handleAddEmail}
-                    className="shrink-0 w-11 h-11 flex items-center justify-center bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 transition-colors border border-indigo-200"
+                    className="shrink-0 w-11 h-11 flex items-center justify-center bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 dark:hover:bg-indigo-500/20 transition-colors border border-indigo-200"
                   >
                     <Plus className="w-5 h-5" />
                   </button>
@@ -238,13 +241,29 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Formato Guardado HAWB
+                </label>
+                <input
+                  type="text"
+                  value={hawbFormatPattern}
+                  onChange={(e) => setHawbFormatPattern(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono"
+                  placeholder="XXX-XXXX-XXXX"
+                />
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  Vacío = no se normaliza HAWB. Usa X para cada carácter a guardar.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Plan de Suscripción
                 </label>
                 <div className="relative">
                   <select
                     value={selectedPlan}
                     onChange={(e) => setSelectedPlan(e.target.value)}
-                    className="w-full appearance-none px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none pr-10 cursor-pointer transition-all"
+                    className="w-full appearance-none px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none pr-10 cursor-pointer transition-all"
                   >
                     {plans.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -305,7 +324,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-xs text-slate-500 uppercase bg-white dark:bg-slate-800 border-b border-slate-100">
+                <thead className="text-xs text-slate-500 uppercase bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
                   <tr>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Agencia</th>
@@ -321,11 +340,11 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
                       <tr key={agency.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <td className="px-6 py-4">
                           {agency.isActive ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/50">
                               <Power className="w-3 h-3" /> ACTIVA
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50">
                               <Power className="w-3 h-3" /> SUSPENDIDA
                             </span>
                           )}
@@ -351,9 +370,12 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
                           <div className="text-[10px] text-slate-400 font-mono mt-1">
                             {agency.id}
                           </div>
+                          <div className="text-[10px] text-slate-500 font-mono mt-1">
+                            HAWB: {agency.hawbFormatPattern || 'Sin normalización'}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold border border-indigo-100">
+                          <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded text-xs font-bold border border-indigo-100 dark:border-indigo-800">
                             {plan?.name || 'Unknown'}
                           </span>
                         </td>
@@ -370,7 +392,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => handleEdit(agency)}
-                              className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
+                              className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors"
                               title="Editar Agencia"
                             >
                               <Pencil className="w-4 h-4" />
@@ -382,7 +404,7 @@ const AgenciesConfiguration: React.FC<AgenciesConfigurationProps> = ({
                                   setError(deleteError);
                                 }
                               }}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                               title="Eliminar Agencia"
                             >
                               <Trash2 className="w-4 h-4" />

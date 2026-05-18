@@ -14,6 +14,7 @@ import {
   Trash2,
   X,
 } from './Icons';
+import PageHeader from './PageHeader';
 import { getConfidenceColor } from '../utils/helpers';
 
 type StatusFilter = 'ALL' | BatchItem['status'];
@@ -263,7 +264,13 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6 h-full flex flex-col">
+    <div className="max-w-7xl mx-auto p-8 space-y-6 h-full flex flex-col">
+      <PageHeader
+        icon={<FileText className="h-3.5 w-3.5" />}
+        badge="Datos Extraídos"
+        title="Gestión de datos extraídos"
+        subtitle="Busca, revisa y elimina registros procesados de la base de datos."
+      />
       {/* Stat Cards — compact, consistent with app design */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
@@ -664,7 +671,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
           </div>
 
           {errorMessage && (
-            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 px-4 py-3 text-sm">
+            <div className="mt-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 px-4 py-3 text-sm">
               {errorMessage}
             </div>
           )}
@@ -717,22 +724,22 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
                       {item.status === 'SUCCESS' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 text-xs font-bold">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 text-xs font-bold">
                           <CheckCircle className="w-3.5 h-3.5" /> OK
                         </span>
                       )}
                       {item.status === 'ERROR' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-700 px-2.5 py-1 text-xs font-bold">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2.5 py-1 text-xs font-bold">
                           <AlertCircle className="w-3.5 h-3.5" /> Error
                         </span>
                       )}
                       {item.status === 'PROCESSING' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2.5 py-1 text-xs font-bold">
                           Procesando
                         </span>
                       )}
                       {item.status === 'PENDING' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2.5 py-1 text-xs font-bold">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1 text-xs font-bold">
                           Pendiente
                         </span>
                       )}

@@ -29,6 +29,7 @@ import plansRoutes from './routes/plans.js';
 import aiRoutes from './routes/ai.js';
 import auditRoutes from './routes/audit.js';
 import documentsRoutes from './routes/documents.js';
+import integrateRoutes from './routes/integrate.js';
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,6 +58,7 @@ app.route('/api/plans', plansRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/audit', auditRoutes);
 app.route('/api/documents', documentsRoutes);
+app.route('/api/integrate', integrateRoutes);
 
 // ── Health check ──
 app.get('/api/health', (c) =>

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { InValue } from '@libsql/client';
 import { ERROR_MESSAGES } from '../../config.js';
+import {
+  normalizeInvoiceDataAirwaybills,
+  sanitizeHawbFormatPattern,
+} from '../../shared/airwaybillFormat.js';
 import type { InvoiceData } from '../../types.js';
 import { getDb } from '../db.js';
 import {
@@ -159,6 +163,18 @@ async function getAgencyName(agencyId: string): Promise<string | null> {
   return result.rows[0]?.name ? String(result.rows[0].name) : null;
 }
 
+async function getAgencyHawbFormatPattern(agencyId: string): Promise<string | null> {
+  const database = getDb();
+  const result = await database.execute({
+    sql: 'SELECT hawb_format_pattern FROM agencies WHERE id = ?',
+    args: [agencyId],
+  });
+
+  return sanitizeHawbFormatPattern(
+    result.rows[0]?.hawb_format_pattern ? String(result.rows[0].hawb_format_pattern) : null,
+  );
+}
+
 function buildBatchItemStatement(input: BatchSyncInput) {
   const resultJson = input.result ? JSON.stringify(input.result) : null;
   const error = input.error || null;
@@ -290,13 +306,16 @@ async function markJobSuccess(
   result: InvoiceData,
   workerId: string,
 ): Promise<void> {
+  const normalizedResult = normalizeInvoiceDataAirwaybills(result, {
+    hawbPattern: await getAgencyHawbFormatPattern(getString(job, 'agency_id')),
+  });
   const processedAt = new Date().toISOString();
-  const resultJson = JSON.stringify(result);
+  const resultJson = JSON.stringify(normalizedResult);
   const syncStatements = await buildBatchAndAuditStatements({
     job,
     status: 'SUCCESS',
     processedAt,
-    result,
+    result: normalizedResult,
   });
 
   await runTransaction(async () => {

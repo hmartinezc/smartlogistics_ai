@@ -1,5 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle, AlertCircle, Plane, Package, History, FileWarning, Globe } from './Icons';
+import {
+  CheckCircle,
+  AlertCircle,
+  Plane,
+  Package,
+  History,
+  FileWarning,
+  Globe,
+  BarChart3,
+} from './Icons';
 import { BatchItem, Agency, SubscriptionPlan } from '../types';
 import {
   buildAwbReconciliationRows,
@@ -7,6 +16,7 @@ import {
   getMockBookedAwbs,
   getOperationDateKey,
 } from '../services/operationalService';
+import PageHeader from './PageHeader';
 
 interface DashboardHomeProps {
   results: BatchItem[];
@@ -76,23 +86,17 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Panel Operativo</h1>
-            {currentAgencyId === 'GLOBAL' && (
-              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200">
-                VISTA GLOBAL
-              </span>
-            )}
-          </div>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            {currentAgencyId === 'GLOBAL'
-              ? 'Visualizando consolidado de todas las agencias del sistema.'
-              : `Conciliación y métricas para: ${currentAgency?.name || 'Agencia Seleccionada'}`}
-          </p>
-        </div>
-        <div className="w-full md:w-auto bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <PageHeader
+        icon={<BarChart3 className="h-3.5 w-3.5" />}
+        badge={currentAgencyId === 'GLOBAL' ? 'Vista Global' : 'Panel Operativo'}
+        title="Panel Operativo"
+        subtitle={
+          currentAgencyId === 'GLOBAL'
+            ? 'Visualizando consolidado de todas las agencias del sistema.'
+            : `Conciliación y métricas para: ${currentAgency?.name || 'Agencia Seleccionada'}`
+        }
+      >
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
             Fecha Operativa
           </label>
@@ -109,7 +113,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
 
         {/* Subscription Usage Widget (Hide if Global) */}
         {currentAgencyId !== 'GLOBAL' && currentAgency && currentPlan && (
-          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-full md:w-80">
+          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-64">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-bold text-slate-500 uppercase">Consumo Mensual</span>
               <span
@@ -149,7 +153,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
             </div>
           </div>
         )}
-      </div>
+      </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
@@ -243,7 +247,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
                 {/* RESERVA GROUP */}
                 <th
                   colSpan={3}
-                  className="px-6 py-2 text-center border-r border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 text-slate-600 font-bold tracking-wider"
+                  className="px-6 py-2 text-center border-r border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold tracking-wider"
                 >
                   Reserva (Booked)
                 </th>
@@ -251,7 +255,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
                 {/* FACTURA GROUP */}
                 <th
                   colSpan={3}
-                  className="px-6 py-2 text-center border-r border-slate-200 dark:border-slate-700 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-700 font-bold tracking-wider"
+                  className="px-6 py-2 text-center border-r border-slate-200 dark:border-slate-700 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 font-bold tracking-wider"
                 >
                   Facturado (Invoiced)
                 </th>
@@ -262,26 +266,26 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
               </tr>
 
               {/* SUB HEADER */}
-              <tr className="text-[10px] text-slate-500 uppercase bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+              <tr className="text-[10px] text-slate-500 dark:text-slate-400 uppercase bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                 {/* Reserva Columns */}
-                <th className="px-4 py-2 text-right bg-slate-50/50 border-r border-slate-100">
+                <th className="px-4 py-2 text-right bg-slate-50/50 dark:bg-slate-800/50 border-r border-slate-100 dark:border-slate-700">
                   Hijas
                 </th>
-                <th className="px-4 py-2 text-right bg-slate-50/50 border-r border-slate-100">
+                <th className="px-4 py-2 text-right bg-slate-50/50 dark:bg-slate-800/50 border-r border-slate-100 dark:border-slate-700">
                   Pcs
                 </th>
-                <th className="px-4 py-2 text-right bg-slate-50/50 border-r border-slate-200">
+                <th className="px-4 py-2 text-right bg-slate-50/50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-600">
                   EQ Full
                 </th>
 
                 {/* Factura Columns */}
-                <th className="px-4 py-2 text-right bg-indigo-50/10 border-r border-slate-100">
+                <th className="px-4 py-2 text-right bg-indigo-50/10 dark:bg-indigo-900/10 border-r border-slate-100 dark:border-slate-700">
                   Hijas
                 </th>
-                <th className="px-4 py-2 text-right bg-indigo-50/10 border-r border-slate-100">
+                <th className="px-4 py-2 text-right bg-indigo-50/10 dark:bg-indigo-900/10 border-r border-slate-100 dark:border-slate-700">
                   Pcs
                 </th>
-                <th className="px-4 py-2 text-right bg-indigo-50/10 border-r border-slate-200">
+                <th className="px-4 py-2 text-right bg-indigo-50/10 dark:bg-indigo-900/10 border-r border-slate-200 dark:border-slate-600">
                   EQ Full
                 </th>
               </tr>
@@ -317,48 +321,48 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                       {/* RESERVA DATA */}
                       <td
-                        className={`px-4 py-4 text-right text-slate-500 text-sm border-r border-slate-100 ${diffHijas ? 'text-amber-600 font-bold bg-amber-50/30' : ''}`}
+                        className={`px-4 py-4 text-right text-slate-500 dark:text-slate-400 text-sm border-r border-slate-100 dark:border-slate-700 ${diffHijas ? 'text-amber-600 font-bold bg-amber-50/30 dark:bg-amber-900/10' : ''}`}
                       >
                         {awb.bookedHijas}
                       </td>
                       <td
-                        className={`px-4 py-4 text-right text-slate-500 text-sm border-r border-slate-100 ${diffPieces ? 'text-amber-600 font-bold bg-amber-50/30' : ''}`}
+                        className={`px-4 py-4 text-right text-slate-500 dark:text-slate-400 text-sm border-r border-slate-100 dark:border-slate-700 ${diffPieces ? 'text-amber-600 font-bold bg-amber-50/30 dark:bg-amber-900/10' : ''}`}
                       >
                         {awb.bookedPieces}
                       </td>
                       <td
-                        className={`px-4 py-4 text-right text-slate-500 text-sm border-r border-slate-200 ${diffFulls ? 'text-amber-600 font-bold bg-amber-50/30' : ''}`}
+                        className={`px-4 py-4 text-right text-slate-500 dark:text-slate-400 text-sm border-r border-slate-200 dark:border-slate-700 ${diffFulls ? 'text-amber-600 font-bold bg-amber-50/30 dark:bg-amber-900/10' : ''}`}
                       >
                         {awb.bookedFulls.toFixed(2)}
                       </td>
 
                       {/* FACTURA DATA */}
-                      <td className="px-4 py-4 text-right font-medium text-slate-700 dark:text-slate-300 text-sm border-r border-slate-100 bg-indigo-50/5">
+                      <td className="px-4 py-4 text-right font-medium text-slate-700 dark:text-slate-300 text-sm border-r border-slate-100 dark:border-slate-700 bg-indigo-50/5 dark:bg-indigo-900/10">
                         {awb.invoicedHijas}
                       </td>
-                      <td className="px-4 py-4 text-right font-medium text-slate-700 dark:text-slate-300 text-sm border-r border-slate-100 bg-indigo-50/5">
+                      <td className="px-4 py-4 text-right font-medium text-slate-700 dark:text-slate-300 text-sm border-r border-slate-100 dark:border-slate-700 bg-indigo-50/5 dark:bg-indigo-900/10">
                         {awb.invoicedPieces}
                       </td>
-                      <td className="px-4 py-4 text-right font-bold text-emerald-600 text-sm border-r border-slate-200 bg-indigo-50/5">
+                      <td className="px-4 py-4 text-right font-bold text-emerald-600 dark:text-emerald-400 text-sm border-r border-slate-200 dark:border-slate-700 bg-indigo-50/5 dark:bg-indigo-900/10">
                         {awb.invoicedFulls.toFixed(2)}
                       </td>
 
                       {/* STATUS */}
                       <td className="px-6 py-4 text-center">
                         {awb.status === 'MATCHED' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 text-green-600 text-xs font-bold border border-green-100">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-xs font-bold border border-green-100 dark:border-green-900/50">
                             <CheckCircle className="w-3 h-3" /> Cuadrado
                           </span>
                         ) : awb.status === 'PENDING_DOCUMENTS' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold border border-slate-200 dark:border-slate-600">
                             <FileWarning className="w-3 h-3" /> Pendiente Docs
                           </span>
                         ) : awb.status === 'PARTIAL' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-bold border border-amber-100 dark:border-amber-900/50">
                             <AlertCircle className="w-3 h-3" /> Parcial
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 text-red-600 text-xs font-bold border border-red-100">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold border border-red-100 dark:border-red-900/50">
                             <AlertCircle className="w-3 h-3" /> Diferencia
                           </span>
                         )}
@@ -388,7 +392,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
             [...filteredResults].reverse().map((item) => (
               <div
                 key={item.id}
-                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded transition-colors"
+                className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded transition-colors"
               >
                 <span className="text-slate-400">
                   {item.processedAt ? new Date(item.processedAt).toLocaleTimeString() : '--:--'}
@@ -401,7 +405,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <span className="flex-1 truncate text-slate-600 dark:text-slate-300">
                   {item.fileName}
                 </span>
-                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold uppercase">
+                <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded text-[10px] font-bold uppercase">
                   {item.user || 'Unknown'}
                 </span>
               </div>

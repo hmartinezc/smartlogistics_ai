@@ -3,6 +3,7 @@ import { AgentType, BatchItem } from '../types';
 import { AI_CONFIG } from '../config';
 import { api } from '../services/apiClient';
 import { Loader2, CheckCircle, AlertCircle, Zap } from './Icons';
+import { Progress } from '@/components/ui/progress';
 
 interface BatchProcessorProps {
   files: File[];
@@ -164,10 +165,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({ files, format, batchId,
           </span>
         </div>
         <div className="w-full h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-indigo-600 transition-all duration-300 ease-out"
-            style={{ width: `${Math.min(progressPercentage, 100)}%` }}
-          ></div>
+          <Progress value={Math.min(progressPercentage, 100)} className="h-3" />
         </div>
       </div>
 

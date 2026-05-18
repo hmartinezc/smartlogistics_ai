@@ -18,6 +18,7 @@ import {
 } from './Icons';
 import { Agency, SubscriptionPlan, DocumentProcessingAuditEntry } from '../types';
 import { api } from '../services/apiClient';
+import PageHeader from './PageHeader';
 
 interface AdminDashboardProps {
   agencies: Agency[];
@@ -258,19 +259,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      <div className="mb-10 flex justify-between items-end">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold mb-4">
-            <Shield className="w-3 h-3" />
-            Portal de Administración
-          </div>
-          <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
-            Facturación y Agencias
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Gestión de límites, suscripciones y costos por agencia.
-          </p>
-        </div>
+      <PageHeader
+        icon={<Shield className="h-3.5 w-3.5" />}
+        badge="Portal de Administración"
+        title="Facturación y Agencias"
+        subtitle="Gestión de límites, suscripciones y costos por agencia."
+      >
         <div className="text-right">
           <div className="text-4xl font-bold text-indigo-600">
             {isAuditLoading ? '...' : totalProcessedForMonth}
@@ -279,7 +273,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
             Procesamientos {selectedMonthLabel}
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       {auditError && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300">
@@ -297,7 +291,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
             <div className="flex justify-between items-start mb-2">
               <h3 className="font-bold text-slate-800 dark:text-white text-lg">{plan.name}</h3>
-              <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded text-xs">
+              <span className="text-indigo-600 dark:text-indigo-300 font-bold bg-indigo-50 dark:bg-indigo-500/15 px-2 py-1 rounded text-xs">
                 ${plan.baseCost}
               </span>
             </div>
@@ -435,8 +429,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                 <th className="px-6 py-4">Plan Asignado</th>
                 <th className="px-6 py-4">Consumo del Mes</th>
                 <th className="px-6 py-4 text-center">Estado Límite</th>
-                <th className="px-6 py-4 text-right bg-slate-50/50">Facturación Estimada</th>
-                <th className="px-6 py-4 text-center bg-slate-50/50">Acciones</th>
+                <th className="px-6 py-4 text-right bg-slate-50/50 dark:bg-slate-800/50">
+                  Facturación Estimada
+                </th>
+                <th className="px-6 py-4 text-center bg-slate-50/50 dark:bg-slate-800/50">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -453,7 +451,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                       <div className="text-xs text-slate-400 font-mono mt-0.5">ID: {agency.id}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2 py-1 rounded bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+                      <span className="px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-xs font-bold border border-indigo-100 dark:border-indigo-800">
                         {details.planName}
                       </span>
                     </td>
@@ -465,7 +463,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                           </span>
                           <span className="text-slate-400">/ {details.limit}</span>
                         </div>
-                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${isOver ? 'bg-red-500' : 'bg-green-500'}`}
                             style={{ width: `${Math.min(percent, 100)}%` }}
@@ -479,16 +477,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                     </td>
                     <td className="px-6 py-4 text-center">
                       {isOver ? (
-                        <span className="inline-flex items-center gap-1 text-red-600 text-xs font-bold bg-red-50 px-2 py-1 rounded border border-red-100">
+                        <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 text-xs font-bold bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-100 dark:border-red-900/50">
                           Excedido (+{details.extraPages})
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded border border-green-100">
+                        <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs font-bold bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded border border-green-100 dark:border-green-900/50">
                           Dentro del Límite
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right bg-slate-50/30">
+                    <td className="px-6 py-4 text-right bg-slate-50/30 dark:bg-slate-800/30">
                       <div className="text-lg font-bold text-slate-800 dark:text-white">
                         ${details.total.toFixed(2)}
                       </div>
@@ -496,11 +494,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                         {isOver ? 'Incluye recargos' : 'Tarifa Base'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 bg-slate-50/30">
+                    <td className="px-6 py-4 bg-slate-50/30 dark:bg-slate-800/30">
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => setDailyBreakdownAgency(agency)}
-                          className="p-2 text-sky-600 hover:bg-sky-100 rounded-full transition-colors disabled:opacity-40"
+                          className="p-2 text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded-full transition-colors disabled:opacity-40"
                           title="Ver detalle diario"
                           disabled={isAuditLoading}
                         >
@@ -508,7 +506,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                         </button>
                         <button
                           onClick={() => setInvoicePreview(agency)}
-                          className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors"
+                          className="p-2 text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-full transition-colors"
                           title="Visualizar Factura"
                         >
                           <Eye className="w-5 h-5" />
@@ -520,7 +518,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                         ) : (
                           <button
                             onClick={() => handleSendInvoice(agency)}
-                            className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                            className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-full transition-colors"
                             title="Enviar Factura por Email"
                           >
                             <Mail className="w-5 h-5" />
@@ -539,7 +537,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
       {/* INVOICE PREVIEW MODAL */}
       {invoicePreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
             {/* Invoice Header */}
             <div className="bg-indigo-600 p-6 text-white flex justify-between items-start">
               <div>
@@ -584,46 +582,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                 return (
                   <>
                     <table className="w-full mb-8">
-                      <thead className="border-b border-slate-200">
+                      <thead className="border-b border-slate-200 dark:border-slate-700">
                         <tr>
-                          <th className="text-left py-2 text-sm font-bold text-slate-600">
+                          <th className="text-left py-2 text-sm font-bold text-slate-600 dark:text-slate-300">
                             Descripción
                           </th>
-                          <th className="text-center py-2 text-sm font-bold text-slate-600">
+                          <th className="text-center py-2 text-sm font-bold text-slate-600 dark:text-slate-300">
                             Cantidad
                           </th>
-                          <th className="text-right py-2 text-sm font-bold text-slate-600">
+                          <th className="text-right py-2 text-sm font-bold text-slate-600 dark:text-slate-300">
                             Total
                           </th>
                         </tr>
                       </thead>
                       <tbody className="text-sm">
-                        <tr className="border-b border-slate-100">
-                          <td className="py-4 text-slate-700">
+                        <tr className="border-b border-slate-100 dark:border-slate-700">
+                          <td className="py-4 text-slate-700 dark:text-slate-200">
                             <span className="font-bold block">{details.planName} Plan Base</span>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
                               Suscripción mensual recurrente
                             </span>
                           </td>
-                          <td className="py-4 text-center text-slate-600">1</td>
-                          <td className="py-4 text-right font-medium text-slate-800">
+                          <td className="py-4 text-center text-slate-600 dark:text-slate-300">1</td>
+                          <td className="py-4 text-right font-medium text-slate-800 dark:text-white">
                             ${details.base.toFixed(2)}
                           </td>
                         </tr>
                         {details.extraPages > 0 && (
-                          <tr className="border-b border-slate-100 bg-amber-50/30">
-                            <td className="py-4 text-slate-700">
-                              <span className="font-bold block text-amber-700">
+                          <tr className="border-b border-slate-100 dark:border-slate-700 bg-amber-50/30 dark:bg-amber-900/10">
+                            <td className="py-4 text-slate-700 dark:text-slate-200">
+                              <span className="font-bold block text-amber-700 dark:text-amber-400">
                                 Procesamientos Adicionales (Excedente)
                               </span>
-                              <span className="text-xs text-amber-600">
+                              <span className="text-xs text-amber-600 dark:text-amber-400">
                                 Superado el límite de {details.limit} procesamientos
                               </span>
                             </td>
-                            <td className="py-4 text-center text-slate-600">
+                            <td className="py-4 text-center text-slate-600 dark:text-slate-300">
                               {details.extraPages}
                             </td>
-                            <td className="py-4 text-right font-medium text-amber-700">
+                            <td className="py-4 text-right font-medium text-amber-700 dark:text-amber-400">
                               ${details.extra.toFixed(2)}
                             </td>
                           </tr>
@@ -631,17 +629,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
                       </tbody>
                     </table>
 
-                    <div className="flex justify-end border-t border-slate-200 pt-4">
+                    <div className="flex justify-end border-t border-slate-200 dark:border-slate-700 pt-4">
                       <div className="w-1/2">
-                        <div className="flex justify-between mb-2 text-slate-500">
+                        <div className="flex justify-between mb-2 text-slate-500 dark:text-slate-400">
                           <span>Subtotal</span>
                           <span>${details.total.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between mb-2 text-slate-500">
+                        <div className="flex justify-between mb-2 text-slate-500 dark:text-slate-400">
                           <span>Impuestos (0%)</span>
                           <span>$0.00</span>
                         </div>
-                        <div className="flex justify-between text-xl font-bold text-slate-800 border-t border-slate-200 pt-2 mt-2">
+                        <div className="flex justify-between text-xl font-bold text-slate-800 dark:text-white border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
                           <span>Total a Pagar</span>
                           <span>${details.total.toFixed(2)}</span>
                         </div>
@@ -653,10 +651,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ agencies, plans }) => {
             </div>
 
             {/* Footer Actions */}
-            <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
               <button
                 onClick={() => setInvoicePreview(null)}
-                className="text-slate-500 hover:text-slate-800 font-medium text-sm px-4"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium text-sm px-4"
               >
                 Cerrar Vista Previa
               </button>

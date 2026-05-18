@@ -71,6 +71,7 @@ export const canRoleAccessAppState = (role: UserRole, target: AppState): boolean
     AppState.DASHBOARD_OPS,
     AppState.DASHBOARD_ADMIN,
     AppState.AGENCY_CONFIG,
+    AppState.INTEGRATION_CONFIG,
     AppState.USER_MANAGEMENT,
   ].includes(target);
 };

@@ -85,22 +85,25 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-    if (score >= 70) return 'text-amber-600 bg-amber-50 border-amber-200';
-    return 'text-rose-600 bg-rose-50 border-rose-200 animate-pulse';
+    if (score >= 90)
+      return 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800';
+    if (score >= 70)
+      return 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-800';
+    return 'text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/20 dark:border-rose-800 animate-pulse';
   };
 
   // Estilos minimalistas
   const inputBase =
-    'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 text-slate-700 text-xs font-medium py-1 outline-none transition-colors';
-  const labelBase = 'text-[10px] font-bold text-slate-400 uppercase tracking-wider';
+    'w-full bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-700 dark:text-slate-200 text-xs font-medium py-1 outline-none transition-colors';
+  const labelBase =
+    'text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider';
 
   return (
     <div
-      className={`w-full max-w-6xl mx-auto bg-white rounded-lg shadow-xl overflow-hidden flex flex-col h-[85vh] border ${hasCriticalErrors ? 'border-rose-400' : 'border-slate-200'}`}
+      className={`w-full max-w-6xl mx-auto bg-white dark:bg-slate-900 rounded-lg shadow-xl overflow-hidden flex flex-col h-[85vh] border ${hasCriticalErrors ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'}`}
     >
       {/* 1. COMPACT TOOLBAR */}
-      <div className="h-14 px-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0 z-20">
+      <div className="h-14 px-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 shrink-0 z-20">
         <div className="flex items-center gap-4">
           <div
             className={`flex items-center gap-2 px-3 py-1 rounded-full border ${getScoreColor(realTimeScore)}`}
@@ -108,7 +111,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
             <BrainCircuit className="w-4 h-4" />
             <span className="text-xs font-bold">{realTimeScore}% Fiabilidad</span>
           </div>
-          <h2 className="text-slate-800 font-bold text-sm flex items-center gap-2">
+          <h2 className="text-slate-800 dark:text-white font-bold text-sm flex items-center gap-2">
             <FileText className="w-4 h-4 text-slate-400" />
             Revisión de Extracción
             <span className="text-slate-400 font-normal">| {formData.invoiceNumber}</span>
@@ -118,7 +121,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -143,7 +146,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
 
       {/* 2. SLIM ALERTS (Only if errors) */}
       {hasCriticalErrors && (
-        <div className="bg-rose-50 border-b border-rose-100 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top">
+        <div className="bg-rose-50 dark:bg-rose-900/20 border-b border-rose-100 dark:border-rose-900/40 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top">
           <div className="flex items-center gap-4 text-xs">
             {isPiecesMismatch && (
               <span className="flex items-center gap-1 text-rose-700 font-bold">
@@ -165,14 +168,14 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
       )}
 
       {/* 3. SCROLLABLE CONTENT AREA */}
-      <div className="flex-1 overflow-y-auto bg-slate-50/50 p-4 scrollbar-thin scrollbar-thumb-slate-300">
+      <div className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 p-4 scrollbar-thin scrollbar-thumb-slate-300">
         {/* A. COMPACT HEADER INFO GRID */}
-        <div className="bg-white rounded-lg border border-slate-200 p-4 mb-4 shadow-sm">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 mb-4 shadow-sm">
           <div
             className="flex justify-between items-center cursor-pointer mb-2"
             onClick={() => setShowHeaderDetails(!showHeaderDetails)}
           >
-            <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2">
               <Package className="w-3 h-3" /> Datos Maestros & Logística
             </h3>
             <ChevronDown
@@ -262,16 +265,16 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
 
         {/* B. ITEMS TABLE (The Focus) */}
         <div
-          className={`bg-white rounded-lg border shadow-sm overflow-hidden ${hasCriticalErrors ? 'ring-2 ring-rose-100 border-rose-200' : 'border-slate-200'}`}
+          className={`bg-white dark:bg-slate-800 rounded-lg border shadow-sm overflow-hidden ${hasCriticalErrors ? 'ring-2 ring-rose-100 dark:ring-rose-900/30 border-rose-200' : 'border-slate-200 dark:border-slate-700'}`}
         >
           {/* Table Control Bar - HEADER SUMMARY */}
-          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-xs">
-            <span className="font-bold text-slate-600">
+          <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center text-xs">
+            <span className="font-bold text-slate-600 dark:text-slate-300">
               Detalle de Ítems ({formData.lineItems.length})
             </span>
 
             <div className="flex gap-4 font-mono items-center">
-              <span className="text-[10px] text-slate-400 uppercase font-bold mr-2">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold mr-2">
                 Totales (Pie de Página):
               </span>
 
@@ -284,7 +287,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                   name="totalPieces"
                   value={formData.totalPieces}
                   onChange={handleHeaderChange}
-                  className={`w-10 bg-transparent text-center font-bold border-b focus:border-indigo-500 outline-none ${isPiecesMismatch ? 'border-rose-400' : 'border-slate-300'}`}
+                  className={`w-10 bg-transparent text-center font-bold border-b focus:border-indigo-500 outline-none ${isPiecesMismatch ? 'border-rose-400' : 'border-slate-300 dark:border-slate-600'}`}
                 />
               </div>
 
@@ -298,11 +301,11 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                   step="0.01"
                   value={formData.totalEq}
                   onChange={handleHeaderChange}
-                  className={`w-12 bg-transparent text-center font-bold border-b focus:border-indigo-500 outline-none ${isEqMismatch ? 'border-amber-400' : 'border-slate-300'}`}
+                  className={`w-12 bg-transparent text-center font-bold border-b focus:border-indigo-500 outline-none ${isEqMismatch ? 'border-amber-400' : 'border-slate-300 dark:border-slate-600'}`}
                 />
               </div>
 
-              <div className="text-emerald-600 font-bold border-l border-slate-200 pl-4 ml-2">
+              <div className="text-emerald-600 dark:text-emerald-400 font-bold border-l border-slate-200 dark:border-slate-700 pl-4 ml-2">
                 Total: ${formData.totalValue}
               </div>
             </div>
@@ -310,7 +313,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-white text-slate-400 uppercase font-bold border-b border-slate-100">
+              <thead className="bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 uppercase font-bold border-b border-slate-100 dark:border-slate-700">
                 <tr>
                   <th className="px-3 py-2 w-16">Box</th>
                   <th className="px-3 py-2 w-16 text-center">Pcs</th>
@@ -319,12 +322,17 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                   <th className="px-3 py-2 w-24">HTS</th>
                   <th className="px-3 py-2 w-20 text-right">Stems</th>
                   <th className="px-3 py-2 w-24 text-right">Unit Price</th>
-                  <th className="px-3 py-2 w-24 text-right bg-slate-50/50">Total</th>
+                  <th className="px-3 py-2 w-24 text-right bg-slate-50/50 dark:bg-slate-700/30">
+                    Total
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
                 {formData.lineItems.map((item, index) => (
-                  <tr key={index} className="hover:bg-indigo-50/30 transition-colors group">
+                  <tr
+                    key={index}
+                    className="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors group"
+                  >
                     <td className="p-1 px-3 align-top">
                       <input
                         value={item.boxType}
@@ -337,7 +345,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                         type="number"
                         value={item.totalPieces}
                         onChange={(e) => handleItemChange(index, 'totalPieces', e.target.value)}
-                        className={`w-full text-center outline-none bg-transparent ${isPiecesMismatch ? 'text-rose-600 font-bold bg-rose-50/50 rounded' : 'text-slate-700'}`}
+                        className={`w-full text-center outline-none bg-transparent ${isPiecesMismatch ? 'text-rose-600 font-bold bg-rose-50/50 dark:bg-rose-900/20 rounded' : 'text-slate-700 dark:text-slate-200'}`}
                       />
                     </td>
                     <td className="p-1 px-3 align-top">
@@ -346,7 +354,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                         step="0.01"
                         value={item.eqFull}
                         onChange={(e) => handleItemChange(index, 'eqFull', e.target.value)}
-                        className={`w-full text-center outline-none bg-transparent ${isEqMismatch ? 'text-amber-600 font-bold bg-amber-50/50 rounded' : 'text-slate-700'}`}
+                        className={`w-full text-center outline-none bg-transparent ${isEqMismatch ? 'text-amber-600 font-bold bg-amber-50/50 dark:bg-amber-900/20 rounded' : 'text-slate-700 dark:text-slate-200'}`}
                       />
                     </td>
                     <td className="p-1 px-3 align-top">
@@ -356,7 +364,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                           onChange={(e) =>
                             handleItemChange(index, 'productDescription', e.target.value)
                           }
-                          className="w-full text-slate-600 bg-transparent outline-none"
+                          className="w-full text-slate-600 dark:text-slate-300 bg-transparent outline-none"
                         />
                         {/* SHOW VARIETIES IF PRESENT */}
                         {item.varieties && item.varieties.length > 0 && (
@@ -364,7 +372,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                             {item.varieties.map((v, i) => (
                               <span
                                 key={i}
-                                className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200"
+                                className="text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-600"
                               >
                                 {v}
                               </span>
@@ -377,7 +385,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                       <input
                         value={item.hts}
                         onChange={(e) => handleItemChange(index, 'hts', e.target.value)}
-                        className="w-full font-mono text-slate-400 bg-transparent outline-none"
+                        className="w-full font-mono text-slate-400 dark:text-slate-500 bg-transparent outline-none"
                       />
                     </td>
                     <td className="p-1 px-3 align-top">
@@ -385,7 +393,7 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                         type="number"
                         value={item.totalStems}
                         onChange={(e) => handleItemChange(index, 'totalStems', e.target.value)}
-                        className="w-full text-right text-slate-600 bg-transparent outline-none"
+                        className="w-full text-right text-slate-600 dark:text-slate-300 bg-transparent outline-none"
                       />
                     </td>
                     <td className="p-1 px-3 align-top">
@@ -394,10 +402,10 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                         step="0.0001"
                         value={item.unitPrice}
                         onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
-                        className="w-full text-right text-slate-600 bg-transparent outline-none"
+                        className="w-full text-right text-slate-600 dark:text-slate-300 bg-transparent outline-none"
                       />
                     </td>
-                    <td className="p-1 px-3 bg-slate-50/30 align-top">
+                    <td className="p-1 px-3 bg-slate-50/30 dark:bg-slate-700/20 align-top">
                       <input
                         type="number"
                         step="0.01"
@@ -411,9 +419,9 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
               </tbody>
 
               {/* TABLE FOOTER SUMMARY */}
-              <tfoot className="bg-slate-100 border-t border-slate-200 font-bold text-slate-700">
+              <tfoot className="bg-slate-100 dark:bg-slate-800/70 border-t border-slate-200 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200">
                 <tr>
-                  <td className="px-3 py-2 text-right text-[10px] uppercase text-slate-500">
+                  <td className="px-3 py-2 text-right text-[10px] uppercase text-slate-500 dark:text-slate-400">
                     Suma Líneas:
                   </td>
 
@@ -433,13 +441,13 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
 
                   <td
                     colSpan={4}
-                    className="px-3 py-2 text-right text-[10px] uppercase text-slate-500"
+                    className="px-3 py-2 text-right text-[10px] uppercase text-slate-500 dark:text-slate-400"
                   >
                     Suma Valor:
                   </td>
 
                   {/* Sum Total Value */}
-                  <td className="px-3 py-2 text-right bg-slate-200/50 text-emerald-700 border-t-2 border-emerald-300">
+                  <td className="px-3 py-2 text-right bg-slate-200/50 dark:bg-slate-700/50 text-emerald-700 dark:text-emerald-400 border-t-2 border-emerald-300 dark:border-emerald-700">
                     ${calculatedValue.toFixed(2)}
                   </td>
                 </tr>
