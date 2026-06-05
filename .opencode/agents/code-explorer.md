@@ -2,7 +2,7 @@
 name: code-explorer
 description: Deeply analyzes existing codebase features by tracing execution paths, mapping architecture layers, and documenting dependencies to inform new development.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.3-codex
 tools:
   read: true
   grep: true

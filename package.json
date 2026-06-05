@@ -18,11 +18,20 @@
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
     "quality": "node scripts/quality/pre-commit-check.js",
     "scan-secrets": "node scripts/quality/check-secrets.js",
+    "test:router": "node --import tsx --test server/services/documentExtractionService.router.test.ts",
     "check": "npm run typecheck && npm run format:check && npm run quality",
-    "docker:up": "docker compose up -d --build",
-    "docker:down": "docker compose down"
+    "docker:up": "docker compose -f docker-compose.yml up -d --build",
+    "docker:up:legacy": "docker compose -f docker-compose.yml -f docker-compose.legacy.yml up -d --build",
+    "docker:up:genai-test": "docker compose -f docker-compose.yml -f docker-compose.genai-test.yml up -d --build",
+    "docker:up:cache-test": "docker compose -f docker-compose.yml -f docker-compose.cache-test.yml up -d --build",
+    "docker:up:legacy-cache-test": "docker compose -f docker-compose.yml -f docker-compose.legacy-cache-test.yml up -d --build",
+    "docker:config": "docker compose -f docker-compose.yml config",
+    "docker:config:genai-test": "docker compose -f docker-compose.yml -f docker-compose.genai-test.yml config",
+    "docker:config:cache-test": "docker compose -f docker-compose.yml -f docker-compose.cache-test.yml config",
+    "docker:down": "docker compose -f docker-compose.yml down"
   },
   "dependencies": {
+    "@google/genai": "^2.7.0",
     "@google/generative-ai": "^0.24.1",
     "@hono/node-server": "^1.19.11",
     "@libsql/client": "^0.17.0",

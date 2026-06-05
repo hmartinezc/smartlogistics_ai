@@ -640,7 +640,7 @@ const IntegrationConfig: React.FC<IntegrationConfigProps> = ({
 
           <div
             ref={mappingContentRef}
-            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5"
+            className="app-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5"
           >
             {mappingView === 'json' ? (
               <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-5 dark:border-slate-700 dark:bg-slate-900/40">

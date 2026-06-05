@@ -1,6 +1,7 @@
 /**
- * Quality check script — detects common issues in staged files.
+ * Quality check script — detects common issues in source files.
  * Run before committing: node scripts/quality/pre-commit-check.js
+ * Use --staged to scan only staged files from a git hook.
  *
  * Checks:
  * 1. console.log / console.debug statements (warn)
@@ -11,13 +12,29 @@
 
 import { execSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
-import { relative, resolve } from 'path';
+import { resolve } from 'path';
 
 const ROOT = process.cwd();
+const STAGED_ONLY = process.argv.includes('--staged');
 
 function getStagedFiles() {
   try {
     const output = execSync('git diff --cached --name-only --diff-filter=ACM', {
+      encoding: 'utf-8',
+      cwd: ROOT,
+    });
+    return output
+      .split('\n')
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function getProjectFiles() {
+  try {
+    const output = execSync('git ls-files --cached --others --exclude-standard', {
       encoding: 'utf-8',
       cwd: ROOT,
     });
@@ -44,12 +61,12 @@ function checkFile(filePath) {
     const lineNum = i + 1;
 
     // Debugger statements — BLOCK
-    if (/\bdebugger\b/.test(line)) {
+    if (/^\s*debugger\s*;?(?:\s*\/\/.*)?$/.test(line)) {
       errors.push(`${filePath}:${lineNum} — debugger statement found. Remove before committing.`);
     }
 
     // console.log — WARN (allow console.error and console.warn)
-    if (/\bconsole\.log\b/.test(line) || /\bconsole\.debug\b/.test(line)) {
+    if (/(^|[^\w.])console\.(log|debug)\s*\(/.test(line)) {
       warnings.push(
         `${filePath}:${lineNum} — console.log/debug found. Remove or replace with proper logging.`,
       );
@@ -86,20 +103,19 @@ function isSourceFile(filePath) {
   return /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(filePath) && !filePath.includes('node_modules');
 }
 
-// Main
-const stagedFiles = getStagedFiles().filter(isSourceFile);
+const filesToCheck = (STAGED_ONLY ? getStagedFiles() : getProjectFiles()).filter(isSourceFile);
 
-if (stagedFiles.length === 0) {
-  console.log('No staged source files to check.');
+if (filesToCheck.length === 0) {
+  console.log(`No ${STAGED_ONLY ? 'staged ' : ''}source files to check.`);
   process.exit(0);
 }
 
-console.log(`Checking ${stagedFiles.length} staged file(s)...\n`);
+console.log(`Checking ${filesToCheck.length} ${STAGED_ONLY ? 'staged ' : ''}source file(s)...\n`);
 
 let totalErrors = 0;
 let totalWarnings = 0;
 
-for (const file of stagedFiles) {
+for (const file of filesToCheck) {
   const { errors, warnings } = checkFile(file);
 
   for (const err of errors) {
@@ -121,7 +137,7 @@ if (totalErrors > 0) {
 }
 
 if (totalWarnings > 0) {
-  console.warn('\nWarnings found. Review them, then commit with --no-verify if acceptable.');
+  console.warn('\nWarnings found. Review them before committing.');
 }
 
 process.exit(0);

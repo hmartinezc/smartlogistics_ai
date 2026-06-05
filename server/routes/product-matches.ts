@@ -1,9 +1,15 @@
 import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
+import type {
+  PendingProductMatchCreateInput,
+  PendingProductMatchExample,
+  PendingProductMatchItem,
+} from '../../types.js';
 
 import { getDb } from '../db.js';
 import { ensureAgencyAccess, requireAuth } from '../security.js';
+import type { AuthUser } from '../security.js';
 
 const productMatches = new Hono();
 
@@ -64,6 +70,31 @@ type MasterBootstrapCandidate = {
   htsMatch: string;
 };
 
+type PendingProductAccumulator = {
+  key: string;
+  product: string;
+  occurrenceCount: number;
+  invoiceIds: Set<string>;
+  htsCounts: Map<string, number>;
+  latestProcessedAt?: string;
+  latestTimestamp: number;
+  examples: PendingProductMatchExample[];
+};
+
+const MAX_PENDING_PRODUCT_EXAMPLES = 5;
+const MAX_PENDING_BATCH_ITEMS = 2000;
+const MAX_PENDING_HTS_CANDIDATES = 10;
+const MAX_PENDING_PRODUCT_LENGTH = 240;
+const MAX_PENDING_CLIENT_CODE_LENGTH = 120;
+const MAX_PENDING_PRODUCT_MATCH_LENGTH = 240;
+const MAX_PENDING_HTS_LENGTH = 60;
+const MAX_PRODUCT_MATCH_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_PRODUCT_MATCH_IMPORT_ROWS = 5000;
+const MAX_PENDING_LINE_ITEMS_PER_INVOICE = 200;
+const MAX_PENDING_TOTAL_LINE_ITEMS = 10000;
+const MAX_PENDING_RETURN_ITEMS = 500;
+const MAX_PENDING_DISPLAY_TEXT_LENGTH = 180;
+
 function normalizeProductKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -77,6 +108,193 @@ function buildMasterCandidate(row: Record<string, unknown>): MasterBootstrapCand
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseJsonRecord(value: unknown): Record<string, unknown> | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(String(value));
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function toTimestamp(value: string | undefined): number {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function exceedsMaxLength(value: string, maxLength: number): boolean {
+  return value.length > maxLength;
+}
+
+function hasProductMatchFieldLengthError(fields: {
+  product: string;
+  clientProductCode: string;
+  productMatch: string;
+  hts: string;
+  htsMatch: string;
+}): boolean {
+  return (
+    exceedsMaxLength(fields.product, MAX_PENDING_PRODUCT_LENGTH) ||
+    exceedsMaxLength(fields.clientProductCode, MAX_PENDING_CLIENT_CODE_LENGTH) ||
+    exceedsMaxLength(fields.productMatch, MAX_PENDING_PRODUCT_MATCH_LENGTH) ||
+    exceedsMaxLength(fields.hts, MAX_PENDING_HTS_LENGTH) ||
+    exceedsMaxLength(fields.htsMatch, MAX_PENDING_HTS_LENGTH)
+  );
+}
+
+function clampText(value: string, maxLength: number): string {
+  return value.slice(0, maxLength);
+}
+
+function buildPendingProductMatches(
+  rows: Record<string, unknown>[],
+  matchedKeys: Set<string>,
+): { items: PendingProductMatchItem[]; truncated: boolean } {
+  const pendingByKey = new Map<string, PendingProductAccumulator>();
+  let processedLineItems = 0;
+  let truncated = false;
+
+  rowLoop: for (const row of rows) {
+    const parsedResult = parseJsonRecord(row.result_json);
+    const lineItems = parsedResult?.lineItems;
+    if (!Array.isArray(lineItems)) {
+      continue;
+    }
+
+    const batchItemId = asText(row.id);
+    const fileName = clampText(asText(row.file_name), MAX_PENDING_DISPLAY_TEXT_LENGTH);
+    const invoiceNumber = clampText(
+      asText(parsedResult?.invoiceNumber),
+      MAX_PENDING_DISPLAY_TEXT_LENGTH,
+    );
+    const processedAt = asText(row.processed_at) || asText(row.created_at) || undefined;
+    const processedTimestamp = toTimestamp(processedAt);
+
+    if (lineItems.length > MAX_PENDING_LINE_ITEMS_PER_INVOICE) {
+      truncated = true;
+    }
+
+    for (const rawLineItem of lineItems.slice(0, MAX_PENDING_LINE_ITEMS_PER_INVOICE)) {
+      if (processedLineItems >= MAX_PENDING_TOTAL_LINE_ITEMS) {
+        truncated = true;
+        break rowLoop;
+      }
+
+      processedLineItems += 1;
+
+      if (!isRecord(rawLineItem)) {
+        continue;
+      }
+
+      const rawProductDescription = asText(rawLineItem.productDescription);
+      if (!rawProductDescription) {
+        continue;
+      }
+
+      if (exceedsMaxLength(rawProductDescription, MAX_PENDING_PRODUCT_LENGTH)) {
+        truncated = true;
+        continue;
+      }
+
+      const normalizedKey = normalizeProductKey(rawProductDescription);
+      if (!normalizedKey || matchedKeys.has(normalizedKey)) {
+        continue;
+      }
+
+      const productDescription = clampText(rawProductDescription, MAX_PENDING_DISPLAY_TEXT_LENGTH);
+      const hts = clampText(asText(rawLineItem.hts), MAX_PENDING_HTS_LENGTH);
+      let pendingItem = pendingByKey.get(normalizedKey);
+
+      if (!pendingItem) {
+        pendingItem = {
+          key: normalizedKey,
+          product: rawProductDescription,
+          occurrenceCount: 0,
+          invoiceIds: new Set<string>(),
+          htsCounts: new Map<string, number>(),
+          latestProcessedAt: processedAt,
+          latestTimestamp: processedTimestamp,
+          examples: [],
+        };
+        pendingByKey.set(normalizedKey, pendingItem);
+      }
+
+      pendingItem.occurrenceCount += 1;
+      if (batchItemId) {
+        pendingItem.invoiceIds.add(batchItemId);
+      }
+
+      if (hts) {
+        pendingItem.htsCounts.set(hts, (pendingItem.htsCounts.get(hts) || 0) + 1);
+      }
+
+      if (processedTimestamp > pendingItem.latestTimestamp) {
+        pendingItem.latestTimestamp = processedTimestamp;
+        pendingItem.latestProcessedAt = processedAt;
+        pendingItem.product = rawProductDescription;
+      }
+
+      if (pendingItem.examples.length < MAX_PENDING_PRODUCT_EXAMPLES) {
+        pendingItem.examples.push({
+          batchItemId,
+          fileName,
+          invoiceNumber: invoiceNumber || undefined,
+          productDescription,
+          hts: hts || undefined,
+        });
+      }
+    }
+  }
+
+  const items = [...pendingByKey.values()]
+    .map((item) => ({
+      key: item.key,
+      product: item.product,
+      occurrenceCount: item.occurrenceCount,
+      invoiceCount: item.invoiceIds.size,
+      htsCandidates: [...item.htsCounts.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], 'es'))
+        .slice(0, MAX_PENDING_HTS_CANDIDATES)
+        .map(([hts]) => hts),
+      latestProcessedAt: item.latestProcessedAt,
+      examples: item.examples,
+    }))
+    .sort((left, right) => {
+      const occurrenceDiff = right.occurrenceCount - left.occurrenceCount;
+      if (occurrenceDiff !== 0) {
+        return occurrenceDiff;
+      }
+
+      const latestDiff = toTimestamp(right.latestProcessedAt) - toTimestamp(left.latestProcessedAt);
+      if (latestDiff !== 0) {
+        return latestDiff;
+      }
+
+      return left.product.localeCompare(right.product, 'es', { sensitivity: 'base' });
+    });
+
+  if (items.length > MAX_PENDING_RETURN_ITEMS) {
+    truncated = true;
+  }
+
+  return {
+    items: items.slice(0, MAX_PENDING_RETURN_ITEMS),
+    truncated,
+  };
+}
+
 async function ensureAgencyExists(agencyId: string): Promise<boolean> {
   const db = getDb();
   const result = await db.execute({
@@ -85,6 +303,33 @@ async function ensureAgencyExists(agencyId: string): Promise<boolean> {
   });
 
   return result.rows.length > 0;
+}
+
+async function ensureProductMatchAgencyAccess(
+  c: Parameters<typeof ensureAgencyAccess>[0],
+  user: AuthUser,
+  agencyId: string,
+): Promise<Response | null> {
+  const accessError = ensureAgencyAccess(c, user, agencyId);
+  if (accessError) {
+    return accessError;
+  }
+
+  if (user.role === 'ADMIN' || agencyId === 'GLOBAL') {
+    return null;
+  }
+
+  const db = getDb();
+  const result = await db.execute({
+    sql: 'SELECT is_active FROM agencies WHERE id = ?',
+    args: [agencyId],
+  });
+
+  if (result.rows.length === 0 || !Boolean(result.rows[0].is_active)) {
+    return c.json({ error: 'No autorizado para acceder a esta agencia.' }, 403);
+  }
+
+  return null;
 }
 
 async function findDuplicateProduct(
@@ -116,6 +361,162 @@ async function findDuplicateProduct(
 }
 
 // GET /api/product-matches?agencyId=...
+productMatches.get('/pending', async (c) => {
+  const authUser = await requireAuth(c);
+  if (authUser instanceof Response) {
+    return authUser;
+  }
+
+  const agencyId = asText(c.req.query('agencyId'));
+  if (!agencyId || agencyId === 'GLOBAL') {
+    return c.json({ error: 'Se requiere un agencyId valido.' }, 400);
+  }
+
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
+  if (accessError) {
+    return accessError;
+  }
+
+  const db = getDb();
+  const [matchesResult, batchResult] = await Promise.all([
+    db.execute({
+      sql: `SELECT product
+            FROM product_matches
+            WHERE agency_id = ?`,
+      args: [agencyId],
+    }),
+    db.execute({
+      sql: `SELECT id, file_name, result_json, processed_at, created_at
+            FROM batch_items
+            WHERE agency_id = ?
+              AND status = 'SUCCESS'
+              AND result_json IS NOT NULL
+            ORDER BY COALESCE(processed_at, created_at) DESC, created_at DESC
+            LIMIT ?`,
+      args: [agencyId, MAX_PENDING_BATCH_ITEMS + 1],
+    }),
+  ]);
+
+  const truncated = batchResult.rows.length > MAX_PENDING_BATCH_ITEMS;
+  const scannedRows = truncated
+    ? (batchResult.rows.slice(0, MAX_PENDING_BATCH_ITEMS) as Record<string, unknown>[])
+    : (batchResult.rows as Record<string, unknown>[]);
+
+  const matchedKeys = new Set(
+    matchesResult.rows
+      .map((row) => normalizeProductKey(asText((row as Record<string, unknown>).product)))
+      .filter(Boolean),
+  );
+
+  const pendingResult = buildPendingProductMatches(scannedRows, matchedKeys);
+
+  return c.json({
+    items: pendingResult.items,
+    truncated: truncated || pendingResult.truncated,
+    scannedBatchItems: scannedRows.length,
+    scanLimit: MAX_PENDING_BATCH_ITEMS,
+  });
+});
+
+productMatches.post('/pending', async (c) => {
+  const authUser = await requireAuth(c);
+  if (authUser instanceof Response) {
+    return authUser;
+  }
+
+  const body = (await c.req
+    .json()
+    .catch(() => null)) as Partial<PendingProductMatchCreateInput> | null;
+  if (!body) {
+    return c.json({ error: 'JSON inválido para crear el match pendiente.' }, 400);
+  }
+
+  const agencyId = asText(body.agencyId);
+  const product = asText(body.product);
+  const clientProductCode = asText(body.clientProductCode);
+  const productMatch = asText(body.productMatch);
+  const htsMatch = asText(body.htsMatch);
+  const sourceHts = asText(body.sourceHts);
+
+  if (!agencyId || agencyId === 'GLOBAL') {
+    return c.json({ error: 'Se requiere una agencia valida.' }, 400);
+  }
+
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
+  if (accessError) {
+    return accessError;
+  }
+
+  if (!(await ensureAgencyExists(agencyId))) {
+    return c.json({ error: 'Agencia no encontrada.' }, 404);
+  }
+
+  if (!product) {
+    return c.json({ error: 'El producto pendiente es obligatorio.' }, 400);
+  }
+
+  if (!clientProductCode) {
+    return c.json({ error: 'El código producto cliente es obligatorio.' }, 400);
+  }
+
+  if (!productMatch) {
+    return c.json({ error: 'La descripción producto cliente es obligatoria.' }, 400);
+  }
+
+  if (!htsMatch) {
+    return c.json({ error: 'El HTS Match es obligatorio.' }, 400);
+  }
+
+  if (
+    exceedsMaxLength(product, MAX_PENDING_PRODUCT_LENGTH) ||
+    exceedsMaxLength(clientProductCode, MAX_PENDING_CLIENT_CODE_LENGTH) ||
+    exceedsMaxLength(productMatch, MAX_PENDING_PRODUCT_MATCH_LENGTH) ||
+    exceedsMaxLength(htsMatch, MAX_PENDING_HTS_LENGTH) ||
+    exceedsMaxLength(sourceHts, MAX_PENDING_HTS_LENGTH)
+  ) {
+    return c.json({ error: 'Uno o más campos exceden el tamaño permitido.' }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  const db = getDb();
+
+  const created = await db.execute({
+    sql: `INSERT INTO product_matches (
+            id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at
+          )
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM product_matches
+            WHERE agency_id = ?
+              AND lower(trim(product)) = lower(trim(?))
+          )
+          RETURNING id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at`,
+    args: [
+      id,
+      agencyId,
+      product,
+      product,
+      clientProductCode,
+      productMatch,
+      sourceHts,
+      htsMatch,
+      now,
+      now,
+      agencyId,
+      product,
+    ],
+  });
+
+  if (created.rows.length === 0) {
+    return c.json({ error: 'Ya existe un match para ese Product en la agencia.' }, 400);
+  }
+
+  return c.json(buildProductMatch(created.rows[0] as Record<string, unknown>), 201);
+});
+
+// GET /api/product-matches?agencyId=...
 productMatches.get('/', async (c) => {
   const authUser = await requireAuth(c);
   if (authUser instanceof Response) {
@@ -127,7 +528,7 @@ productMatches.get('/', async (c) => {
     return c.json({ error: 'Se requiere un agencyId valido.' }, 400);
   }
 
-  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
   if (accessError) {
     return accessError;
   }
@@ -158,7 +559,7 @@ productMatches.post('/bootstrap', async (c) => {
     return c.json({ error: 'Se requiere una agencia valida.' }, 400);
   }
 
-  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
   if (accessError) {
     return accessError;
   }
@@ -264,7 +665,7 @@ productMatches.post('/', async (c) => {
     return c.json({ error: 'Se requiere una agencia valida.' }, 400);
   }
 
-  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
   if (accessError) {
     return accessError;
   }
@@ -273,7 +674,8 @@ productMatches.post('/', async (c) => {
     return c.json({ error: 'Agencia no encontrada.' }, 404);
   }
 
-  if (!asText(body.id)) {
+  const requestedId = asText(body.id);
+  if (!requestedId) {
     return c.json({ error: 'Se requiere id para crear el match.' }, 400);
   }
 
@@ -281,20 +683,35 @@ productMatches.post('/', async (c) => {
     return c.json({ error: 'El campo Product es obligatorio.' }, 400);
   }
 
-  if (await findDuplicateProduct(agencyId, product)) {
-    return c.json({ error: 'Ya existe un match para ese Product en la agencia.' }, 400);
+  if (
+    hasProductMatchFieldLengthError({
+      product,
+      clientProductCode: asText(body.clientProductCode),
+      productMatch: asText(body.productMatch),
+      hts: asText(body.hts),
+      htsMatch: asText(body.htsMatch),
+    })
+  ) {
+    return c.json({ error: 'Uno o más campos exceden el tamaño permitido.' }, 400);
   }
 
   const now = new Date().toISOString();
   const db = getDb();
 
-  await db.execute({
+  const created = await db.execute({
     sql: `INSERT INTO product_matches (
             id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM product_matches
+            WHERE agency_id = ?
+              AND lower(trim(product)) = lower(trim(?))
+          )
+          RETURNING id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at`,
     args: [
-      asText(body.id),
+      requestedId,
       agencyId,
       asText(body.category),
       product,
@@ -304,15 +721,14 @@ productMatches.post('/', async (c) => {
       asText(body.htsMatch),
       now,
       now,
+      agencyId,
+      product,
     ],
   });
 
-  const created = await db.execute({
-    sql: `SELECT id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at
-          FROM product_matches
-          WHERE id = ?`,
-    args: [asText(body.id)],
-  });
+  if (created.rows.length === 0) {
+    return c.json({ error: 'Ya existe un match para ese Product en la agencia.' }, 400);
+  }
 
   return c.json(buildProductMatch(created.rows[0] as Record<string, unknown>), 201);
 });
@@ -339,7 +755,7 @@ productMatches.put('/:id', async (c) => {
   }
 
   const agencyId = String(existing.rows[0].agency_id);
-  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
   if (accessError) {
     return accessError;
   }
@@ -349,12 +765,20 @@ productMatches.put('/:id', async (c) => {
     return c.json({ error: 'El campo Product es obligatorio.' }, 400);
   }
 
-  if (await findDuplicateProduct(agencyId, product, id)) {
-    return c.json({ error: 'Ya existe un match para ese Product en la agencia.' }, 400);
+  if (
+    hasProductMatchFieldLengthError({
+      product,
+      clientProductCode: asText(body.clientProductCode),
+      productMatch: asText(body.productMatch),
+      hts: asText(body.hts),
+      htsMatch: asText(body.htsMatch),
+    })
+  ) {
+    return c.json({ error: 'Uno o más campos exceden el tamaño permitido.' }, 400);
   }
 
   const now = new Date().toISOString();
-  await db.execute({
+  const updated = await db.execute({
     sql: `UPDATE product_matches
           SET category = ?,
               product = ?,
@@ -363,7 +787,15 @@ productMatches.put('/:id', async (c) => {
               hts = ?,
               hts_match = ?,
               updated_at = ?
-          WHERE id = ?`,
+          WHERE id = ?
+            AND NOT EXISTS (
+              SELECT 1
+              FROM product_matches
+              WHERE agency_id = ?
+                AND lower(trim(product)) = lower(trim(?))
+                AND id != ?
+            )
+          RETURNING id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at`,
     args: [
       asText(body.category),
       product,
@@ -373,15 +805,15 @@ productMatches.put('/:id', async (c) => {
       asText(body.htsMatch),
       now,
       id,
+      agencyId,
+      product,
+      id,
     ],
   });
 
-  const updated = await db.execute({
-    sql: `SELECT id, agency_id, category, product, client_product_code, product_match, hts, hts_match, created_at, updated_at
-          FROM product_matches
-          WHERE id = ?`,
-    args: [id],
-  });
+  if (updated.rows.length === 0) {
+    return c.json({ error: 'Ya existe un match para ese Product en la agencia.' }, 400);
+  }
 
   return c.json(buildProductMatch(updated.rows[0] as Record<string, unknown>));
 });
@@ -406,7 +838,11 @@ productMatches.delete('/:id', async (c) => {
     return c.json({ error: 'Match de producto no encontrado.' }, 404);
   }
 
-  const accessError = ensureAgencyAccess(c, authUser, String(existing.rows[0].agency_id));
+  const accessError = await ensureProductMatchAgencyAccess(
+    c,
+    authUser,
+    String(existing.rows[0].agency_id),
+  );
   if (accessError) {
     return accessError;
   }
@@ -433,7 +869,7 @@ productMatches.get('/template', async (c) => {
     return c.json({ error: 'Se requiere un agencyId valido.' }, 400);
   }
 
-  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
   if (accessError) {
     return accessError;
   }
@@ -479,13 +915,22 @@ productMatches.post('/import', async (c) => {
     return c.json({ error: 'Se requiere una agencia valida.' }, 400);
   }
 
-  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  const accessError = await ensureProductMatchAgencyAccess(c, authUser, agencyId);
   if (accessError) {
     return accessError;
   }
 
   if (!file) {
     return c.json({ error: 'Se requiere un archivo Excel (.xlsx) o CSV para importar.' }, 400);
+  }
+
+  if (file.size > MAX_PRODUCT_MATCH_IMPORT_FILE_BYTES) {
+    return c.json(
+      {
+        error: `El archivo excede el tamaño permitido para importación (${Math.floor(MAX_PRODUCT_MATCH_IMPORT_FILE_BYTES / (1024 * 1024))} MB).`,
+      },
+      400,
+    );
   }
 
   // Validar extensión
@@ -564,6 +1009,15 @@ productMatches.post('/import', async (c) => {
     );
   }
 
+  if (rawData.length > MAX_PRODUCT_MATCH_IMPORT_ROWS + 1) {
+    return c.json(
+      {
+        error: `El archivo supera el límite de ${MAX_PRODUCT_MATCH_IMPORT_ROWS} filas de datos para una importación inicial.`,
+      },
+      400,
+    );
+  }
+
   // Primera fila como cabeceras. Solo se aceptan las 4 columnas visibles de la plantilla.
   const headers = (rawData[0] as unknown[]).map((h) => normalizeHeader(h));
   const productIndex = findHeaderIndex(headers, 'product');
@@ -618,6 +1072,20 @@ productMatches.post('/import', async (c) => {
     const productMatch = cells[productMatchIndex] || '';
     const hts = '';
     const htsMatch = cells[htsMatchIndex] || '';
+
+    if (
+      exceedsMaxLength(product, MAX_PENDING_PRODUCT_LENGTH) ||
+      exceedsMaxLength(clientProductCode, MAX_PENDING_CLIENT_CODE_LENGTH) ||
+      exceedsMaxLength(productMatch, MAX_PENDING_PRODUCT_MATCH_LENGTH) ||
+      exceedsMaxLength(htsMatch, MAX_PENDING_HTS_LENGTH)
+    ) {
+      return c.json(
+        {
+          error: `La fila ${i + 1} contiene valores que exceden el tamaño permitido.`,
+        },
+        400,
+      );
+    }
 
     await db.execute({
       sql: `INSERT INTO product_matches (

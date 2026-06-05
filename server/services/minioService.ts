@@ -18,6 +18,15 @@ export interface BuildDocumentObjectKeyInput {
   now?: Date;
 }
 
+export interface BuildAutoPilotReviewObjectKeyInput {
+  agencyId: string;
+  agencyName?: string;
+  documentId: string;
+  originalFilename: string;
+  reviewDate: string;
+  runId: string;
+}
+
 export interface PutDocumentObjectInput {
   objectKey: string;
   buffer: Buffer;
@@ -149,6 +158,20 @@ export function buildDocumentObjectKey(input: BuildDocumentObjectKeyInput): stri
   const documentId = sanitizeObjectSegment(input.documentId || randomUUID(), randomUUID());
 
   return `documents/${agencySegment}/${year}/${month}/${documentId}-${safeFilename}`;
+}
+
+export function buildAutoPilotReviewObjectKey(input: BuildAutoPilotReviewObjectKeyInput): string {
+  const [year = 'unknown-year', month = 'unknown-month', day = 'unknown-day'] = input.reviewDate
+    .split('-')
+    .map((part) => sanitizeObjectSegment(part, 'unknown'));
+  const agencySegment = input.agencyName
+    ? sanitizeObjectSegment(input.agencyName, 'unknown-agency')
+    : sanitizeObjectSegment(input.agencyId, 'unknown-agency');
+  const runId = sanitizeObjectSegment(input.runId, 'unknown-run');
+  const documentId = sanitizeObjectSegment(input.documentId, randomUUID());
+  const safeFilename = sanitizeObjectSegment(input.originalFilename, 'document.pdf');
+
+  return `autopilot-ai/${agencySegment}/${year}/${month}/${day}/${runId}/${documentId}-${safeFilename}`;
 }
 
 export async function putDocumentObject(input: PutDocumentObjectInput): Promise<void> {

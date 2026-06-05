@@ -11,10 +11,12 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { randomUUID } from 'node:crypto';
 import { getDb, closeDb } from './db.js';
 import { ensureProductMatchMasterSeed } from './productMatchMasterSeed.js';
 import { runMigrations } from './schema.js';
 import { runSeed } from './seed.js';
+import { cleanupExpiredGeminiExtractionEvents } from './services/geminiExtractionEvents.js';
 import { startDocumentWorker, type DocumentWorkerHandle } from './workers/documentWorker.js';
 
 // Rutas
@@ -27,6 +29,7 @@ import productMatchesRoutes from './routes/product-matches.js';
 import settingsRoutes from './routes/settings.js';
 import plansRoutes from './routes/plans.js';
 import aiRoutes from './routes/ai.js';
+import aiReviewRoutes from './routes/ai-review.js';
 import auditRoutes from './routes/audit.js';
 import documentsRoutes from './routes/documents.js';
 import integrateRoutes from './routes/integrate.js';
@@ -36,6 +39,19 @@ import path from 'node:path';
 
 const app = new Hono();
 let documentWorker: DocumentWorkerHandle | null = null;
+
+app.onError((error, c) => {
+  const errorId = randomUUID();
+  console.error(`[${errorId}] Error no controlado en API:`, error);
+
+  return c.json(
+    {
+      error: 'Error interno del servidor.',
+      errorId,
+    },
+    500,
+  );
+});
 
 // ── CORS (solo necesario en desarrollo; en producción el SPA y la API comparten origen) ──
 app.use(
@@ -56,6 +72,7 @@ app.route('/api/product-matches', productMatchesRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/plans', plansRoutes);
 app.route('/api/ai', aiRoutes);
+app.route('/api/ai-review', aiReviewRoutes);
 app.route('/api/audit', auditRoutes);
 app.route('/api/documents', documentsRoutes);
 app.route('/api/integrate', integrateRoutes);
@@ -91,6 +108,9 @@ async function start() {
 
   const db = getDb();
   await runMigrations(db);
+  cleanupExpiredGeminiExtractionEvents().catch((error) => {
+    console.warn('No se pudo limpiar observabilidad Gemini expirada al iniciar.', error);
+  });
   await runSeed(db);
   await ensureProductMatchMasterSeed(db);
   documentWorker = await startDocumentWorker();

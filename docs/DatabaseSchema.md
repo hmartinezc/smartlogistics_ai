@@ -29,6 +29,7 @@ subscription_plans ────< agencies ────< agency_emails
                               │       └──── document_processing_audit (referencia lógica por batch_item_id)
                               │
                               ├────< document_jobs (PDFs en MinIO, cola async)
+                              │       └────< ai_review_items >──── ai_review_runs
                               │
                                ├────< integration_delivery_logs
                                │
@@ -67,17 +68,17 @@ Define los niveles de servicio disponibles para las agencias.
 
 Cada agencia es un "tenant" del sistema con su propio plan y uso.
 
-| Columna               | Tipo    | Restricción                                | Descripción                                                       |
-| --------------------- | ------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| `id`                  | TEXT    | **PRIMARY KEY**                            | ID único (ej: `AGENCY_HQ`)                                        |
-| `name`                | TEXT    | NOT NULL                                   | Nombre de la agencia                                              |
-| `plan_id`             | TEXT    | NOT NULL, **FK** → `subscription_plans.id` | Plan asignado                                                     |
-| `current_usage`       | INTEGER | NOT NULL, DEFAULT 0                        | Documentos procesados en período actual                           |
-| `is_active`           | INTEGER | NOT NULL, DEFAULT 1                        | 1=activa, 0=suspendida                                            |
-| `hawb_format_pattern` | TEXT    | nullable                                   | Patrón opcional para normalizar HAWB al guardado inicial desde IA |
+| Columna               | Tipo    | Restricción                                | Descripción                                                                         |
+| --------------------- | ------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `id`                  | TEXT    | **PRIMARY KEY**                            | ID único (ej: `AGENCY_HQ`)                                                          |
+| `name`                | TEXT    | NOT NULL                                   | Nombre de la agencia                                                                |
+| `plan_id`             | TEXT    | NOT NULL, **FK** → `subscription_plans.id` | Plan asignado                                                                       |
+| `current_usage`       | INTEGER | NOT NULL, DEFAULT 0                        | Documentos procesados en período actual                                             |
+| `is_active`           | INTEGER | NOT NULL, DEFAULT 1                        | 1=activa, 0=suspendida                                                              |
+| `hawb_format_pattern` | TEXT    | nullable                                   | Patrón opcional para normalizar HAWB al guardado inicial desde IA                   |
 | `integration_config`  | TEXT    | nullable                                   | Configuración JSON de integración externa (endpoint, autenticación, field mappings) |
-| `created_at`          | TEXT    | DEFAULT now                                | Fecha de creación                                                 |
-| `updated_at`          | TEXT    | DEFAULT now                                | Última modificación                                               |
+| `created_at`          | TEXT    | DEFAULT now                                | Fecha de creación                                                                   |
+| `updated_at`          | TEXT    | DEFAULT now                                | Última modificación                                                                 |
 
 **Datos seed:** AGENCY_HQ (SmartLogistics HQ, Enterprise), AGENCY_CLIENT_A (Flores Del Valle, Basic), AGENCY_CLIENT_B (Cargo Express, Pro)
 
@@ -152,7 +153,7 @@ Maneja sesiones con expiración de 8 horas.
 
 ### 7. `batch_items` — Resultados de Procesamiento de Facturas
 
-Cada fila es un documento procesado. El campo `result_json` guarda el `InvoiceData` completo como JSON.
+Cada fila es un documento procesado. El campo `result_json` guarda el `InvoiceData` completo como JSON, incluyendo `confidenceScore` y, cuando aplica, `confidenceReasons` y `confidenceAudit`.
 
 | Columna        | Tipo | Restricción                                                  | Descripción                            |
 | -------------- | ---- | ------------------------------------------------------------ | -------------------------------------- |
@@ -294,7 +295,115 @@ Catálogo global de productos con sus equivalencias estándar, usado como refere
 
 ---
 
-### 13. `app_settings` — Configuración de la App
+### 13. `ai_prompt_snapshots` — Snapshots de Prompts AutoPilot AI
+
+Guarda copias trazables de prompts usados por AutoPilot AI. Es aditiva y no cambia prompts activos.
+
+| Columna           | Tipo | Restricción     | Descripción                              |
+| ----------------- | ---- | --------------- | ---------------------------------------- |
+| `id`              | TEXT | **PRIMARY KEY** | ID determinístico del snapshot           |
+| `prompt_hash`     | TEXT | NOT NULL        | Hash corto registrado por observabilidad |
+| `prompt_kind`     | TEXT | NOT NULL        | `classifier`, `extractor`, etc.          |
+| `agent_type`      | TEXT | nullable        | Agente/formato asociado                  |
+| `router_category` | TEXT | nullable        | Categoría visual del router              |
+| `model`           | TEXT | NOT NULL        | Modelo asociado al evento                |
+| `prompt_profile`  | TEXT | nullable        | Perfil `full`/`compact` cuando aplica    |
+| `prompt_text`     | TEXT | NOT NULL        | Texto del prompt                         |
+| `source`          | TEXT | NOT NULL        | Origen del snapshot                      |
+| `created_at`      | TEXT | DEFAULT now     | Fecha de creación                        |
+
+**Índice:** `idx_ai_prompt_snapshots_hash`
+
+---
+
+### 14. `ai_review_runs` — Muestras AutoPilot AI
+
+Cada fila representa una ejecución manual del admin para seleccionar las facturas más costosas de una fecha.
+
+| Columna                    | Tipo    | Restricción                            | Descripción                     |
+| -------------------------- | ------- | -------------------------------------- | ------------------------------- |
+| `id`                       | TEXT    | **PRIMARY KEY**                        | UUID de la carpeta              |
+| `review_date`              | TEXT    | NOT NULL                               | Fecha revisada `YYYY-MM-DD`     |
+| `agency_id`                | TEXT    | nullable                               | Agencia filtrada; null = global |
+| `status`                   | TEXT    | CHECK(`READY`, `EMPTY`, `ERROR`)       | Estado de selección             |
+| `selected_count`           | INTEGER | NOT NULL, DEFAULT 0                    | Cantidad seleccionada           |
+| `total_input_tokens`       | INTEGER | NOT NULL, DEFAULT 0                    | Tokens de entrada agregados     |
+| `total_output_tokens`      | INTEGER | NOT NULL, DEFAULT 0                    | Tokens de salida agregados      |
+| `total_tokens`             | INTEGER | NOT NULL, DEFAULT 0                    | Tokens totales agregados        |
+| `total_estimated_cost_usd` | REAL    | NOT NULL, DEFAULT 0                    | Costo estimado agregado         |
+| `created_by_user_id`       | TEXT    | **FK** → `users.id` ON DELETE SET NULL | Admin que creó la carpeta       |
+| `created_by_email`         | TEXT    | nullable                               | Email capturado                 |
+| `created_by_name`          | TEXT    | nullable                               | Nombre capturado                |
+| `error`                    | TEXT    | nullable                               | Error de selección si aplica    |
+| `created_at`               | TEXT    | DEFAULT now                            | Fecha de creación               |
+| `updated_at`               | TEXT    | DEFAULT now                            | Última actualización            |
+
+**Índices:** `idx_ai_review_runs_date`, `idx_ai_review_runs_agency_date`
+
+---
+
+### 15. `ai_review_items` — Facturas Seleccionadas por AutoPilot AI
+
+Referencia documentos procesados y conserva una copia independiente del PDF bajo `autopilot-ai/` en MinIO.
+
+| Columna                  | Tipo    | Restricción                                             | Descripción                     |
+| ------------------------ | ------- | ------------------------------------------------------- | ------------------------------- |
+| `id`                     | TEXT    | **PRIMARY KEY**                                         | UUID del item                   |
+| `run_id`                 | TEXT    | NOT NULL, **FK** → `ai_review_runs.id` CASCADE          | Carpeta propietaria             |
+| `document_job_id`        | TEXT    | NOT NULL                                                | ID del documento original       |
+| `batch_id`               | TEXT    | nullable                                                | Lote original                   |
+| `agency_id`              | TEXT    | NOT NULL, **FK** → `agencies.id` ON DELETE CASCADE      | Agencia propietaria             |
+| `agency_name`            | TEXT    | nullable                                                | Nombre de agencia capturado     |
+| `original_file_name`     | TEXT    | NOT NULL                                                | Nombre original del PDF         |
+| `review_storage_bucket`  | TEXT    | nullable                                                | Bucket de la copia preservada   |
+| `review_object_key`      | TEXT    | nullable                                                | Ruta MinIO de AutoPilot AI      |
+| `review_file_size_bytes` | INTEGER | NOT NULL, DEFAULT 0                                     | Tamaño de la copia preservada   |
+| `extraction_format`      | TEXT    | NOT NULL                                                | Formato/agente usado            |
+| `model_summary`          | TEXT    | nullable                                                | Modelos involucrados            |
+| `prompt_hashes`          | TEXT    | nullable                                                | Hashes de prompts involucrados  |
+| `status`                 | TEXT    | CHECK(`PENDING_ANALYSIS`, `ANALYZED`, `ANALYSIS_ERROR`) | Estado de revisión              |
+| `input_tokens`           | INTEGER | NOT NULL, DEFAULT 0                                     | Tokens de entrada agregados     |
+| `output_tokens`          | INTEGER | NOT NULL, DEFAULT 0                                     | Tokens de salida agregados      |
+| `total_tokens`           | INTEGER | NOT NULL, DEFAULT 0                                     | Tokens totales agregados        |
+| `estimated_cost_usd`     | REAL    | NOT NULL, DEFAULT 0                                     | Costo estimado agregado         |
+| `processed_at`           | TEXT    | nullable                                                | Fecha de procesamiento original |
+| `analysis_error`         | TEXT    | nullable                                                | Error del agente revisor        |
+| `created_at`             | TEXT    | DEFAULT now                                             | Fecha de creación               |
+| `updated_at`             | TEXT    | DEFAULT now                                             | Última actualización            |
+
+**Constraint UNIQUE:** `(run_id, document_job_id)`  
+**Índices:** `idx_ai_review_items_run`, `idx_ai_review_items_document`, `idx_ai_review_items_review_object`
+
+---
+
+### 16. `ai_review_analyses` — Análisis del Agente Revisor
+
+Guarda diagnósticos y propuestas. No aplica cambios automáticos a prompts ni al extractor.
+
+| Columna                  | Tipo    | Restricción                                                | Descripción                    |
+| ------------------------ | ------- | ---------------------------------------------------------- | ------------------------------ |
+| `id`                     | TEXT    | **PRIMARY KEY**                                            | UUID del análisis              |
+| `item_id`                | TEXT    | NOT NULL, **FK** → `ai_review_items.id` CASCADE            | Factura revisada               |
+| `status`                 | TEXT    | CHECK(`DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`) | Estado humano                  |
+| `reviewer_model`         | TEXT    | NOT NULL                                                   | Modelo usado por el revisor    |
+| `verdict`                | TEXT    | NOT NULL                                                   | Veredicto resumido             |
+| `confidence_score`       | INTEGER | nullable                                                   | Confianza del revisor          |
+| `analysis_json`          | TEXT    | NOT NULL                                                   | JSON estructurado del análisis |
+| `recommendation_summary` | TEXT    | nullable                                                   | Resumen visible                |
+| `input_tokens`           | INTEGER | NOT NULL, DEFAULT 0                                        | Tokens de entrada del análisis |
+| `output_tokens`          | INTEGER | NOT NULL, DEFAULT 0                                        | Tokens de salida del análisis  |
+| `total_tokens`           | INTEGER | NOT NULL, DEFAULT 0                                        | Tokens totales del análisis    |
+| `estimated_cost_usd`     | REAL    | NOT NULL, DEFAULT 0                                        | Costo estimado del análisis    |
+| `created_by_user_id`     | TEXT    | **FK** → `users.id` ON DELETE SET NULL                     | Admin que ejecutó el análisis  |
+| `created_by_email`       | TEXT    | nullable                                                   | Email capturado                |
+| `created_at`             | TEXT    | DEFAULT now                                                | Fecha de creación              |
+| `updated_at`             | TEXT    | DEFAULT now                                                | Última actualización           |
+
+**Índice:** `idx_ai_review_analyses_item`
+
+---
+
+### 17. `app_settings` — Configuración de la App
 
 Almacén key-value para configuraciones generales.
 
@@ -308,26 +417,26 @@ Almacén key-value para configuraciones generales.
 
 ---
 
-### 14. `integration_delivery_logs` — Logs de Envíos de Integración
+### 18. `integration_delivery_logs` — Logs de Envíos de Integración
 
 Cada registro documenta un envío a un endpoint externo de integración (test o exportación).
 
-| Columna                  | Tipo    | Restricción                                                               | Descripción                                      |
-| ------------------------ | ------- | ------------------------------------------------------------------------- | ------------------------------------------------ |
-| `id`                     | TEXT    | **PRIMARY KEY**                                                           | ID único                                         |
-| `agency_id`              | TEXT    | NOT NULL, **FK** → `agencies.id` ON DELETE CASCADE                        | Agencia propietaria                              |
-| `event_type`             | TEXT    | NOT NULL, CHECK(`TEST`, `EXPORT`)                                         | Tipo de evento                                   |
-| `source`                 | TEXT    | NOT NULL                                                                  | Origen del envío                                 |
-| `export_reference`       | TEXT    | nullable                                                                  | Referencia de exportación                        |
-| `export_filename`        | TEXT    | nullable                                                                  | Nombre de archivo exportado                      |
-| `endpoint_url`           | TEXT    | NOT NULL                                                                  | URL de destino                                   |
-| `request_document_count` | INTEGER | NOT NULL, DEFAULT 0                                                       | Documentos incluidos en la petición              |
-| `used_client_mapping`    | INTEGER | NOT NULL, DEFAULT 0                                                       | 1 si usó mapping de cliente, 0 si no             |
-| `response_status`        | INTEGER | nullable                                                                  | Código HTTP de respuesta                         |
-| `response_body`          | TEXT    | nullable                                                                  | Cuerpo de la respuesta                           |
-| `success`                | INTEGER | NOT NULL, CHECK(0, 1)                                                     | 1 si fue exitoso, 0 si falló                     |
-| `error`                  | TEXT    | nullable                                                                  | Mensaje de error                                 |
-| `created_at`             | TEXT    | DEFAULT now                                                               | Fecha del envío                                  |
+| Columna                  | Tipo    | Restricción                                        | Descripción                          |
+| ------------------------ | ------- | -------------------------------------------------- | ------------------------------------ |
+| `id`                     | TEXT    | **PRIMARY KEY**                                    | ID único                             |
+| `agency_id`              | TEXT    | NOT NULL, **FK** → `agencies.id` ON DELETE CASCADE | Agencia propietaria                  |
+| `event_type`             | TEXT    | NOT NULL, CHECK(`TEST`, `EXPORT`)                  | Tipo de evento                       |
+| `source`                 | TEXT    | NOT NULL                                           | Origen del envío                     |
+| `export_reference`       | TEXT    | nullable                                           | Referencia de exportación            |
+| `export_filename`        | TEXT    | nullable                                           | Nombre de archivo exportado          |
+| `endpoint_url`           | TEXT    | NOT NULL                                           | URL de destino                       |
+| `request_document_count` | INTEGER | NOT NULL, DEFAULT 0                                | Documentos incluidos en la petición  |
+| `used_client_mapping`    | INTEGER | NOT NULL, DEFAULT 0                                | 1 si usó mapping de cliente, 0 si no |
+| `response_status`        | INTEGER | nullable                                           | Código HTTP de respuesta             |
+| `response_body`          | TEXT    | nullable                                           | Cuerpo de la respuesta               |
+| `success`                | INTEGER | NOT NULL, CHECK(0, 1)                              | 1 si fue exitoso, 0 si falló         |
+| `error`                  | TEXT    | nullable                                           | Mensaje de error                     |
+| `created_at`             | TEXT    | DEFAULT now                                        | Fecha del envío                      |
 
 **Índice:** `idx_integration_delivery_logs_agency_created` en `(agency_id, created_at DESC)`
 
@@ -374,12 +483,12 @@ Cada registro documenta un envío a un endpoint externo de integración (test o 
 
 ### Batch / Facturas (`/api/batch`)
 
-| Método | Ruta             | Descripción                         |
-| ------ | ---------------- | ----------------------------------- |
-| GET    | `/api/batch`     | Listar items (filtro: `?agencyId=`) |
-| POST   | `/api/batch`     | Guardar resultados de batch         |
-| PUT    | `/api/batch/:id` | Actualizar un item                  |
-| DELETE | `/api/batch`     | Limpiar todos los items             |
+| Método | Ruta             | Descripción                                 |
+| ------ | ---------------- | ------------------------------------------- |
+| GET    | `/api/batch`     | Listar items (filtros: `?agencyId=&limit=`) |
+| POST   | `/api/batch`     | Guardar resultados de batch                 |
+| PUT    | `/api/batch/:id` | Actualizar un item                          |
+| DELETE | `/api/batch`     | Limpiar todos los items                     |
 
 **Autorización:** cada sesión solo puede leer o modificar batches de sus agencias; `ADMIN` puede ver todo.
 
@@ -395,7 +504,7 @@ Cada registro documenta un envío a un endpoint externo de integración (test o 
 
 **Filtros de listado:** `agencyId`, `status`, `batchId`, `limit`  
 **Upload:** `multipart/form-data` con `file` o `files`, `agencyId`, `batchId` opcional, `format` opcional.  
-**Process:** JSON con `jobIds` o `batchId` + `agencyId`.  
+**Process:** JSON con `jobIds` o `batchId` + `agencyId`; si `GEMINI_EXTRACTION_SDK=genai` o `legacy-cache` y `GEMINI_PROMPT_CACHE_USE_FOR_EXTRACTION=true`, prepara el cache del prompt Gemini por formato antes de encolar y devuelve `promptCaches` con `ready/error/disabled`. Con `GEMINI_EXTRACTION_SDK=genai-router-files`, el worker sube cada PDF a Gemini Files API, clasifica, extrae y borra el archivo remoto sin usar cache.
 **Delete:** JSON con `jobIds` y `agencyId`; solo elimina estados `UPLOADED`, `SUCCESS`, `ERROR` o `CANCELLED` para no interrumpir documentos `QUEUED`/`PROCESSING`.  
 **Worker:** procesa jobs `QUEUED` en backend, lee el PDF desde MinIO, llama a Gemini y actualiza `document_jobs`, `batch_items` y `document_processing_audit`.  
 **Autorización:** acceso restringido por agencia; `ADMIN` puede consultar global.
@@ -420,13 +529,16 @@ Cada registro documenta un envío a un endpoint externo de integración (test o 
 
 ### IA / Extracción (`/api/ai`)
 
-| Método | Ruta              | Descripción                              |
-| ------ | ----------------- | ---------------------------------------- |
-| POST   | `/api/ai/extract` | Extrae datos del documento usando Gemini |
+| Método | Ruta                   | Descripción                                                                                          |
+| ------ | ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| POST   | `/api/ai/extract`      | Extrae datos del documento usando Gemini                                                             |
+| GET    | `/api/ai/cache-status` | Diagnóstico del SDK activo, modelo, key fingerprint, worker, cache del prompt y últimas extracciones |
+| POST   | `/api/ai/cache-warm`   | Crea/reusa manualmente el cache explícito del prompt para un formato                                 |
 
 **Body:** `multipart/form-data` con `file` y `format`  
 **Autorización:** sesión requerida  
-**Nota:** la API key ya no viaja al navegador; la llamada a Gemini sale desde backend.
+**Respuesta:** `InvoiceData` con `confidenceScore` final; opcionalmente incluye `confidenceReasons[]` y `confidenceAudit` dentro del JSON persistido.
+**Nota:** la API key ya no viaja al navegador; la llamada a Gemini sale desde backend. Por defecto en Docker `GEMINI_EXTRACTION_SDK=genai-router-files` usa el SDK nuevo `@google/genai`, Gemini Files API, clasificador y extractor especializado sin cache. El SDK legacy sigue disponible con `GEMINI_EXTRACTION_SDK=legacy` para rollback y comparación contra el prompt completo anterior. El backend revalida discrepancias matemáticas (`PIECES_TOTAL_MISMATCH`, `EQ_TOTAL_MISMATCH`, `VALUE_TOTAL_MISMATCH`) antes de devolver el score final.
 
 ### Planes (`/api/plans`)
 
@@ -447,11 +559,11 @@ Cada registro documenta un envío a un endpoint externo de integración (test o 
 
 ### Integración (`/api/integrate`)
 
-| Método | Ruta                      | Descripción                                  |
-| ------ | ------------------------- | -------------------------------------------- |
-| POST   | `/api/integrate/test`     | Probar envío a endpoint externo con docs dummy |
+| Método | Ruta                      | Descripción                                        |
+| ------ | ------------------------- | -------------------------------------------------- |
+| POST   | `/api/integrate/test`     | Probar envío a endpoint externo con docs dummy     |
 | POST   | `/api/integrate/send`     | Enviar documentos transformados a endpoint externo |
-| GET    | `/api/integrate/logs/:id` | Listar historial de envíos de una agencia    |
+| GET    | `/api/integrate/logs/:id` | Listar historial de envíos de una agencia          |
 
 **Body (send):** `{ agencyId, documents[], useClientMapping?, source?, exportReference?, exportFilename? }`  
 **Body (test):** `{ agencyId }`  
@@ -481,6 +593,7 @@ Cada registro documenta un envío a un endpoint externo de integración (test o 
 12. **Auditoría de PDFs** — cada batch terminado persiste un registro independiente de `batch_items`; Admin Metrics usa esta tabla como fuente de verdad
 13. **Carga asíncrona de PDFs** — los archivos se guardan en MinIO y SQLite conserva solo metadatos/estado en `document_jobs`
 14. **Worker de documentos** — procesa jobs `QUEUED` en backend y refleja resultados en `batch_items` para conservar compatibilidad con vistas existentes
+15. **Scoring de confianza** — Gemini puede proponer `confidenceReasons`, pero el backend confirma de forma determinística las discrepancias matemáticas y ajusta el `confidenceScore` final antes de persistirlo
 
 ---
 
@@ -511,21 +624,42 @@ PORT=8080 npm run start
 
 ### Variables de Entorno
 
-| Variable                              | Requerida | Descripción                                                   |
-| ------------------------------------- | --------- | ------------------------------------------------------------- |
-| `PORT`                                | No        | Puerto del servidor (default: 3001)                           |
-| `TURSO_DATABASE_URL`                  | No        | URL de Turso remoto (default: archivo local)                  |
-| `TURSO_AUTH_TOKEN`                    | No        | Token de auth de Turso (si es remoto)                         |
-| `GEMINI_API_KEY`                      | Sí        | API key de Google Gemini para IA                              |
-| `MINIO_ROOT_USER`                     | Sí        | Usuario interno de MinIO en Docker Compose                    |
-| `MINIO_ROOT_PASSWORD`                 | Sí        | Password interno de MinIO en Docker Compose                   |
-| `MINIO_BUCKET`                        | No        | Bucket de PDFs (default: `smart-invoices`)                    |
-| `DOCUMENT_UPLOAD_MAX_BYTES`           | No        | Tamaño máximo por PDF (default: 25 MB)                        |
-| `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`     | No        | Tamaño máximo total por carga (default: 100 MB)               |
-| `DOCUMENT_WORKER_ENABLED`             | No        | Activa/desactiva el worker (default: `true`)                  |
-| `DOCUMENT_WORKER_POLL_MS`             | No        | Intervalo de polling del worker (default: 5000)               |
-| `DOCUMENT_WORKER_CONCURRENCY`         | No        | Jobs procesados por ciclo (default: 1, max: 5)                |
-| `DOCUMENT_WORKER_STALE_PROCESSING_MS` | No        | Tiempo para reencolar `PROCESSING` vencidos (default: 30 min) |
+| Variable                                      | Requerida | Descripción                                                                                                           |
+| --------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                                        | No        | Puerto del servidor (default: 3001)                                                                                   |
+| `TURSO_DATABASE_URL`                          | No        | URL de Turso remoto (default: archivo local)                                                                          |
+| `TURSO_AUTH_TOKEN`                            | No        | Token de auth de Turso (si es remoto)                                                                                 |
+| `GEMINI_API_KEY`                              | Sí        | API key de Google Gemini para IA                                                                                      |
+| `GEMINI_MODEL_ID`                             | No        | Modelo Gemini activo (default: `gemini-3-flash-preview`)                                                              |
+| `GEMINI_EXTRACTION_SDK`                       | No        | `genai-router-files` por defecto en Docker; `legacy` para baseline/rollback; `genai` para pruebas con SDK nuevo/cache |
+| `GEMINI_EXTRACTION_PROMPT_PROFILE`            | No        | `full` por defecto; `compact` reduce tokens para pruebas de latencia/costo                                            |
+| `GEMINI_GENERATE_TIMEOUT_MS`                  | No        | Timeout de extracción Gemini (default: 180000)                                                                        |
+| `GEMINI_CACHED_GENERATE_TIMEOUT_MS`           | No        | Timeout del camino con `cachedContent` (default: 180000)                                                              |
+| `GEMINI_MAX_OUTPUT_TOKENS`                    | No        | Limite de salida de Gemini para controlar costo/latencia (default: 4096)                                              |
+| `GEMINI_THINKING_LEVEL`                       | No        | Nivel de thinking: `minimal`, `low`, `medium`, `high` u `off` (default: minimal)                                      |
+| `GEMINI_GENAI_TRANSIENT_RETRY_ATTEMPTS`       | No        | Intentos totales de `genai` ante errores transitorios rápidos (default: 3)                                            |
+| `GEMINI_GENAI_TRANSIENT_RETRY_BASE_DELAY_MS`  | No        | Espera base entre reintentos transitorios de `genai` (default: 15000)                                                 |
+| `GEMINI_LEGACY_TRANSIENT_RETRY_ATTEMPTS`      | No        | Intentos totales de `legacy` ante errores transitorios rápidos (default: 3)                                           |
+| `GEMINI_LEGACY_TRANSIENT_RETRY_BASE_DELAY_MS` | No        | Espera base entre reintentos transitorios de `legacy` (default: 15000)                                                |
+| `GEMINI_PROMPT_CACHE_ENABLED`                 | No        | Activa creación/diagnóstico de cache explícito (default: true)                                                        |
+| `GEMINI_PROMPT_CACHE_USE_FOR_EXTRACTION`      | No        | Usa `cachedContent` con `GEMINI_EXTRACTION_SDK=genai` o `legacy-cache` (default: false)                               |
+| `GEMINI_PROMPT_CACHE_TTL_SECONDS`             | No        | TTL del cache explícito del prompt (default: 14400)                                                                   |
+| `MINIO_ROOT_USER`                             | Sí        | Usuario interno de MinIO en Docker Compose                                                                            |
+| `MINIO_ROOT_PASSWORD`                         | Sí        | Password interno de MinIO en Docker Compose                                                                           |
+| `MINIO_ENDPOINT`                              | No        | Host MinIO/S3-compatible (en Docker Compose: `minio`)                                                                 |
+| `MINIO_PORT`                                  | No        | Puerto MinIO/S3-compatible (default: `9000`)                                                                          |
+| `MINIO_ACCESS_KEY`                            | No        | Access key MinIO; si falta usa `MINIO_ROOT_USER`                                                                      |
+| `MINIO_SECRET_KEY`                            | No        | Secret key MinIO; si falta usa `MINIO_ROOT_PASSWORD`                                                                  |
+| `MINIO_BUCKET`                                | No        | Bucket de PDFs (default: `smart-invoices`)                                                                            |
+| `MINIO_USE_SSL`                               | No        | Activa SSL para MinIO/S3-compatible (default: `false`)                                                                |
+| `DOCUMENT_UPLOAD_MAX_BYTES`                   | No        | Tamaño máximo por PDF (default: 25 MB)                                                                                |
+| `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`             | No        | Tamaño máximo total por carga (default: 100 MB)                                                                       |
+| `DOCUMENT_WORKER_ENABLED`                     | No        | Activa/desactiva el worker (default: `true`)                                                                          |
+| `DOCUMENT_WORKER_POLL_MS`                     | No        | Intervalo de polling del worker (default: 1000)                                                                       |
+| `DOCUMENT_WORKER_CONCURRENCY`                 | No        | Jobs procesados por ciclo (default: 5, max: 5)                                                                        |
+| `DOCUMENT_WORKER_JOB_TIMEOUT_MS`              | No        | Timeout duro por documento (default: 210000)                                                                          |
+| `DOCUMENT_WORKER_STALE_PROCESSING_MS`         | No        | Tiempo para reencolar `PROCESSING` vencidos (default: 4 min)                                                          |
+| `API_KEY`                                     | No        | Fallback legacy para Gemini si no se define `GEMINI_API_KEY`                                                          |
 
 ### Artefactos de despliegue incluidos
 

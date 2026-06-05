@@ -103,13 +103,12 @@ Every token in the prompt costs money. Audit `buildExtractionPrompt()` in `servi
 **Token counting helper:**
 
 ```typescript
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 export async function countTokens(prompt: string, modelId: string): Promise<number> {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: modelId });
-  const result = await model.countTokens(prompt);
-  return result.totalTokens;
+  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  const result = await genAI.models.countTokens({ model: modelId, contents: prompt });
+  return result.totalTokens ?? 0;
 }
 
 // Usage: log before every extraction

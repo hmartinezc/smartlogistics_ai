@@ -21,6 +21,7 @@ interface DocumentWorkerConfig {
   enabled: boolean;
   pollIntervalMs: number;
   concurrency: number;
+  jobTimeoutMs: number;
   staleProcessingMs: number;
 }
 
@@ -39,6 +40,12 @@ export interface DocumentWorkerHandle {
 let activeWorker: DocumentWorker | null = null;
 let transactionQueue: Promise<void> = Promise.resolve();
 
+const DEFAULT_WORKER_CONCURRENCY = 5;
+const MAX_WORKER_CONCURRENCY = 5;
+const DEFAULT_WORKER_POLL_MS = 7_000;
+const DEFAULT_WORKER_JOB_TIMEOUT_MS = 300_000;
+const DEFAULT_STALE_PROCESSING_MS = 2_100_000;
+
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value || fallback);
 
@@ -52,12 +59,29 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
 function getDocumentWorkerConfig(): DocumentWorkerConfig {
   return {
     enabled: String(process.env.DOCUMENT_WORKER_ENABLED || 'true').toLowerCase() !== 'false',
-    pollIntervalMs: parsePositiveInteger(process.env.DOCUMENT_WORKER_POLL_MS, 5000),
-    concurrency: Math.min(parsePositiveInteger(process.env.DOCUMENT_WORKER_CONCURRENCY, 1), 5),
+    pollIntervalMs: parsePositiveInteger(
+      process.env.DOCUMENT_WORKER_POLL_MS,
+      DEFAULT_WORKER_POLL_MS,
+    ),
+    concurrency: Math.min(
+      parsePositiveInteger(process.env.DOCUMENT_WORKER_CONCURRENCY, DEFAULT_WORKER_CONCURRENCY),
+      MAX_WORKER_CONCURRENCY,
+    ),
+    jobTimeoutMs: parsePositiveInteger(
+      process.env.DOCUMENT_WORKER_JOB_TIMEOUT_MS,
+      DEFAULT_WORKER_JOB_TIMEOUT_MS,
+    ),
     staleProcessingMs: parsePositiveInteger(
       process.env.DOCUMENT_WORKER_STALE_PROCESSING_MS,
-      30 * 60 * 1000,
+      DEFAULT_STALE_PROCESSING_MS,
     ),
+  };
+}
+
+export function getDocumentWorkerRuntimeConfig(): DocumentWorkerConfig & { active: boolean } {
+  return {
+    ...getDocumentWorkerConfig(),
+    active: Boolean(activeWorker),
   };
 }
 
@@ -105,6 +129,10 @@ async function listQueuedJobIds(limit: number): Promise<string[]> {
     sql: `SELECT id
           FROM document_jobs
           WHERE status = 'QUEUED'
+            AND (
+              queued_at IS NULL
+              OR unixepoch(queued_at) <= unixepoch('now')
+            )
           ORDER BY COALESCE(queued_at, created_at), created_at
           LIMIT ?`,
     args: [limit],
@@ -144,7 +172,7 @@ async function claimQueuedJobs(
   const claimedJobs: DocumentJobRow[] = [];
 
   for (const jobId of jobIds) {
-    const claimedJob = await claimJob(jobId, workerId, staleProcessingMs);
+    const claimedJob = await claimJob(jobId, `${workerId}:${randomUUID()}`, staleProcessingMs);
     if (claimedJob) {
       claimedJobs.push(claimedJob);
     }
@@ -348,13 +376,14 @@ async function requeueJob(
   job: DocumentJobRow,
   errorMessage: string,
   workerId: string,
+  delayMs = 0,
 ): Promise<void> {
   const database = getDb();
   await database.execute({
     sql: `UPDATE document_jobs SET
             status = 'QUEUED',
             retry_count = retry_count + 1,
-            queued_at = datetime('now'),
+            queued_at = datetime('now', ?),
             started_at = NULL,
             result_json = NULL,
             processed_at = NULL,
@@ -363,7 +392,7 @@ async function requeueJob(
             error = ?,
             updated_at = datetime('now')
           WHERE id = ? AND status = 'PROCESSING' AND locked_by = ?`,
-    args: [errorMessage, getString(job, 'id'), workerId],
+    args: [getSqliteIntervalModifier(delayMs), errorMessage, getString(job, 'id'), workerId],
   });
 }
 
@@ -385,7 +414,7 @@ async function markJobFailure(
     const updateResult = await database.execute({
       sql: `UPDATE document_jobs SET
               status = 'ERROR',
-              retry_count = retry_count + 1,
+              retry_count = max_retries,
               result_json = NULL,
               error = ?,
               processed_at = ?,
@@ -407,6 +436,49 @@ async function markJobFailure(
   });
 }
 
+function isTransientProcessingError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  return (
+    message.includes('499') ||
+    message.includes('429') ||
+    message.includes('503') ||
+    message.includes('504') ||
+    message.includes('cancelled') ||
+    message.includes('deadline_exceeded') ||
+    message.includes('high demand') ||
+    message.includes('operation was cancelled') ||
+    message.includes('overloaded') ||
+    message.includes('resource_exhausted') ||
+    message.includes('timed out') ||
+    message.includes('timeout') ||
+    message.includes('unavailable')
+  );
+}
+
+function getRetryDelayMs(retryCount: number, error: unknown): number {
+  if (!isTransientProcessingError(error)) {
+    return 0;
+  }
+
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const isHighDemandError =
+    message.includes('429') ||
+    message.includes('503') ||
+    message.includes('high demand') ||
+    message.includes('overloaded') ||
+    message.includes('resource_exhausted') ||
+    message.includes('unavailable');
+  const baseDelayMs = isHighDemandError ? 30_000 : 5_000;
+  const maxDelayMs = isHighDemandError ? 180_000 : 60_000;
+  const jitterMs = Math.floor(Math.random() * (isHighDemandError ? 5_000 : 2_000));
+
+  const backoffMs = Math.min(maxDelayMs, baseDelayMs * 2 ** Math.max(0, retryCount));
+  return backoffMs + jitterMs;
+}
+
 async function handleJobError(
   job: DocumentJobRow,
   error: unknown,
@@ -416,29 +488,67 @@ async function handleJobError(
   const publicError = buildPublicProcessingError(errorId);
   const retryCount = getNumber(job, 'retry_count');
   const maxRetries = getNumber(job, 'max_retries', 3);
+  const isTransientError = isTransientProcessingError(error);
 
   console.error(`[${errorId}] Error procesando documento ${getString(job, 'id')}:`, error);
 
-  if (retryCount < maxRetries) {
-    await requeueJob(job, publicError, workerId);
+  // Only transient Gemini/runtime failures should return to the queue.
+  if (isTransientError && retryCount < maxRetries) {
+    await requeueJob(job, publicError, workerId, getRetryDelayMs(retryCount, error));
     return;
   }
 
   await markJobFailure(job, publicError, workerId);
 }
 
-async function processJob(job: DocumentJobRow, workerId: string): Promise<void> {
-  try {
-    const pdfBuffer = await getDocumentObject(getString(job, 'object_key'));
-    const result = await extractInvoiceFromBuffer({
-      buffer: pdfBuffer,
-      mimeType: getString(job, 'mime_type', 'application/pdf'),
-      format: getString(job, 'extraction_format', 'AGENT_GENERIC_A'),
-    });
+async function runJobExtraction(job: DocumentJobRow, lockId: string): Promise<void> {
+  const pdfBuffer = await getDocumentObject(getString(job, 'object_key'));
+  const result = await extractInvoiceFromBuffer({
+    buffer: pdfBuffer,
+    mimeType: getString(job, 'mime_type', 'application/pdf'),
+    format: getString(job, 'extraction_format', 'AGENT_GENERIC_A'),
+    telemetryContext: {
+      agencyId: getString(job, 'agency_id'),
+      batchId: getString(job, 'batch_id'),
+      documentJobId: getString(job, 'id'),
+      originalFileName: getString(job, 'original_file_name'),
+      source: 'document-worker',
+      userEmail: getString(job, 'user_email'),
+      userId: getString(job, 'user_id'),
+      userName: getString(job, 'user_name'),
+    },
+  });
 
-    await markJobSuccess(job, result, workerId);
+  await markJobSuccess(job, result, lockId);
+}
+
+async function runWithTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
+  let timeoutId: NodeJS.Timeout | null = null;
+
+  try {
+    await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Document job timed out after ${timeoutMs}ms.`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+
+    work.catch(() => undefined);
+  }
+}
+
+async function processJob(job: DocumentJobRow, jobTimeoutMs: number): Promise<void> {
+  const lockId = getString(job, 'locked_by');
+  try {
+    await runWithTimeout(runJobExtraction(job, lockId), jobTimeoutMs);
   } catch (error) {
-    await handleJobError(job, error, workerId);
+    await handleJobError(job, error, lockId);
   }
 }
 
@@ -500,7 +610,7 @@ class DocumentWorker {
         return;
       }
 
-      await Promise.allSettled(jobs.map((job) => processJob(job, this.workerId)));
+      await Promise.allSettled(jobs.map((job) => processJob(job, this.config.jobTimeoutMs)));
     } catch (error) {
       console.error('Error en document worker:', error);
     } finally {
@@ -533,7 +643,7 @@ export async function startDocumentWorker(): Promise<DocumentWorkerHandle | null
   activeWorker = new DocumentWorker(config);
   await activeWorker.start();
   console.log(
-    `Document worker activo: concurrency=${config.concurrency}, poll=${config.pollIntervalMs}ms`,
+    `Document worker activo: concurrency=${config.concurrency}, poll=${config.pollIntervalMs}ms, jobTimeout=${config.jobTimeoutMs}ms`,
   );
 
   return activeWorker;

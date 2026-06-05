@@ -49,7 +49,7 @@ Each `.expected.json` contains the ground truth:
 
 ```json
 {
-  "agentType": "AGENT_TCBV",
+  "agentType": "AGENT_GENERIC_A",
   "expectedData": {
     "header": {
       "invoiceNumber": "FAC-2024-001",
@@ -94,8 +94,8 @@ import { AI_CONFIG } from '../../config';
 const GOLDEN_DIR = join(__dirname, '..', 'fixtures', 'invoices', 'golden');
 
 // Mock Gemini API
-vi.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: vi.fn(),
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: vi.fn(),
 }));
 
 describe('Extraction Regression', () => {
@@ -178,10 +178,10 @@ When prompts change, compare extraction quality on the golden set:
 
 ```bash
 # Before making changes, establish baseline
-node scripts/regression/baseline.js --agent AGENT_TCBV --output baseline.json
+node scripts/regression/baseline.js --agent AGENT_GENERIC_A --output baseline.json
 
 # After changes, compare
-node scripts/regression/compare.js --baseline baseline.json --agent AGENT_TCBV
+node scripts/regression/compare.js --baseline baseline.json --agent AGENT_GENERIC_A
 ```
 
 ### Baseline Script: `scripts/regression/baseline.js`

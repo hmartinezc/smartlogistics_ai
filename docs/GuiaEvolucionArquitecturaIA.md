@@ -16,6 +16,7 @@ Esta guia complementa, no reemplaza, estos documentos existentes:
 
 - `docs/AIAgentsFutureUpgradePlan.md` -> diagnostico y direccion de evolucion
 - `docs/AgentScenarios.md` -> reglas y escenarios de razonamiento actuales
+- `docs/AutoPilotAI.md` -> alcance actual y proxima iteracion del ciclo de mejora continua
 - `docs/GuiaReplicacionArquitectura.md` -> patron transaccional general del repo
 
 ---

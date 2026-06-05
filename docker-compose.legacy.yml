@@ -1,0 +1,4 @@
+services:
+  app:
+    environment:
+      GEMINI_EXTRACTION_SDK: legacy

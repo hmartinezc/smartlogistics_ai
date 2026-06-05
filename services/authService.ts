@@ -70,6 +70,7 @@ export const canRoleAccessAppState = (role: UserRole, target: AppState): boolean
   return ![
     AppState.DASHBOARD_OPS,
     AppState.DASHBOARD_ADMIN,
+    AppState.AI_REVIEW,
     AppState.AGENCY_CONFIG,
     AppState.INTEGRATION_CONFIG,
     AppState.USER_MANAGEMENT,

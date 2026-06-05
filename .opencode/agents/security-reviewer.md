@@ -9,7 +9,7 @@ tools:
   bash: true
   grep: true
   glob: true
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.5
 ---
 
 # Security Reviewer

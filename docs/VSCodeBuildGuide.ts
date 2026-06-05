@@ -20,7 +20,7 @@ Esta guía explica cómo descargar este código, compilarlo localmente y usarlo 
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^2.7.0",
     "lucide-react": "^0.300.0"
   },
   "devDependencies": {

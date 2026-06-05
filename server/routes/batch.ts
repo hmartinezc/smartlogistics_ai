@@ -3,6 +3,7 @@
 // ============================================
 
 import { Hono } from 'hono';
+import { randomUUID } from 'node:crypto';
 import type { InValue } from '@libsql/client';
 import {
   maybeNormalizeInvoiceDataAirwaybills,
@@ -15,15 +16,48 @@ import { ensureAgencyAccess, requireAuth } from '../security.js';
 const batch = new Hono();
 
 const AUDITABLE_STATUSES = new Set(['SUCCESS', 'ERROR']);
+const DEFAULT_BATCH_LIST_LIMIT = 100;
+const MAX_BATCH_LIST_LIMIT = 500;
+
+function parseBatchListLimit(value: string | undefined): number {
+  const parsed = Number(value || DEFAULT_BATCH_LIST_LIMIT);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return DEFAULT_BATCH_LIST_LIMIT;
+  }
+
+  return Math.min(parsed, MAX_BATCH_LIST_LIMIT);
+}
+
+function parseBatchResultJson(row: Record<string, unknown>): {
+  error?: string;
+  value?: unknown;
+} {
+  if (!row.result_json) {
+    return {};
+  }
+
+  try {
+    return { value: JSON.parse(String(row.result_json)) };
+  } catch (error) {
+    console.error('Result JSON inválido en batch_items; se omitirá result para este item.', {
+      batchItemId: String(row.id || ''),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { error: 'Resultado guardado inválido. Reprocese el documento.' };
+  }
+}
 
 // Helper: reconstruir BatchItem desde DB row
 function buildBatchItem(row: Record<string, unknown>) {
+  const parsedResult = parseBatchResultJson(row);
+
   return {
     id: String(row.id),
     fileName: String(row.file_name),
     status: String(row.status) as 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'ERROR',
-    result: row.result_json ? JSON.parse(String(row.result_json)) : undefined,
-    error: row.error ? String(row.error) : undefined,
+    result: parsedResult.value,
+    error: row.error ? String(row.error) : parsedResult.error,
     createdAt: row.created_at ? String(row.created_at) : undefined,
     processedAt: row.processed_at ? String(row.processed_at) : undefined,
     user: row.user_email ? String(row.user_email) : undefined,
@@ -103,41 +137,60 @@ function buildAuditStatement(
 
 // GET /api/batch — Listar resultados (con filtro opcional por agencia)
 batch.get('/', async (c) => {
-  const authUser = await requireAuth(c);
-  if (authUser instanceof Response) {
-    return authUser;
-  }
-
-  const db = getDb();
-  const agencyId = c.req.query('agencyId');
-
-  let result;
-  if (agencyId && agencyId !== 'GLOBAL') {
-    const accessError = ensureAgencyAccess(c, authUser, agencyId);
-    if (accessError) {
-      return accessError;
+  try {
+    const authUser = await requireAuth(c);
+    if (authUser instanceof Response) {
+      return authUser;
     }
 
-    result = await db.execute({
-      sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
-            FROM batch_items WHERE agency_id = ? ORDER BY created_at DESC`,
-      args: [agencyId],
-    });
-  } else if (authUser.role !== 'ADMIN') {
-    result = await db.execute({
-      sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
-            FROM batch_items
-            WHERE agency_id IN (${authUser.agencyIds.map(() => '?').join(',')})
-            ORDER BY created_at DESC`,
-      args: authUser.agencyIds,
-    });
-  } else {
-    result = await db.execute(
-      'SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at FROM batch_items ORDER BY created_at DESC',
+    const db = getDb();
+    const agencyId = c.req.query('agencyId');
+    const limit = parseBatchListLimit(c.req.query('limit'));
+
+    let result;
+    if (agencyId && agencyId !== 'GLOBAL') {
+      const accessError = ensureAgencyAccess(c, authUser, agencyId);
+      if (accessError) {
+        return accessError;
+      }
+
+      result = await db.execute({
+        sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
+              FROM batch_items WHERE agency_id = ? ORDER BY created_at DESC LIMIT ?`,
+        args: [agencyId, limit],
+      });
+    } else if (authUser.role !== 'ADMIN') {
+      if (authUser.agencyIds.length === 0) {
+        return c.json([]);
+      }
+
+      result = await db.execute({
+        sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
+              FROM batch_items
+              WHERE agency_id IN (${authUser.agencyIds.map(() => '?').join(',')})
+              ORDER BY created_at DESC LIMIT ?`,
+        args: [...authUser.agencyIds, limit],
+      });
+    } else {
+      result = await db.execute({
+        sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
+              FROM batch_items ORDER BY created_at DESC LIMIT ?`,
+        args: [limit],
+      });
+    }
+
+    return c.json(result.rows.map(buildBatchItem));
+  } catch (error) {
+    const errorId = randomUUID();
+    console.error(`[${errorId}] Error listando batch_items:`, error);
+    return c.json(
+      {
+        error: 'No se pudieron cargar los resultados batch.',
+        errorId,
+      },
+      500,
     );
   }
-
-  return c.json(result.rows.map(buildBatchItem));
 });
 
 // POST /api/batch — Guardar resultados de un batch

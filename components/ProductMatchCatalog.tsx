@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Agency, ProductMatchCatalogItem } from '../types';
 import { api, ApiError } from '../services/apiClient';
+import {
+  clearProductMatchCatalogRequest,
+  getCachedProductMatchCatalog,
+  getProductMatchCatalogCacheVersion,
+  getProductMatchCatalogRequest,
+  invalidateProductMatchCatalogCache,
+  setCachedProductMatchCatalog,
+  setProductMatchCatalogRequest,
+} from '../services/productMatchCatalogCache';
 import { generateId } from '../utils/helpers';
 import {
   AlertCircle,
@@ -56,9 +65,6 @@ const sortMatches = (items: ProductMatchCatalogItem[]) =>
     return left.product.localeCompare(right.product, 'es', { sensitivity: 'base' });
   });
 
-const productMatchCatalogCache = new Map<string, ProductMatchCatalogItem[]>();
-const productMatchCatalogRequests = new Map<string, Promise<ProductMatchCatalogItem[]>>();
-
 type LoadCatalogOptions = {
   force?: boolean;
 };
@@ -66,9 +72,10 @@ type LoadCatalogOptions = {
 const cacheProductMatches = (
   agencyId: string,
   items: ProductMatchCatalogItem[],
+  expectedVersion?: number,
 ): ProductMatchCatalogItem[] => {
   const sortedItems = sortMatches(items);
-  productMatchCatalogCache.set(agencyId, sortedItems);
+  setCachedProductMatchCatalog(agencyId, sortedItems, expectedVersion);
   return sortedItems;
 };
 
@@ -77,6 +84,7 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
   currentAgency,
 }) => {
   const activeAgencyRef = useRef(currentAgencyId);
+  const loadSequenceRef = useRef(0);
   const [items, setItems] = useState<ProductMatchCatalogItem[]>([]);
   const [draft, setDraft] = useState<ProductMatchDraft>(EMPTY_DRAFT);
   const [query, setQuery] = useState('');
@@ -106,13 +114,23 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
 
       if (!currentAgency || agencyId === 'GLOBAL') {
         setItems([]);
+        setIsLoading(false);
+        setInfoMessage(null);
         return;
       }
 
-      const cachedItems = productMatchCatalogCache.get(agencyId);
+      const loadSequence = ++loadSequenceRef.current;
+
+      if (force) {
+        invalidateProductMatchCatalogCache(agencyId);
+      }
+
+      const cachedItems = getCachedProductMatchCatalog(agencyId);
       if (cachedItems && !force) {
         setItems(cachedItems);
+        setIsLoading(false);
         setErrorMessage(null);
+        setInfoMessage(null);
         return;
       }
 
@@ -122,38 +140,44 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
 
       setIsLoading(true);
       setErrorMessage(null);
+      setInfoMessage(null);
 
-      let request = productMatchCatalogRequests.get(agencyId);
+      let request = getProductMatchCatalogRequest(agencyId);
 
       try {
         if (!request || force) {
+          const cacheVersion = getProductMatchCatalogCacheVersion();
           request = api
             .getProductMatches(agencyId)
-            .then((result) => cacheProductMatches(agencyId, result));
-          productMatchCatalogRequests.set(agencyId, request);
+            .then((result) => cacheProductMatches(agencyId, result, cacheVersion));
+          setProductMatchCatalogRequest(agencyId, request);
         }
 
         const result = await request;
-        if (activeAgencyRef.current === agencyId) {
+        if (activeAgencyRef.current === agencyId && loadSequenceRef.current === loadSequence) {
           setItems(result);
         }
       } catch (error) {
-        if (activeAgencyRef.current === agencyId) {
+        if (activeAgencyRef.current === agencyId && loadSequenceRef.current === loadSequence) {
           setErrorMessage(
             error instanceof ApiError ? error.message : 'No fue posible cargar el catálogo.',
           );
         }
       } finally {
-        if (productMatchCatalogRequests.get(agencyId) === request) {
-          productMatchCatalogRequests.delete(agencyId);
-        }
-        if (activeAgencyRef.current === agencyId) {
+        clearProductMatchCatalogRequest(agencyId, request);
+        if (activeAgencyRef.current === agencyId && loadSequenceRef.current === loadSequence) {
           setIsLoading(false);
         }
       }
     },
     [currentAgency, currentAgencyId],
   );
+
+  useEffect(() => {
+    setErrorMessage(null);
+    setInfoMessage(null);
+    resetForm();
+  }, [currentAgencyId, resetForm]);
 
   useEffect(() => {
     if (!currentAgency || currentAgencyId === 'GLOBAL') {
@@ -271,15 +295,19 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
       return;
     }
 
+    const agencyId = currentAgencyId;
     const normalizedDraft = normalizeDraft(draft);
     if (!normalizedDraft.product) {
       setErrorMessage('El campo Descripción Product es obligatorio.');
       return;
     }
 
+    loadSequenceRef.current += 1;
+    invalidateProductMatchCatalogCache(agencyId);
+
     const payload: ProductMatchCatalogItem = {
       id: editingId || generateId('PMATCH'),
-      agencyId: currentAgencyId,
+      agencyId,
       ...normalizedDraft,
       category: normalizedDraft.product,
     };
@@ -293,12 +321,16 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
         ? await api.updateProductMatch(payload)
         : await api.createProductMatch(payload);
 
+      if (activeAgencyRef.current !== agencyId) {
+        return;
+      }
+
       setItems((prev) => {
         const nextItems = editingId
           ? sortMatches(prev.map((item) => (item.id === saved.id ? saved : item)))
           : sortMatches([...prev, saved]);
 
-        productMatchCatalogCache.set(currentAgencyId, nextItems);
+        setCachedProductMatchCatalog(agencyId, nextItems);
         return nextItems;
       });
 
@@ -307,11 +339,15 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
       );
       resetForm();
     } catch (error) {
-      setErrorMessage(
-        error instanceof ApiError ? error.message : 'No fue posible guardar el match.',
-      );
+      if (activeAgencyRef.current === agencyId) {
+        setErrorMessage(
+          error instanceof ApiError ? error.message : 'No fue posible guardar el match.',
+        );
+      }
     } finally {
-      setIsSaving(false);
+      if (activeAgencyRef.current === agencyId) {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -320,15 +356,23 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
       return;
     }
 
+    const agencyId = currentAgencyId;
+    loadSequenceRef.current += 1;
+    invalidateProductMatchCatalogCache(agencyId);
+
     setDeletingId(item.id);
     setErrorMessage(null);
     setInfoMessage(null);
 
     try {
       await api.deleteProductMatch(item.id);
+      if (activeAgencyRef.current !== agencyId) {
+        return;
+      }
+
       setItems((prev) => {
         const nextItems = prev.filter((currentItem) => currentItem.id !== item.id);
-        productMatchCatalogCache.set(currentAgencyId, nextItems);
+        setCachedProductMatchCatalog(agencyId, nextItems);
         return nextItems;
       });
       if (editingId === item.id) {
@@ -336,11 +380,15 @@ const ProductMatchCatalog: React.FC<ProductMatchCatalogProps> = ({
       }
       setInfoMessage('Match eliminado correctamente.');
     } catch (error) {
-      setErrorMessage(
-        error instanceof ApiError ? error.message : 'No fue posible eliminar el match.',
-      );
+      if (activeAgencyRef.current === agencyId) {
+        setErrorMessage(
+          error instanceof ApiError ? error.message : 'No fue posible eliminar el match.',
+        );
+      }
     } finally {
-      setDeletingId(null);
+      if (activeAgencyRef.current === agencyId) {
+        setDeletingId(null);
+      }
     }
   };
 

@@ -2,7 +2,7 @@
 name: loop-operator
 description: Manage iterative refinement loops for AI extraction quality. Run extraction, evaluate results, identify issues, fix prompts/schema, repeat.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.4
 permission:
   read: allow
   grep: allow

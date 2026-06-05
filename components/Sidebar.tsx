@@ -17,6 +17,7 @@ import {
   Search,
   Globe,
   Settings,
+  FileWarning,
 } from './Icons';
 import { AppState, UserRole, Agency } from '../types';
 import { canRoleAccessAppState } from '../services/authService';
@@ -173,6 +174,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       desc: 'Resultados Auditados',
     },
     {
+      id: AppState.PENDING_PRODUCT_MATCHES,
+      label: 'Pendientes Match',
+      icon: FileWarning,
+      desc: 'Productos sin equivalencia',
+    },
+    {
       id: AppState.PRODUCT_MATCHES,
       label: 'Match Productos',
       icon: Search,
@@ -201,6 +208,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Admin Metrics',
       icon: Shield,
       desc: 'Consumo IA y Costos',
+    });
+
+    menuItems.push({
+      id: AppState.AI_REVIEW,
+      label: 'AutoPilot AI',
+      icon: BrainCircuit,
+      desc: 'Revisión y Aprendizaje',
     });
 
     menuItems.push({

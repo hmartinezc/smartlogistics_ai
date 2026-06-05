@@ -6,7 +6,8 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { InValue } from '@libsql/client';
 import { getDb } from '../db.js';
-import { ensureAgencyAccess, requireAuth } from '../security.js';
+import { ensureAgencyAccess, requireAuth, requireRole } from '../security.js';
+import { listGeminiExtractionEvents } from '../services/geminiExtractionEvents.js';
 
 const audit = new Hono();
 
@@ -95,6 +96,40 @@ function appendDateFilter(c: Context, where: string[], args: InValue[]): Respons
   return null;
 }
 
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseBooleanFilter(value: string | undefined): boolean | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value === 'true' || value === '1') {
+    return true;
+  }
+
+  if (value === 'false' || value === '0') {
+    return false;
+  }
+
+  return undefined;
+}
+
+function validateOptionalDate(c: Context, name: 'from' | 'to'): Response | null {
+  const value = c.req.query(name);
+  if (value && !DATE_RE.test(value)) {
+    return c.json({ error: `El parámetro ${name} debe tener formato YYYY-MM-DD.` }, 400);
+  }
+
+  return null;
+}
+
 // GET /api/audit/document-processing
 audit.get('/document-processing', async (c) => {
   const authUser = await requireAuth(c);
@@ -136,6 +171,51 @@ audit.get('/document-processing', async (c) => {
 
   const result = await getDb().execute({ sql, args });
   return c.json(result.rows.map(buildAuditEntry));
+});
+
+// GET /api/audit/gemini-extraction-events
+audit.get('/gemini-extraction-events', async (c) => {
+  const authUser = await requireAuth(c);
+  if (authUser instanceof Response) {
+    return authUser;
+  }
+
+  const roleError = requireRole(c, authUser, ['ADMIN']);
+  if (roleError) {
+    return roleError;
+  }
+
+  const fromError = validateOptionalDate(c, 'from');
+  if (fromError) {
+    return fromError;
+  }
+
+  const toError = validateOptionalDate(c, 'to');
+  if (toError) {
+    return toError;
+  }
+
+  const successRaw = c.req.query('success');
+  const success = parseBooleanFilter(successRaw);
+  if (successRaw && success === undefined) {
+    return c.json({ error: 'El parámetro success debe ser true, false, 1 o 0.' }, 400);
+  }
+
+  const response = await listGeminiExtractionEvents({
+    agencyId: c.req.query('agencyId'),
+    from: c.req.query('from'),
+    jobId: c.req.query('jobId'),
+    limit: parsePositiveInt(c.req.query('limit')),
+    model: c.req.query('model'),
+    offset: parsePositiveInt(c.req.query('offset')),
+    routerCategory: c.req.query('routerCategory'),
+    sdk: c.req.query('sdk'),
+    stage: c.req.query('stage'),
+    success,
+    to: c.req.query('to'),
+  });
+
+  return c.json(response);
 });
 
 export default audit;

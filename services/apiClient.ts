@@ -1,3 +1,5 @@
+import { invalidateProductMatchCatalogCache } from './productMatchCatalogCache';
+
 // ============================================
 // API CLIENT — Capa de comunicación con el backend
 // ============================================
@@ -17,6 +19,11 @@ function getSessionId(): string | null {
 }
 
 function setSessionId(id: string | null): void {
+  const previousSessionId = _sessionId ?? localStorage.getItem('smart-invoice-ai.sessionId');
+  if (previousSessionId !== id) {
+    invalidateProductMatchCatalogCache();
+  }
+
   _sessionId = id;
   if (id) {
     localStorage.setItem('smart-invoice-ai.sessionId', id);
@@ -160,6 +167,21 @@ export const api = {
   // ── Product Matches ──
   async getProductMatches(agencyId: string): Promise<import('../types').ProductMatchCatalogItem[]> {
     return request(`/product-matches?agencyId=${encodeURIComponent(agencyId)}`);
+  },
+
+  async getPendingProductMatches(
+    agencyId: string,
+  ): Promise<import('../types').PendingProductMatchResponse> {
+    return request(`/product-matches/pending?agencyId=${encodeURIComponent(agencyId)}`);
+  },
+
+  async createPendingProductMatch(
+    item: import('../types').PendingProductMatchCreateInput,
+  ): Promise<import('../types').ProductMatchCatalogItem> {
+    return request('/product-matches/pending', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    });
   },
 
   async createProductMatch(
@@ -309,6 +331,82 @@ export const api = {
     return request(`/audit/document-processing${query ? `?${query}` : ''}`);
   },
 
+  async getGeminiExtractionEvents(
+    params: import('../types').GeminiExtractionEventQuery = {},
+  ): Promise<import('../types').GeminiExtractionEventListResponse> {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        search.set(key, String(value));
+      }
+    });
+
+    const query = search.toString();
+    return request(`/audit/gemini-extraction-events${query ? `?${query}` : ''}`);
+  },
+
+  // ── AI Review / Mejora continua ──
+  async getLatestAiReviewRun(
+    params: {
+      agencyId?: string;
+      date?: string;
+    } = {},
+  ): Promise<import('../types').AiReviewRunResponse> {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        search.set(key, String(value));
+      }
+    });
+
+    const query = search.toString();
+    return request(`/ai-review/runs/latest${query ? `?${query}` : ''}`);
+  },
+
+  async createAiReviewRun(input: {
+    agencyId?: string;
+    reviewDate: string;
+  }): Promise<import('../types').AiReviewRunResponse> {
+    return request('/ai-review/runs', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async getAiReviewRun(id: string): Promise<import('../types').AiReviewRunResponse> {
+    return request(`/ai-review/runs/${encodeURIComponent(id)}`);
+  },
+
+  async getAiReviewItem(id: string): Promise<import('../types').AiReviewDetailResponse> {
+    return request(`/ai-review/items/${encodeURIComponent(id)}`);
+  },
+
+  async analyzeAiReviewItem(id: string): Promise<import('../types').AiReviewAnalyzeResponse> {
+    return request(`/ai-review/items/${encodeURIComponent(id)}/analyze`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async getAiReviewItemPdfBlobUrl(itemId: string): Promise<string> {
+    const sessionId = getSessionId();
+    const headers: Record<string, string> = {};
+    if (sessionId) {
+      headers['X-Session-Id'] = sessionId;
+    }
+
+    const response = await fetch(`${API_BASE}/ai-review/items/${encodeURIComponent(itemId)}/pdf`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Error al cargar el PDF.' }));
+      throw new ApiError(body.error || response.statusText, response.status);
+    }
+
+    return URL.createObjectURL(await response.blob());
+  },
+
   // ── Documents / Background AI queue ──
   async getDocuments(
     params: import('../types').DocumentListQuery = {},
@@ -368,6 +466,28 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify(input),
     });
+  },
+
+  async getDocumentPreviewBlobUrl(documentJobId: string): Promise<string> {
+    const sessionId = getSessionId();
+    const headers: Record<string, string> = {};
+    if (sessionId) {
+      headers['X-Session-Id'] = sessionId;
+    }
+
+    const response = await fetch(
+      `${API_BASE}/documents/${encodeURIComponent(documentJobId)}/preview`,
+      {
+        headers,
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Error al cargar el PDF.' }));
+      throw new ApiError(body.error || response.statusText, response.status);
+    }
+
+    return URL.createObjectURL(await response.blob());
   },
 
   // ── Operational ──

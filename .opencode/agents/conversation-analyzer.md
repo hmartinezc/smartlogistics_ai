@@ -2,7 +2,7 @@
 name: conversation-analyzer
 description: Analyze agent session transcripts to extract reusable patterns, detect repeated mistakes, and identify behaviors worth codifying as skills or rules.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.4
 permission:
   read: allow
   grep: allow

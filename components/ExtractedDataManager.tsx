@@ -678,7 +678,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
         </div>
 
         {/* Card List */}
-        <div className="flex-1 overflow-auto p-4 space-y-3">
+        <div className="app-scroll flex-1 overflow-auto p-4 space-y-3">
           {filteredResults.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-6 py-14 text-slate-400">
               <FileText className="w-12 h-12 mb-4 opacity-30" />

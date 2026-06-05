@@ -17,9 +17,11 @@ import ExtractedDataManager from './components/ExtractedDataManager';
 import DashboardHome from './components/DashboardHome';
 import OperatorPanel from './components/OperatorPanel';
 import AdminDashboard from './components/AdminDashboard';
+import AIReviewDashboard from './components/AIReviewDashboard';
 import UserManagement from './components/UserManagement';
 import AgenciesConfiguration from './components/AgenciesConfiguration';
 import IntegrationConfig from './components/IntegrationConfig';
+import PendingProductMatches from './components/PendingProductMatches';
 import ProductMatchCatalog from './components/ProductMatchCatalog';
 import Sidebar from './components/Sidebar';
 import { X } from './components/Icons';
@@ -135,7 +137,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
       ![
         AppState.DASHBOARD_OPS,
         AppState.DASHBOARD_ADMIN,
+        AppState.AI_REVIEW,
         AppState.DASHBOARD_PANEL,
+        AppState.PENDING_PRODUCT_MATCHES,
         AppState.PRODUCT_MATCHES,
         AppState.PROCESS_SELECTION,
         AppState.INTEGRATION_CONFIG,
@@ -413,6 +417,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 {appState === AppState.DASHBOARD_ADMIN && currentUser?.role === 'ADMIN' && (
                   <AdminDashboard agencies={agencies} plans={PLANS} />
                 )}
+                {appState === AppState.AI_REVIEW && currentUser?.role === 'ADMIN' && (
+                  <AIReviewDashboard agencies={agencies} />
+                )}
                 {/* TODO: Re-enable when Conciliación y Log is ready */}
                 {/* appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (
                   <DashboardHome
@@ -456,6 +463,12 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 )}
                 {appState === AppState.PRODUCT_MATCHES && currentUser && (
                   <ProductMatchCatalog
+                    currentAgencyId={currentAgencyId}
+                    currentAgency={currentAgency}
+                  />
+                )}
+                {appState === AppState.PENDING_PRODUCT_MATCHES && currentUser && (
+                  <PendingProductMatches
                     currentAgencyId={currentAgencyId}
                     currentAgency={currentAgency}
                   />

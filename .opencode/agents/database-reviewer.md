@@ -2,7 +2,7 @@
 name: database-reviewer
 description: Database schema, migration, and query review specialist for libSQL/SQLite. Use PROACTIVELY when changing server/schema.ts, writing migrations, adding queries, or reviewing database performance.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.4
 permission:
   read: allow
   grep: allow

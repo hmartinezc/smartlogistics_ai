@@ -23,6 +23,10 @@ Este documento describe:
 
 No implementa cambios en la aplicacion. Es solo una especificacion tecnica.
 
+## Nota actual: AutoPilot AI
+
+La primera base runtime de mejora continua ya existe como `AutoPilot AI`. Su alcance actual y la siguiente iteracion recomendada estan documentados en `docs/AutoPilotAI.md`.
+
 ## 1. Estado actual del sistema
 
 ## 1.1 Flujo actual de extremo a extremo
@@ -32,30 +36,29 @@ Hoy el flujo funciona asi:
 1. El usuario inicia sesion en la aplicacion.
 2. El frontend guarda el `sessionId` y luego lo envia al backend en `X-Session-Id`.
 3. El usuario carga uno o varios archivos en la interfaz.
-4. El componente batch del frontend procesa los archivos uno por uno.
-5. Por cada archivo, el frontend llama al endpoint `POST /api/ai/extract`.
+4. En el flujo directo, el frontend llama a `POST /api/ai/extract` con `file` y `format`.
+5. En el flujo en cola, el frontend llama a `/api/documents/upload` y el worker procesa los documentos despues.
 6. El backend valida la sesion.
-7. El backend arma un prompt a partir del tipo de agente seleccionado.
+7. El backend arma el prompt centralizado usando `buildExtractionPrompt(format)`.
 8. El backend envia archivo + prompt al modelo Gemini.
-9. Gemini responde en JSON estructurado usando un schema.
-10. El backend devuelve ese JSON al frontend.
-11. El frontend muestra el progreso item por item localmente.
-12. Cuando termina todo el lote, `App.tsx` agrega metadatos de usuario y agencia.
-13. Despues de eso, el frontend persiste el lote completo en la API.
+9. Gemini responde en JSON estructurado usando `invoiceExtractionSchema`.
+10. El backend valida estructura minima y recalcula discrepancias de confianza.
+11. En el flujo worker, se normalizan MAWB/HAWB y se persiste el resultado.
+12. El frontend muestra estado, resultado e historial para revision operativa.
 
 ## 1.2 Donde vive cada responsabilidad hoy
 
 ### Frontend
 
-- Orquesta el procesamiento batch.
-- Decide el orden de procesamiento.
-- Hace una llamada por archivo.
-- Controla el progreso visual.
-- Al finalizar el lote, agrega metadatos y persiste resultados procesados al backend.
+- Permite seleccionar agencia, cargar PDFs y elegir el formato activo.
+- Muestra estado de carga, cola, procesamiento, errores y resultados.
+- Conserva el flujo directo legacy mediante `BatchProcessor.tsx` para llamadas a `/api/ai/extract`.
+- En el flujo actual de workspace, delega la cola persistente al backend.
 
 Archivos principales relacionados:
 
 - `components/BatchProcessor.tsx`
+- `components/DocumentProcessingWorkspace.tsx`
 - `App.tsx`
 - `hooks/index.ts`
 
@@ -66,11 +69,16 @@ Archivos principales relacionados:
 - Construye el prompt.
 - Llama a Gemini.
 - Exige salida JSON compatible con schema.
+- Recalcula discrepancias de confianza para piezas, EQ y valor.
+- Procesa documentos en background mediante `documentWorker` cuando se usa la cola persistente.
 - Devuelve el resultado o un error.
 
-Archivo principal relacionado:
+Archivos principales relacionados:
 
 - `server/routes/ai.ts`
+- `server/routes/documents.ts`
+- `server/services/documentExtractionService.ts`
+- `server/workers/documentWorker.ts`
 
 ### Definicion de prompts
 
@@ -114,24 +122,26 @@ Esto significa que el sistema actual ya tiene una buena base porque:
 
 ## 2.2 Tipos de agentes actuales
 
-Actualmente existen configuraciones como:
+Actualmente el agente activo de extraccion es:
 
-- `AGENT_TCBV`
 - `AGENT_GENERIC_A`
+
+Tambien existen agentes reservados/deshabilitados para evolucion futura:
+
 - `AGENT_GENERIC_B`
 - `AGENT_CUSTOMS`
 
-En la practica, hoy los agentes activos son pocos y la diferenciacion real es limitada.
+En la practica, hoy el prompt operativo vive en `AGENT_GENERIC_A`.
 
 La diferencia principal actual es esta:
 
-- `AGENT_TCBV` y `AGENT_GENERIC_A` activan `ADVANCED_DISTRIBUTION_LOGIC`.
-- Los demas usan casi el mismo prompt base sin especializacion profunda.
+- `AGENT_GENERIC_A` activa `ADVANCED_DISTRIBUTION_LOGIC`.
+- `AGENT_GENERIC_B` y `AGENT_CUSTOMS` permanecen como reservas deshabilitadas.
 
 Conclusion tecnica:
 
-- Hoy existe un sistema de agentes, pero todavia no es una arquitectura de agentes especializada por pipeline.
-- En realidad es un sistema de variantes de prompt sobre un mismo flujo de extraccion.
+- Hoy existe un agente principal de factura general, no una arquitectura multi-agente especializada.
+- Las variantes futuras deben agregarse solo cuando tengan reglas reales distintas y pruebas de regresion.
 
 ## 2.3 Fortalezas actuales
 
@@ -153,18 +163,20 @@ Conclusion tecnica:
 
 ## 3.1 Orquestacion actual
 
-El procesamiento batch actual ocurre en el frontend.
+El procesamiento puede ocurrir por dos rutas:
 
-Eso significa que:
+- Ruta directa legacy: `BatchProcessor.tsx` llama a `/api/ai/extract` por archivo.
+- Ruta actual de workspace: `DocumentProcessingWorkspace.tsx` sube PDFs a `/api/documents/upload` y `documentWorker` procesa la cola persistente.
 
-- El navegador mantiene la cola.
-- El navegador decide cuando enviar cada archivo.
-- Se hace un loop secuencial de un archivo por vez.
-- Hay una pausa artificial de 500 ms entre archivos.
+En la ruta de workspace:
 
-Esto hoy esta implementado en `components/BatchProcessor.tsx`.
+- El backend conserva jobs persistentes por agencia y lote.
+- El worker lee el PDF almacenado, llama a Gemini y guarda el JSON resultante.
+- Los estados `UPLOADED`, `QUEUED`, `PROCESSING`, `SUCCESS`, `ERROR` y `CANCELLED` permiten seguimiento operativo.
 
-El guardado definitivo del lote y la adicion de metadatos ocurre despues en `App.tsx` y `hooks/index.ts`.
+Esto hoy esta implementado principalmente en `components/DocumentProcessingWorkspace.tsx`, `server/routes/documents.ts` y `server/workers/documentWorker.ts`.
+
+`components/BatchProcessor.tsx` se mantiene como flujo directo compatible, pero no representa la ruta principal de cola persistente.
 
 ## 3.2 Que pasa cuando el usuario sube 20 archivos
 

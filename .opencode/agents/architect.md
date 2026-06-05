@@ -2,7 +2,7 @@
 name: architect
 description: System architecture specialist for Hono + React + libSQL + Gemini stack. Use when making architecture decisions, designing new subsystems, or evaluating trade-offs.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.5
 permission:
   read: allow
   grep: allow

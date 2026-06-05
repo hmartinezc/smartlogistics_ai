@@ -1,50 +1,38 @@
 export const WORKFLOW_DOCS = `
 # Documentación del Flujo de Trabajo (Workflow Logic)
 
-Este documento detalla la lógica secuencial y las decisiones algorítmicas que toma la aplicación para procesar un documento PDF.
+Este documento detalla la lógica secuencial y las decisiones algorítmicas actuales para procesar facturas PDF con Gemini.
 
 ## 1. Fase de Selección (Frontend)
-El proceso comienza antes de subir el archivo. El usuario selecciona un **Perfil de Aerolínea** (Botones 369, 406, 729, etc.).
-*   **Variable Clave**: \`selectedFormat\` (e.g., '369' | '406_016' | '729' | '865_GROUP').
-*   **Propósito**: Esta selección actúa como un "switch" que determina qué set de reglas se enviarán a la IA.
+El usuario carga uno o varios PDFs desde el módulo de procesamiento de facturas.
+*   **Variable clave**: \`selectedFormat\` / \`format\`.
+*   **Agente activo**: \`AGENT_GENERIC_A\` (Factura General).
+*   **Propósito**: usar un único prompt general para facturas comerciales de logística perecedera, con reglas de extracción, matemática y validación.
 
 ## 2. Fase de Pre-Procesamiento
-1.  **Conversión**: El archivo PDF se convierte a **Base64** (cadena de texto) para poder viajar vía API.
-2.  **Inyección de Prompt (Dynamic Context Injection)**:
-    En \`services/geminiService.ts\`, el sistema evalúa la variable \`selectedFormat\` e inyecta un bloque de texto específico:
-
-    *   **Si es 369 (Atlas/Polar)**:
-        *   *Instrucción*: "Busca columnas llamadas EQ, POS o ULD".
-        *   *Objetivo*: Diferenciar piezas sueltas de Pallets.
-    
-    *   **Si es 406 (UPS)**:
-        *   *Instrucción*: "Busca la columna Type. 'P'=Full, 'L'=Loose".
-        *   *Objetivo*: UPS mezcla tipos en la misma tabla.
-    
-    *   **Si es 729 (Avianca)**:
-        *   *Instrucción*: "Selecciona solo una temperatura (no rangos). Asume Fulls=0 si no hay columna explícita".
-        *   *Objetivo*: Limpieza de datos numéricos.
-
-    *   **Si es 865/176 (Aerosan/Otros)**:
-        *   *Instrucción*: "Realiza cálculo matemático (Prorrateo). PesoItem = (PiezasItem / TotalPiezas) * PesoTotal".
-        *   *Objetivo*: Resolver la falta de pesos individuales en estos formatos.
+1.  **Carga directa**: \`/api/ai/extract\` recibe \`multipart/form-data\` con \`file\` y \`format\`.
+2.  **Carga en background**: \`/api/documents/upload\` guarda PDFs y \`documentWorker\` los procesa en cola.
+3.  **Estrategia IA**: \`server/services/documentExtractionService.ts\` selecciona el modo con \`GEMINI_EXTRACTION_SDK\`.
+4.  **Legacy/genai directo**: el backend convierte el PDF a Base64 y lo envía a Gemini como \`inlineData\` junto con \`buildExtractionPrompt(format)\`.
+5.  **Router Files**: si \`GEMINI_EXTRACTION_SDK=genai-router-files\`, el backend sube el PDF una sola vez con Gemini Files API, clasifica el formato, extrae con el prompt corto de esa categoria y borra el archivo remoto en \`finally\`.
+6.  **Schema**: se fuerza salida JSON con \`shared/extractionSchema.ts\`.
 
 ## 3. Fase de Ejecución (AI Vision)
-Se envía a Google Cloud:
+Se envía a Gemini:
 *   **Modelo**: \`gemini-3-flash-preview\`
-*   **Payload**: [Imagen del PDF] + [Prompt Genérico] + [Prompt Específico Inyectado]
-*   **Configuración**: \`thinkingBudget: 1024\` (Le da tiempo a la IA para razonar matemáticas y tablas complejas).
+*   **Payload**: [PDF en Base64] + [Prompt de extracción]
+*   **Configuración**: \`responseMimeType: application/json\` y \`responseSchema: invoiceExtractionSchema\`.
+*   **Alternativa sin cache**: \`genai-router-files\` usa \`gemini-3.1-flash-lite\` para clasificar y \`gemini-3-flash-preview\` para extraer, \`thinkingLevel: minimal\`, \`responseSchema\` estricto y reutiliza la URI de Files API entre las dos llamadas.
 
 ## 4. Fase de Post-Procesamiento (Validación)
-La IA devuelve un JSON estricto. La aplicación (React) lo recibe y:
-1.  **Pinta el Formulario**: Muestra los datos extraídos.
-2.  **Auto-Cálculo (Hooks)**:
-    *   Si el usuario edita una dimensión, se recalcula el Peso Volumétrico automáticamente.
-    *   Si se editan filas, se recalculan los Totales del encabezado (Piezas, Peso).
+La IA devuelve un JSON estricto y el backend valida la estructura mínima esperada.
+1.  **Validación de confianza**: el backend recalcula discrepancias de piezas, EQ y valor total.
+2.  **Normalización**: en procesamiento por worker se normalizan MAWB/HAWB antes de persistir.
+3.  **Revisión UI**: el usuario revisa los datos extraídos en pantalla antes de exportar o integrar.
 
 ## 5. Fase de Exportación
 Al aprobar:
 1.  Se genera un objeto JSON final.
-2.  Se añade metadata (fecha, fuente).
-3.  Se descarga el archivo para integración con Base de Datos.
+2.  Se añade metadata operativa del documento/procesamiento.
+3.  Se descarga o se envía a integración según la configuración de agencia.
 `;

@@ -14,7 +14,7 @@
 
 - The extraction flow follows: `File Upload → Agent Selection → Prompt Construction → Gemini API → Response Validation → Storage`.
 - Agent prompts are assembled by `buildExtractionPrompt()` using composable knowledge base sections.
-- Each agent type (`AGENT_TCBV`, `AGENT_GENERIC_A`, etc.) adds its specific sections on top of the base prompt.
+- `AGENT_GENERIC_A` is the active extraction agent; disabled future agents should only add sections when they have real distinct rules and regression coverage.
 
 ### Frontend (React)
 

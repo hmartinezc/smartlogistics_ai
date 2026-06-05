@@ -1,4 +1,4 @@
-import { SchemaType, type Schema } from '@google/generative-ai';
+import { Type as SchemaType, type Schema } from '@google/genai';
 
 export const invoiceExtractionSchema: Schema = {
   type: SchemaType.OBJECT,
@@ -36,7 +36,25 @@ export const invoiceExtractionSchema: Schema = {
     },
     confidenceScore: {
       type: SchemaType.NUMBER,
-      description: 'Calculated reliability score (0-100). Subtract points if Math mismatches.',
+      description:
+        'Model visual reliability score (0-100). Backend recalculates math penalties after extraction.',
+    },
+    confidenceReasons: {
+      type: SchemaType.ARRAY,
+      description:
+        'Only visual/OCR/table ambiguity reason codes from the model. Backend adds messages and penalties.',
+      maxItems: '3',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          code: {
+            type: SchemaType.STRING,
+            description:
+              'One of: OCR_UNCERTAIN, MISSING_FIELD, AMBIGUOUS_TABLE, DOCUMENT_INCOMPLETE, OTHER.',
+          },
+        },
+        required: ['code'],
+      },
     },
     lineItems: {
       type: SchemaType.ARRAY,

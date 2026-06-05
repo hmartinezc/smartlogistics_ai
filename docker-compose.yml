@@ -8,6 +8,34 @@ services:
     environment:
       PORT: '3001'
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL_ID: gemini-3-flash-preview
+      GEMINI_EXTRACTION_SDK: genai-router-files
+      GEMINI_EXTRACTION_PROMPT_PROFILE: full
+      GEMINI_EXTRACTION_FALLBACK_TO_LEGACY_ON_TRANSIENT_ERROR: 'false'
+      GEMINI_GENERATE_TIMEOUT_MS: '180000'
+      GEMINI_CACHED_GENERATE_TIMEOUT_MS: '180000'
+      GEMINI_MAX_OUTPUT_TOKENS: '4096'
+      GEMINI_AI_REVIEW_MODEL_ID: gemini-3-flash-preview
+      GEMINI_ROUTER_MODEL_ID: gemini-3.1-flash-lite
+      GEMINI_ROUTER_EXTRACTOR_MODEL_ID: gemini-3-flash-preview
+      GEMINI_ROUTER_CLASSIFIER_CONFIDENCE_THRESHOLD: '0.7'
+      GEMINI_ROUTER_CLASSIFIER_MAX_OUTPUT_TOKENS: '512'
+      GEMINI_ROUTER_CLASSIFIER_MEDIA_RESOLUTION: medium
+      GEMINI_ROUTER_CLASSIFIER_THINKING_LEVEL: medium
+      GEMINI_ROUTER_CLASSIFIER_TIMEOUT_MS: '45000'
+      GEMINI_ROUTER_EXTRACTOR_TIMEOUT_MS: '180000'
+      GEMINI_THINKING_LEVEL: minimal
+      GEMINI_GENAI_TRANSIENT_RETRY_ATTEMPTS: '3'
+      GEMINI_GENAI_TRANSIENT_RETRY_BASE_DELAY_MS: '15000'
+      GEMINI_LEGACY_TRANSIENT_RETRY_ATTEMPTS: '3'
+      GEMINI_LEGACY_TRANSIENT_RETRY_BASE_DELAY_MS: '15000'
+      GEMINI_PROMPT_CACHE_ENABLED: 'true'
+      GEMINI_PROMPT_CACHE_USE_FOR_EXTRACTION: 'false'
+      GEMINI_PROMPT_CACHE_AUTO_WARM_ENABLED: 'false'
+      GEMINI_PROMPT_CACHE_TRANSIENT_FALLBACK_TO_UNCACHED: 'false'
+      GEMINI_PROMPT_CACHE_TTL_SECONDS: '14400'
+      GEMINI_PROMPT_CACHE_FAILURE_COOLDOWN_SECONDS: '600'
+      GEMINI_PROMPT_CACHE_CREATE_TIMEOUT_MS: '60000'
       TURSO_DATABASE_URL: file:./data/smart-invoice.db
       MINIO_ENDPOINT: minio
       MINIO_PORT: '9000'
@@ -17,22 +45,16 @@ services:
       MINIO_USE_SSL: 'false'
       DOCUMENT_WORKER_ENABLED: 'true'
       DOCUMENT_WORKER_CONCURRENCY: '5'
-      DOCUMENT_WORKER_POLL_MS: '5000'
-      DOCUMENT_WORKER_STALE_PROCESSING_MS: '1800000'
+      DOCUMENT_WORKER_POLL_MS: '7000'
+      DOCUMENT_WORKER_JOB_TIMEOUT_MS: '300000'
+      DOCUMENT_WORKER_STALE_PROCESSING_MS: '2100000'
     volumes:
       - app_data:/app/data
     depends_on:
       - minio
     healthcheck:
       test:
-        [
-          'CMD',
-          'wget',
-          '--no-verbose',
-          '--tries=1',
-          '--spider',
-          'http://localhost:3001/api/health',
-        ]
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3001/api/health']
       interval: 30s
       timeout: 10s
       start_period: 20s

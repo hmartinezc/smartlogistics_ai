@@ -1,7 +1,7 @@
 ---
 description: Validación completa pre-deploy — ejecuta typecheck, build, scan-secrets y revisa documentación
 agent: build
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.4
 ---
 
 Ejecuta esta checklist de validación pre-deploy para el proyecto Smart Logistics Extractor:
@@ -56,7 +56,7 @@ Confirma que el Dockerfile incluya:
 - [ ] Multi-stage build (builder + runner)
 - [ ] `dumb-init` como ENTRYPOINT
 - [ ] HEALTHCHECK con wget a `/api/health`
-- [ ] `USER` no-root (nodejs)
+- [ ] `USER` no-root (nodejs) o excepción documentada para este repo cuando Coolify monta `/app/data` con SQLite persistido y cambiar de usuario rompe permisos
 - [ ] `VOLUME ["/app/data"]`
 - [ ] `npm ci --omit=dev` en stage runner
 

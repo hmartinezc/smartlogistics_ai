@@ -2,7 +2,7 @@
 name: performance-optimizer
 description: Performance optimization specialist for the full stack — Gemini API costs, React re-renders, libSQL queries, and bundle size.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.5
 permission:
   read: allow
   grep: allow

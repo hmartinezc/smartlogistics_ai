@@ -29,6 +29,11 @@ Ventajas:
 - crea MinIO junto a la aplicacion en la misma red interna
 - deja un arranque consistente entre local, Coolify y Hetzner
 
+Nota operativa:
+
+- El `Dockerfile` actual mantiene el usuario por defecto del contenedor en runtime para evitar problemas de permisos con volúmenes ya existentes en `/app/data`. No cambies eso a no-root sin validar primero ownership/migración del volumen.
+- En este proyecto eso NO debe tratarse como fallo de pre-deploy por sí solo. Es una decisión operativa consciente para compatibilidad con Coolify + SQLite persistido en volumen.
+
 ## Configuracion exacta en Coolify
 
 ### Crear servicio
@@ -50,20 +55,52 @@ Ventajas:
 
 Carga estas variables en Coolify:
 
-| Variable                              | Requerida                 | Valor recomendado              |
-| ------------------------------------- | ------------------------- | ------------------------------ |
-| `PORT`                                | No                        | `3001`                         |
-| `GEMINI_API_KEY`                      | Si                        | tu clave real                  |
-| `TURSO_DATABASE_URL`                  | No                        | `file:./data/smart-invoice.db` |
-| `TURSO_AUTH_TOKEN`                    | Solo si usas Turso remoto | token real                     |
-| `MINIO_ROOT_USER`                     | Si, con Docker Compose    | usuario interno de MinIO       |
-| `MINIO_ROOT_PASSWORD`                 | Si, con Docker Compose    | password fuerte de MinIO       |
-| `DOCUMENT_UPLOAD_MAX_BYTES`           | No                        | `26214400`                     |
-| `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`     | No                        | `104857600`                    |
-| `DOCUMENT_WORKER_ENABLED`             | No                        | `true`                         |
-| `DOCUMENT_WORKER_POLL_MS`             | No                        | `5000`                         |
-| `DOCUMENT_WORKER_CONCURRENCY`         | No                        | `1`                            |
-| `DOCUMENT_WORKER_STALE_PROCESSING_MS` | No                        | `1800000`                      |
+Nota:
+
+- El `docker-compose.yml` del repo deja credenciales internas fijas para MinIO.
+- Mientras mantengas ese compose tal cual, no necesitas definir `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ACCESS_KEY` ni `MINIO_SECRET_KEY` en Coolify.
+
+| Variable                                        | Requerida                              | Valor recomendado              |
+| ----------------------------------------------- | -------------------------------------- | ------------------------------ |
+| `PORT`                                          | No                                     | `3001`                         |
+| `GEMINI_API_KEY`                                | Si                                     | tu clave real                  |
+| `GEMINI_MODEL_ID`                               | No                                     | `gemini-3-flash-preview`       |
+| `GEMINI_EXTRACTION_SDK`                         | No                                     | `genai-router-files`           |
+| `GEMINI_EXTRACTION_PROMPT_PROFILE`              | No                                     | `full`                         |
+| `GEMINI_GENERATE_TIMEOUT_MS`                    | No                                     | `180000`                       |
+| `GEMINI_CACHED_GENERATE_TIMEOUT_MS`             | No                                     | `180000`                       |
+| `GEMINI_MAX_OUTPUT_TOKENS`                      | No                                     | `4096`                         |
+| `GEMINI_AI_REVIEW_MODEL_ID`                     | No                                     | `gemini-3-flash-preview`       |
+| `GEMINI_ROUTER_MODEL_ID`                        | No                                     | `gemini-3.1-flash-lite`        |
+| `GEMINI_ROUTER_EXTRACTOR_MODEL_ID`              | No                                     | `gemini-3-flash-preview`       |
+| `GEMINI_ROUTER_CLASSIFIER_CONFIDENCE_THRESHOLD` | No                                     | `0.7`                          |
+| `GEMINI_ROUTER_CLASSIFIER_MAX_OUTPUT_TOKENS`    | No                                     | `512`                          |
+| `GEMINI_ROUTER_CLASSIFIER_MEDIA_RESOLUTION`     | No                                     | `medium`                       |
+| `GEMINI_ROUTER_CLASSIFIER_THINKING_LEVEL`       | No                                     | `medium`                       |
+| `GEMINI_ROUTER_CLASSIFIER_TIMEOUT_MS`           | No                                     | `45000`                        |
+| `GEMINI_ROUTER_EXTRACTOR_TIMEOUT_MS`            | No                                     | `180000`                       |
+| `GEMINI_THINKING_LEVEL`                         | No                                     | `minimal`                      |
+| `GEMINI_GENAI_TRANSIENT_RETRY_ATTEMPTS`         | No                                     | `3`                            |
+| `GEMINI_GENAI_TRANSIENT_RETRY_BASE_DELAY_MS`    | No                                     | `15000`                        |
+| `GEMINI_LEGACY_TRANSIENT_RETRY_ATTEMPTS`        | No                                     | `3`                            |
+| `GEMINI_LEGACY_TRANSIENT_RETRY_BASE_DELAY_MS`   | No                                     | `15000`                        |
+| `GEMINI_PROMPT_CACHE_ENABLED`                   | No                                     | `true`                         |
+| `GEMINI_PROMPT_CACHE_USE_FOR_EXTRACTION`        | No                                     | `false`                        |
+| `GEMINI_PROMPT_CACHE_AUTO_WARM_ENABLED`         | No                                     | `false`                        |
+| `GEMINI_PROMPT_CACHE_TTL_SECONDS`               | No                                     | `14400`                        |
+| `GEMINI_PROMPT_CACHE_FAILURE_COOLDOWN_SECONDS`  | No                                     | `600`                          |
+| `GEMINI_PROMPT_CACHE_CREATE_TIMEOUT_MS`         | No                                     | `60000`                        |
+| `TURSO_DATABASE_URL`                            | No                                     | `file:./data/smart-invoice.db` |
+| `TURSO_AUTH_TOKEN`                              | Solo si usas Turso remoto              | token real                     |
+| `MINIO_ROOT_USER`                               | No, referencia si parametrizas Compose | usuario interno de MinIO       |
+| `MINIO_ROOT_PASSWORD`                           | No, referencia si parametrizas Compose | password fuerte de MinIO       |
+| `DOCUMENT_UPLOAD_MAX_BYTES`                     | No                                     | `26214400`                     |
+| `DOCUMENT_UPLOAD_MAX_TOTAL_BYTES`               | No                                     | `104857600`                    |
+| `DOCUMENT_WORKER_ENABLED`                       | No                                     | `true`                         |
+| `DOCUMENT_WORKER_POLL_MS`                       | No                                     | `7000`                         |
+| `DOCUMENT_WORKER_CONCURRENCY`                   | No                                     | `5`                            |
+| `DOCUMENT_WORKER_JOB_TIMEOUT_MS`                | No                                     | `300000`                       |
+| `DOCUMENT_WORKER_STALE_PROCESSING_MS`           | No                                     | `2100000`                      |
 
 Puedes partir de `.env.example`.
 
@@ -110,9 +147,15 @@ El servidor ya ejecuta migraciones y seed idempotente al arrancar. Usa `npm run 
 2. La pantalla de login carga sin errores.
 3. `admin@smart.com / 1234` entra si la base fue creada desde cero.
 4. Puedes listar agencias y planes.
-5. La extraccion IA funciona con `GEMINI_API_KEY` valida.
-6. Los documentos puestos en cola pasan de `QUEUED` a `PROCESSING` y luego a `SUCCESS` o `ERROR`.
-7. Tras reiniciar el servicio, los datos siguen presentes si montaste `/app/data`.
+5. La extraccion IA funciona con `GEMINI_API_KEY` valida y `GEMINI_EXTRACTION_SDK=genai-router-files`, usando Files API, clasificador en `medium` y extractor especializado sin cache.
+6. Para comparar legacy contra el SDK nuevo sin cache, usa `POST /api/ai/compare` con un PDF y revisa `legacy`, `genaiRouterFiles` y `diff.summary`.
+7. Para comparar contra el baseline operativo, usa `GEMINI_EXTRACTION_SDK=legacy` o el override `docker-compose.legacy.yml`.
+8. Si quieres probar cache explicito fuera del modo estable, usa `GEMINI_EXTRACTION_SDK=genai` o `GEMINI_EXTRACTION_SDK=legacy-cache` y activa `GEMINI_PROMPT_CACHE_USE_FOR_EXTRACTION=true`; `POST /api/documents/process` devuelve `promptCaches` y los logs de Gemini registran uso de cache.
+9. Los documentos puestos en cola pasan de `QUEUED` a `PROCESSING` y luego a `SUCCESS` o `ERROR`.
+10. Tras reiniciar el servicio, los datos siguen presentes si montaste `/app/data`.
+11. Un documento con `invoice.totalValue = 50.5` y suma de lineas `50.50` no queda marcado con `VALUE_TOTAL_MISMATCH`.
+12. Un documento con baja confianza visual puede seguir en revision aunque no existan discrepancias matematicas.
+13. Si Gemini devuelve `confidenceReasons`, el score persistido refleja solo discrepancias matematicas confirmadas por backend mas razones visuales/OCR no verificables.
 
 ## Troubleshooting rapido
 
@@ -131,6 +174,16 @@ Casi siempre es volumen mal montado o montado en una ruta distinta de `/app/data
 ### La IA no extrae datos
 
 Revisa `GEMINI_API_KEY`. La clave se usa en backend, no en el navegador.
+
+El default de Docker es `GEMINI_EXTRACTION_SDK=genai-router-files` sin fallback automático a legacy. Si `GET /api/ai/cache-status` muestra errores recurrentes del SDK nuevo o del Files API, cambia manualmente a `legacy` solo para diagnosticar y luego reconstruye el servicio para comparar con el baseline.
+
+### La confianza baja parece incorrecta
+
+Revisa el `result_json` persistido en `batch_items` o `document_jobs`:
+
+- `confidenceScore` es el score final ya revalidado por backend.
+- `confidenceReasons` contiene los motivos aceptados para la penalizacion.
+- `confidenceAudit` conserva `modelScore`, `backendScore`, `finalScore` y codigos invalidados para debugging.
 
 ### Quiero usar Turso remoto
 

@@ -1689,7 +1689,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
       {/* Results Table */}
       <div className="flex min-h-[320px] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+        <div className="app-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
           {results.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400 sm:p-12">
               <FileText className="w-12 h-12 mb-4 opacity-20" />

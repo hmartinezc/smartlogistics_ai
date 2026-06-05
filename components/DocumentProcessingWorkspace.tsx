@@ -34,7 +34,8 @@ interface DocumentProcessingWorkspaceProps {
   onConfirm: (message: string) => Promise<boolean>;
 }
 
-const MAX_FILES = 50;
+const MAX_FILES = 40;
+const WORKER_PARALLELISM = 5;
 const POLL_INTERVAL_MS = 3000;
 
 const TERMINAL_STATUSES = new Set<DocumentJobStatus>(['SUCCESS', 'ERROR', 'CANCELLED']);
@@ -187,6 +188,8 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
   const activeCount = summary.QUEUED + summary.PROCESSING;
   const pendingCount = summary.UPLOADED + summary.QUEUED + summary.PROCESSING;
   const currentBatchPendingCount = pendingCount;
+  const queueBacklogCount = summary.QUEUED;
+  const processingNowCount = summary.PROCESSING;
   const progress = jobs.length > 0 ? Math.round((terminalCount / jobs.length) * 100) : 0;
   const canSelectFiles =
     isAgencyReady &&
@@ -393,7 +396,10 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
       setJobs(response.jobs);
       setUploadErrors(response.errors || []);
       setSelectedFiles([]);
-      setNotice({ type: 'success', text: `${response.count} documentos cargados.` });
+      setNotice({
+        type: 'success',
+        text: `${response.count} documentos cargados. Cuando inicies el lote, el worker procesará hasta ${WORKER_PARALLELISM} PDFs a la vez.`,
+      });
     } catch (error) {
       if (currentAgencyIdRef.current === agencyIdAtStart) {
         setErrorNotice(error, 'No se pudieron cargar los documentos.');
@@ -425,12 +431,17 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
       }
 
       setJobs(response.jobs);
+      const activeJobsAfterQueue = response.jobs.filter(
+        (job) => job.status === 'QUEUED' || job.status === 'PROCESSING',
+      ).length;
       setNotice({
         type: response.queuedCount > 0 ? 'success' : 'info',
         text:
           response.queuedCount > 0
-            ? `${response.queuedCount} documentos enviados al worker.`
-            : 'No hay documentos pendientes para enviar.',
+            ? `${response.queuedCount} documentos enviados a la cola. El worker toma hasta ${WORKER_PARALLELISM} a la vez y deja el resto en espera.`
+            : activeJobsAfterQueue > 0
+              ? 'Este lote ya está en cola o procesándose. No necesitas reenviarlo manualmente.'
+              : 'No hay documentos pendientes para enviar.',
       });
       void loadDocuments({ batchId: batchIdAtStart, silent: true });
     } catch (error) {
@@ -570,7 +581,8 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
                     Carga de PDFs
                   </h3>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    {selectedFiles.length} seleccionados · {formatBytes(selectedTotalBytes)}
+                    {selectedFiles.length} seleccionados · {formatBytes(selectedTotalBytes)} · hasta{' '}
+                    {MAX_FILES} por lote
                   </p>
                 </div>
 
@@ -593,6 +605,13 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
                 </div>
               </div>
 
+              <div className="mb-5 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm font-medium text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200">
+                Flujo recomendado: carga el lote una vez y envialo a la cola. El worker procesa
+                hasta {` ${WORKER_PARALLELISM} `}PDFs al mismo tiempo y deja el resto en estado En
+                cola, asi no hace falta reintentar manualmente mientras veas estados En cola o
+                Procesando.
+              </div>
+
               <label
                 onDragOver={(event) => {
                   event.preventDefault();
@@ -613,7 +632,8 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
                   Seleccionar documentos
                 </div>
                 <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  PDF · máximo 50
+                  PDF · hasta {MAX_FILES} por lote · el worker procesa {WORKER_PARALLELISM} a la
+                  vez
                 </div>
                 <input
                   type="file"
@@ -716,6 +736,10 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
                     style={{ width: `${progress}%` }}
                   />
                 </div>
+                <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Worker activo: {processingNowCount} procesando · {queueBacklogCount} en cola ·
+                  maximo {WORKER_PARALLELISM} simultaneos
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -771,7 +795,13 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
                   <button
                     type="button"
                     onClick={handleRetryErrors}
-                    disabled={!isAgencyReady || isUploading || summary.ERROR === 0 || isQueueing}
+                    disabled={
+                      !isAgencyReady ||
+                      isUploading ||
+                      summary.ERROR === 0 ||
+                      isQueueing ||
+                      currentBatchPendingCount > 0
+                    }
                     className="h-10 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     Reintentar errores
@@ -836,7 +866,17 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
                         <span>{formatBytes(job.fileSizeBytes)}</span>
                         <span>{formatTime(job.processedAt || job.startedAt || job.createdAt)}</span>
                         {job.error && (
-                          <span className="text-red-600 dark:text-red-300">{job.error}</span>
+                          <span
+                            className={
+                              job.status === 'ERROR'
+                                ? 'text-red-600 dark:text-red-300'
+                                : 'text-amber-600 dark:text-amber-300'
+                            }
+                          >
+                            {job.status === 'ERROR'
+                              ? job.error
+                              : `Reintento automatico programado. Ultima referencia: ${job.error}`}
+                          </span>
                         )}
                       </div>
                     </div>

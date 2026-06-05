@@ -2,7 +2,7 @@
 name: tdd-guide
 description: Test-Driven Development workflow enforcer. Use PROACTIVELY when the user asks to write tests, add features that need tests, or before implementing any business logic. Guides writing tests FIRST, then implementation.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.4
 permission:
   read: allow
   write: allow
@@ -123,13 +123,13 @@ const testDb = createClient({ url: ':memory:' });
 ```typescript
 import { vi } from 'vitest';
 
-vi.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: vi.fn(() => ({
-    getGenerativeModel: vi.fn(() => ({
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: vi.fn(() => ({
+    models: {
       generateContent: vi.fn().mockResolvedValue({
-        response: { text: () => JSON.stringify(mockResponse) },
+        text: JSON.stringify(mockResponse),
       }),
-    })),
+    },
   })),
 }));
 ```

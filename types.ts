@@ -11,6 +11,36 @@ export interface InvoiceItem {
   totalValue: number; // TOTAL VALUE-USD
 }
 
+export type ConfidenceReasonCode =
+  | 'PIECES_TOTAL_MISMATCH'
+  | 'EQ_TOTAL_MISMATCH'
+  | 'VALUE_TOTAL_MISMATCH'
+  | 'OCR_UNCERTAIN'
+  | 'MISSING_FIELD'
+  | 'AMBIGUOUS_TABLE'
+  | 'DOCUMENT_INCOMPLETE'
+  | 'OTHER';
+
+export interface ConfidenceReason {
+  code: ConfidenceReasonCode;
+  penalty: number;
+  message: string;
+  footerTotal?: number;
+  calculatedTotal?: number;
+  invoiceTotal?: number;
+  calculatedLineTotal?: number;
+  tolerance?: number;
+}
+
+export interface ConfidenceAudit {
+  modelScore: number;
+  backendScore: number;
+  finalScore: number;
+  acceptedReasonCodes: ConfidenceReasonCode[];
+  overriddenReasonCodes: ConfidenceReasonCode[];
+  backendReasonCodes: ConfidenceReasonCode[];
+}
+
 export interface InvoiceData {
   // Header Info
   invoiceNumber: string; // COMMERCIAL INVOICE NO.
@@ -36,6 +66,8 @@ export interface InvoiceData {
 
   // AI Self-Evaluation
   confidenceScore: number; // 0 to 100
+  confidenceReasons?: ConfidenceReason[];
+  confidenceAudit?: ConfidenceAudit;
 }
 
 export interface ExportInvoiceItem extends InvoiceItem {
@@ -149,6 +181,243 @@ export interface DocumentProcessingAuditQuery {
   to?: string;
 }
 
+export interface GeminiExtractionEvent {
+  agencyId?: string;
+  agentType: string;
+  batchId?: string;
+  cacheMode: string;
+  cacheTokenCount?: number;
+  cachedContentTokenCount?: number;
+  candidatesTokenCount?: number;
+  createdAt?: string;
+  documentJobId?: string;
+  durationMs: number;
+  error?: string;
+  estimatedCostUsd: number;
+  expiresAt: string;
+  fileDeleteDurationMs?: number;
+  fileDeleteOk?: boolean;
+  fileInputMode?: string;
+  fileUploadDurationMs?: number;
+  id: string;
+  model: string;
+  originalFileName?: string;
+  inputTokenCount: number;
+  outputTokenCount: number;
+  promptHash: string;
+  promptTokenCount?: number;
+  routerCategory?: string;
+  routerConfidence?: number;
+  routerVisualSignals?: string[];
+  sdk: string;
+  source: string;
+  stage?: string;
+  success: boolean;
+  thoughtsTokenCount?: number;
+  timestamp: string;
+  totalTokenCount?: number;
+  userEmail?: string;
+  userId?: string;
+  userName?: string;
+}
+
+export interface GeminiExtractionEventQuery {
+  agencyId?: string;
+  from?: string;
+  jobId?: string;
+  limit?: number;
+  model?: string;
+  offset?: number;
+  routerCategory?: string;
+  sdk?: string;
+  stage?: string;
+  success?: boolean;
+  to?: string;
+}
+
+export interface GeminiExtractionEventSummary {
+  averageDurationMs: number;
+  byCategory: Array<{ category: string; count: number }>;
+  byModel: Array<{
+    estimatedCostUsd: number;
+    inputTokens: number;
+    model: string;
+    outputTokens: number;
+  }>;
+  byStage: Array<{ stage: string; count: number }>;
+  estimatedCostUsd: number;
+  error: number;
+  inputTokens: number;
+  outputTokens: number;
+  success: number;
+  total: number;
+  totalTokens: number;
+}
+
+export interface GeminiExtractionEventListResponse {
+  events: GeminiExtractionEvent[];
+  limit: number;
+  offset: number;
+  summary: GeminiExtractionEventSummary;
+  total: number;
+}
+
+export interface AiPromptSnapshot {
+  id: string;
+  promptHash: string;
+  promptKind: string;
+  agentType: string | null;
+  routerCategory: string | null;
+  model: string;
+  promptProfile: string | null;
+  promptText: string;
+  source: string;
+  createdAt: string | null;
+}
+
+export interface AiReviewAnalysis {
+  id: string;
+  itemId: string;
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | string;
+  reviewerModel: string;
+  verdict: string;
+  confidenceScore: number | null;
+  analysis: {
+    verdict?: string;
+    confidenceScore?: number;
+    summary?: string;
+    suspectedIssues?: Array<{
+      field?: string;
+      reason?: string;
+      severity?: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+    }>;
+    extractorTechnicalImprovements?: Array<{
+      area?: string;
+      recommendation?: string;
+      expectedImpact?: string;
+      costImpact?: 'LOWER' | 'NEUTRAL' | 'HIGHER' | string;
+    }>;
+    classifierTechnicalImprovements?: Array<{
+      area?: string;
+      recommendation?: string;
+      expectedImpact?: string;
+      costImpact?: 'LOWER' | 'NEUTRAL' | 'HIGHER' | string;
+    }>;
+    costEfficiencyNotes?: string[];
+    costGuardrails?: string[];
+    promptRecommendations?: Array<{
+      target?: 'classifier' | 'extractor' | 'none' | string;
+      promptHash?: string;
+      recommendation?: string;
+      risk?: string;
+    }>;
+    validationPlan?: string[];
+    requiresDeveloperWork?: boolean;
+    developerWorkReason?: string | null;
+  } | null;
+  recommendationSummary: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  createdBy: {
+    id: string | null;
+    email: string | null;
+  };
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AiReviewItem {
+  id: string;
+  runId: string;
+  documentJobId: string;
+  batchId: string | null;
+  agencyId: string;
+  agencyName: string | null;
+  originalFileName: string;
+  reviewStorageBucket: string | null;
+  reviewObjectKey: string | null;
+  reviewFileSizeBytes: number;
+  extractionFormat: string;
+  modelSummary: string | null;
+  promptHashes: string[];
+  status: 'PENDING_ANALYSIS' | 'ANALYZED' | 'ANALYSIS_ERROR' | string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  processedAt: string | null;
+  analysisError: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AiReviewGeminiEvent {
+  id: string;
+  timestamp: string;
+  source: string;
+  documentJobId: string | null;
+  batchId: string | null;
+  agencyId: string | null;
+  originalFileName: string | null;
+  agentType: string;
+  sdk: string;
+  stage: string | null;
+  cacheMode: string;
+  model: string;
+  promptHash: string;
+  success: boolean;
+  error: string | null;
+  inputTokenCount: number;
+  outputTokenCount: number;
+  totalTokenCount: number;
+  estimatedCostUsd: number;
+  durationMs: number;
+  routerCategory: string | null;
+  routerConfidence: number | null;
+}
+
+export interface AiReviewRun {
+  id: string;
+  reviewDate: string;
+  agencyId: string | null;
+  status: 'READY' | 'EMPTY' | 'ERROR' | string;
+  selectedCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalEstimatedCostUsd: number;
+  createdBy: {
+    id: string | null;
+    email: string | null;
+    name: string | null;
+  };
+  error: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  items: AiReviewItem[];
+}
+
+export interface AiReviewDetail {
+  item: AiReviewItem;
+  invoiceResult: InvoiceData | null;
+  pdfPreviewUrl: string;
+  events: AiReviewGeminiEvent[];
+  promptSnapshots: AiPromptSnapshot[];
+  analyses: AiReviewAnalysis[];
+}
+
+export interface AiReviewRunResponse {
+  run: AiReviewRun | null;
+}
+
+export interface AiReviewDetailResponse extends AiReviewDetail {}
+
+export interface AiReviewAnalyzeResponse {
+  detail: AiReviewDetail;
+}
+
 export type DocumentJobStatus =
   | 'UPLOADED'
   | 'QUEUED'
@@ -199,10 +468,22 @@ export interface DocumentUploadResponse {
   errors: Array<{ fileName: string; error: string; errorId?: string }>;
 }
 
+export interface ExtractionPromptCacheStatus {
+  agentType: AgentType;
+  cacheName?: string;
+  cacheTokenCount?: number;
+  error?: string;
+  promptHash: string;
+  reusedExisting?: boolean;
+  state: 'disabled' | 'ready' | 'error';
+  waitedForCreate?: boolean;
+}
+
 export interface DocumentProcessResponse {
   queuedCount: number;
   skippedCount: number;
   jobs: DocumentJob[];
+  promptCaches?: ExtractionPromptCacheStatus[];
 }
 
 export interface DocumentDeleteResponse {
@@ -256,6 +537,40 @@ export interface ProductMatchCatalogItem {
   htsMatch: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface PendingProductMatchExample {
+  batchItemId: string;
+  fileName: string;
+  invoiceNumber?: string;
+  productDescription: string;
+  hts?: string;
+}
+
+export interface PendingProductMatchItem {
+  key: string;
+  product: string;
+  occurrenceCount: number;
+  invoiceCount: number;
+  htsCandidates: string[];
+  latestProcessedAt?: string;
+  examples: PendingProductMatchExample[];
+}
+
+export interface PendingProductMatchResponse {
+  items: PendingProductMatchItem[];
+  truncated: boolean;
+  scannedBatchItems: number;
+  scanLimit: number;
+}
+
+export interface PendingProductMatchCreateInput {
+  agencyId: string;
+  product: string;
+  clientProductCode: string;
+  productMatch: string;
+  htsMatch: string;
+  sourceHts?: string;
 }
 
 export interface ProductMatchExport {
@@ -327,8 +642,10 @@ export enum AppState {
   DASHBOARD_OPS = 'DASHBOARD_OPS', // Panel Operativo (Solo Admin)
   DASHBOARD_PANEL = 'DASHBOARD_PANEL', // Panel Facturado (Operación)
   DASHBOARD_ADMIN = 'DASHBOARD_ADMIN', // Panel Admin (Solo Admin)
+  AI_REVIEW = 'AI_REVIEW', // AutoPilot AI: revisión y mejora continua (Solo Admin)
   AGENCY_CONFIG = 'AGENCY_CONFIG', // Configuración Agencias (Solo Admin)
   INTEGRATION_CONFIG = 'INTEGRATION_CONFIG', // Integración por agencia (Solo Admin)
+  PENDING_PRODUCT_MATCHES = 'PENDING_PRODUCT_MATCHES', // Productos extraídos sin equivalencia
   PRODUCT_MATCHES = 'PRODUCT_MATCHES', // Catálogo Match Productos
   PROCESS_SELECTION = 'PROCESS_SELECTION',
   BATCH_RUNNING = 'BATCH_RUNNING',
@@ -337,8 +654,8 @@ export enum AppState {
   USER_MANAGEMENT = 'USER_MANAGEMENT', // Gestión de Usuarios (Solo Admin)
 }
 
-// Updated to reflect the Client Agents
-export type AgentType = 'AGENT_TCBV' | 'AGENT_GENERIC_A' | 'AGENT_GENERIC_B' | 'AGENT_CUSTOMS';
+// Client extraction agents
+export type AgentType = 'AGENT_GENERIC_A' | 'AGENT_GENERIC_B' | 'AGENT_CUSTOMS';
 
 export type DocumentFormat =
   | 'FORMAT_A_STD'
@@ -347,7 +664,6 @@ export type DocumentFormat =
   | 'FORMAT_D_CUSTOMS';
 
 export const AGENT_GROUPS = {
-  AGENT_TCBV: ['TCBV Specific Format'],
   AGENT_GENERIC_A: ['Standard Invoice'],
   AGENT_GENERIC_B: ['Disabled'],
   AGENT_CUSTOMS: ['Disabled'],

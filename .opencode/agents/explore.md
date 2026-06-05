@@ -2,7 +2,7 @@
 name: explore
 description: Fast agent for exploring this codebase. Use for finding files by patterns, searching code for keywords, or answering questions about the codebase structure. Optimized for speed.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.3-codex
 tools:
   read: true
   grep: true

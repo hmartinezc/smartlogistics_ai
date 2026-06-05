@@ -1,18 +1,18 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI, type Content } from '@google/genai';
 import { InvoiceData, AgentType } from '../types';
 import { AI_CONFIG, ERROR_MESSAGES } from '../config';
 import { buildExtractionPrompt } from './agentPrompts';
 import { invoiceExtractionSchema } from '../shared/extractionSchema';
 
 // Inicialización lazy del cliente de Gemini
-let genAIInstance: GoogleGenerativeAI | null = null;
+let genAIInstance: GoogleGenAI | null = null;
 
-const getGenAI = (): GoogleGenerativeAI => {
+const getGenAI = (): GoogleGenAI => {
   if (!process.env.API_KEY) {
     throw new Error(ERROR_MESSAGES.API_KEY_MISSING);
   }
   if (!genAIInstance) {
-    genAIInstance = new GoogleGenerativeAI(process.env.API_KEY);
+    genAIInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
   return genAIInstance;
 };
@@ -46,26 +46,31 @@ export const extractLogisticsData = async (
   const prompt = buildExtractionPrompt(format);
 
   try {
-    const model = genAI.getGenerativeModel({
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: file.type,
+              data: base64Data,
+            },
+          },
+        ],
+      },
+    ];
+
+    const result = await genAI.models.generateContent({
       model: AI_CONFIG.MODEL_ID,
-      generationConfig: {
+      contents,
+      config: {
         responseMimeType: 'application/json',
         responseSchema: invoiceExtractionSchema,
       },
     });
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: file.type,
-          data: base64Data,
-        },
-      },
-      { text: prompt },
-    ]);
-
-    const response = result.response;
-    const text = response.text();
+    const text = result.text;
 
     if (!text) {
       throw new Error('No se recibió respuesta del modelo');

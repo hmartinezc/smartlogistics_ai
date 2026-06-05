@@ -9,11 +9,15 @@ import { randomUUID } from 'node:crypto';
 import type { InValue } from '@libsql/client';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
+import type { AgentType } from '../../types.js';
 import { getDb } from '../db.js';
 import type { AuthUser } from '../security.js';
-import { ensureAgencyAccess, hasAgencyAccess, requireAuth } from '../security.js';
+import { ensureAgencyAccess, hasAgencyAccess, requireAuth, requireRole } from '../security.js';
+import { ensureExtractionPromptCache } from '../services/documentExtractionService.js';
+import { isGeminiPromptCacheUsedForExtraction } from '../services/geminiPromptCache.js';
 import {
   buildDocumentObjectKey,
+  getDocumentObject,
   getInvoiceBucketName,
   putDocumentObject,
   removeDocumentObject,
@@ -31,17 +35,12 @@ const DOCUMENT_JOB_STATUSES = new Set([
 ]);
 const QUEUEABLE_STATUSES = new Set(['UPLOADED', 'ERROR']);
 const DELETABLE_STATUSES = new Set(['UPLOADED', 'SUCCESS', 'ERROR', 'CANCELLED']);
-const ALLOWED_EXTRACTION_FORMATS = new Set([
-  'AGENT_TCBV',
-  'AGENT_GENERIC_A',
-  'AGENT_GENERIC_B',
-  'AGENT_CUSTOMS',
-]);
+const ALLOWED_EXTRACTION_FORMATS = new Set(['AGENT_GENERIC_A', 'AGENT_GENERIC_B', 'AGENT_CUSTOMS']);
 const DEFAULT_EXTRACTION_FORMAT = 'AGENT_GENERIC_A';
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_LIST_LIMIT = 100;
 const MAX_LIST_LIMIT = 500;
-const MAX_FILES_PER_UPLOAD = 50;
+const MAX_FILES_PER_UPLOAD = 40;
 const MAX_JOB_IDS_PER_REQUEST = 200;
 const MAX_BATCH_ID_LENGTH = 80;
 const MAX_ORIGINAL_FILE_NAME_LENGTH = 180;
@@ -171,6 +170,10 @@ function getOriginalFileName(file: File): string {
   return sanitizeText(file.name || 'document.pdf', MAX_ORIGINAL_FILE_NAME_LENGTH) || 'document.pdf';
 }
 
+function buildInlinePdfFileName(value: string): string {
+  return sanitizeText(value || 'document.pdf', MAX_ORIGINAL_FILE_NAME_LENGTH).replace(/"/g, '');
+}
+
 function normalizeBatchId(value: string): string | null {
   if (!value) {
     return randomUUID();
@@ -230,7 +233,7 @@ function parseResultJson(value: unknown): unknown | null {
   }
 }
 
-function buildDocumentJob(row: DocumentJobRow) {
+function buildDocumentJob(row: DocumentJobRow, options: { includeResult?: boolean } = {}) {
   return {
     id: String(row.id),
     batchId: String(row.batch_id),
@@ -242,7 +245,7 @@ function buildDocumentJob(row: DocumentJobRow) {
     extractionFormat: String(row.extraction_format || DEFAULT_EXTRACTION_FORMAT),
     retryCount: Number(row.retry_count || 0),
     maxRetries: Number(row.max_retries || DEFAULT_MAX_RETRIES),
-    result: parseResultJson(row.result_json),
+    result: options.includeResult ? parseResultJson(row.result_json) : null,
     error: row.error ? String(row.error) : null,
     queuedAt: row.queued_at ? String(row.queued_at) : null,
     startedAt: row.started_at ? String(row.started_at) : null,
@@ -348,6 +351,49 @@ async function queueEligibleJobs(
   };
 }
 
+async function preparePromptCachesForRows(rows: DocumentJobRow[]) {
+  if (!isGeminiPromptCacheUsedForExtraction()) {
+    return [];
+  }
+
+  const formats = Array.from(
+    new Set(
+      rows
+        .filter((row) => QUEUEABLE_STATUSES.has(String(row.status || '')))
+        .map((row) => {
+          const format = normalizeExtractionFormat(
+            String(row.extraction_format || DEFAULT_EXTRACTION_FORMAT),
+          );
+          return format || DEFAULT_EXTRACTION_FORMAT;
+        }),
+    ),
+  ) as AgentType[];
+
+  if (formats.length === 0) {
+    return [];
+  }
+
+  return Promise.all(
+    formats.map(async (format) => {
+      try {
+        return await ensureExtractionPromptCache(format);
+      } catch (error) {
+        console.warn('Gemini prompt cache prepare failed; continuing queued processing.', {
+          error: error instanceof Error ? error.message : String(error),
+          format,
+        });
+
+        return {
+          agentType: format,
+          error: error instanceof Error ? error.message : String(error),
+          promptHash: 'unavailable',
+          state: 'error' as const,
+        };
+      }
+    }),
+  );
+}
+
 // GET /api/documents — Listar jobs con filtros opcionales
 // Filtros: agencyId, status, batchId, limit, offset, dateFrom, dateTo
 documents.get('/', async (c) => {
@@ -413,31 +459,43 @@ documents.get('/', async (c) => {
     countArgs.push(dateTo + ' 23:59:59');
   }
 
-  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
-  const database = getDb();
-  const result = await database.execute({
-    sql: `SELECT * FROM document_jobs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-    args: [...args, limit, offset],
-  });
+  try {
+    const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const database = getDb();
+    const result = await database.execute({
+      sql: `SELECT * FROM document_jobs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      args: [...args, limit, offset],
+    });
 
-  const countResult = await database.execute({
-    sql: `SELECT COUNT(*) as total FROM document_jobs ${whereClause}`,
-    args: countArgs,
-  });
-  const total = Number(countResult.rows[0]?.total || 0);
+    const countResult = await database.execute({
+      sql: `SELECT COUNT(*) as total FROM document_jobs ${whereClause}`,
+      args: countArgs,
+    });
+    const total = Number(countResult.rows[0]?.total || 0);
 
-  const summaryResult = await database.execute({
-    sql: `SELECT status, COUNT(*) as total FROM document_jobs ${whereClause} GROUP BY status`,
-    args: countArgs,
-  });
+    const summaryResult = await database.execute({
+      sql: `SELECT status, COUNT(*) as total FROM document_jobs ${whereClause} GROUP BY status`,
+      args: countArgs,
+    });
 
-  return c.json({
-    jobs: result.rows.map((row) => buildDocumentJob(row as DocumentJobRow)),
-    summary: buildStatusSummary(summaryResult.rows as DocumentJobRow[]),
-    limit,
-    offset,
-    total,
-  });
+    return c.json({
+      jobs: result.rows.map((row) => buildDocumentJob(row as DocumentJobRow)),
+      summary: buildStatusSummary(summaryResult.rows as DocumentJobRow[]),
+      limit,
+      offset,
+      total,
+    });
+  } catch (error) {
+    const errorId = randomUUID();
+    console.error(`[${errorId}] Error listando documentos:`, error);
+    return c.json(
+      {
+        error: 'No se pudieron cargar los documentos.',
+        errorId,
+      },
+      500,
+    );
+  }
 });
 
 // GET /api/documents/status/:id — Estado de un job
@@ -457,7 +515,50 @@ documents.get('/status/:id', async (c) => {
     return c.json({ error: 'Documento no encontrado.' }, 404);
   }
 
-  return c.json(buildDocumentJob(row));
+  return c.json(buildDocumentJob(row, { includeResult: true }));
+});
+
+// GET /api/documents/:id/preview — Vista inline del PDF almacenado
+documents.get('/:id/preview', async (c) => {
+  const authUser = await requireAuth(c);
+  if (authUser instanceof Response) {
+    return authUser;
+  }
+
+  const rows = await getDocumentRowsByIds([c.req.param('id')]);
+  if (rows.length === 0) {
+    return c.json({ error: 'Documento no encontrado.' }, 404);
+  }
+
+  const row = rows[0];
+  if (!hasAgencyAccess(authUser, String(row.agency_id || ''))) {
+    return c.json({ error: 'Documento no encontrado.' }, 404);
+  }
+
+  const objectKey = String(row.object_key || '');
+  if (!objectKey) {
+    return c.json({ error: 'Documento sin archivo PDF asociado.' }, 404);
+  }
+
+  try {
+    const buffer = await getDocumentObject(objectKey);
+    const fileName = buildInlinePdfFileName(String(row.original_file_name || 'document.pdf'));
+
+    return new Response(buffer, {
+      headers: {
+        'Cache-Control': 'private, max-age=60',
+        'Content-Disposition': `inline; filename="${fileName}"`,
+        'Content-Length': String(buffer.length),
+        'Content-Type': 'application/pdf',
+        'X-Content-Type-Options': 'nosniff',
+      },
+      status: 200,
+    });
+  } catch (error) {
+    const errorId = randomUUID();
+    console.error(`[${errorId}] Error leyendo PDF ${c.req.param('id')}:`, error);
+    return c.json({ error: 'No se pudo cargar el PDF.', errorId }, 502);
+  }
 });
 
 // POST /api/documents/upload — Cargar uno o varios PDFs a MinIO
@@ -731,12 +832,104 @@ documents.post(
       return c.json({ error: 'Uno o más documentos no existen.' }, 404);
     }
 
+    const promptCaches = await preparePromptCachesForRows(rows);
     const queuedResult = await queueEligibleJobs(rows);
 
     return c.json({
+      promptCaches,
       queuedCount: queuedResult.queuedCount,
       skippedCount: rows.length - queuedResult.queuedCount,
-      jobs: queuedResult.rows.map(buildDocumentJob),
+      jobs: queuedResult.rows.map((row) => buildDocumentJob(row)),
+    });
+  },
+);
+
+// POST /api/documents/recover-stale — Reencolar jobs PROCESSING vencidos
+documents.post(
+  '/recover-stale',
+  bodyLimit({
+    maxSize: MAX_JSON_BODY_BYTES,
+    onError: (c) => c.json({ error: 'La solicitud supera el tamaño máximo permitido.' }, 413),
+  }),
+  async (c) => {
+    const authUser = await requireAuth(c);
+    if (authUser instanceof Response) {
+      return authUser;
+    }
+
+    const roleError = requireRole(c, authUser, ['ADMIN', 'SUPERVISOR']);
+    if (roleError) {
+      return roleError;
+    }
+
+    const body = (await c.req.json().catch(() => ({}))) as {
+      agencyId?: unknown;
+      jobIds?: unknown;
+      olderThanMinutes?: unknown;
+    };
+    const olderThanMinutes = Math.max(
+      1,
+      Math.min(1440, Math.floor(Number(body.olderThanMinutes || 5))),
+    );
+    const requestedAgencyId = typeof body.agencyId === 'string' ? body.agencyId.trim() : '';
+    const requestedJobIds = Array.isArray(body.jobIds)
+      ? body.jobIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id) => JOB_ID_PATTERN.test(id))
+          .slice(0, MAX_JOB_IDS_PER_REQUEST)
+      : [];
+    const whereParts = [
+      "status = 'PROCESSING'",
+      `(
+        lock_expires_at IS NULL
+        OR unixepoch(lock_expires_at) <= unixepoch('now')
+        OR (started_at IS NOT NULL AND unixepoch(started_at) <= unixepoch('now') - ?)
+      )`,
+    ];
+    const args: InValue[] = [olderThanMinutes * 60];
+
+    if (requestedAgencyId) {
+      const accessError = ensureAgencyAccess(c, authUser, requestedAgencyId);
+      if (accessError) {
+        return accessError;
+      }
+
+      whereParts.push('agency_id = ?');
+      args.push(requestedAgencyId);
+    } else {
+      const agencyFilter = getAccessibleAgencyFilter(authUser, args);
+      if (agencyFilter) {
+        whereParts.push(agencyFilter);
+      }
+    }
+
+    if (requestedJobIds.length > 0) {
+      whereParts.push(`id IN (${requestedJobIds.map(() => '?').join(',')})`);
+      args.push(...requestedJobIds);
+    }
+
+    const database = getDb();
+    const result = await database.execute({
+      sql: `UPDATE document_jobs SET
+              status = 'QUEUED',
+              queued_at = datetime('now'),
+              started_at = NULL,
+              locked_by = NULL,
+              lock_expires_at = NULL,
+              error = 'Reencolado por recuperación de jobs PROCESSING vencidos.',
+              updated_at = datetime('now')
+            WHERE ${whereParts.join(' AND ')}
+            RETURNING id, original_file_name, agency_id`,
+      args,
+    });
+
+    return c.json({
+      recoveredCount: result.rows.length,
+      jobs: result.rows.map((row) => ({
+        id: String(row.id),
+        originalFileName: String(row.original_file_name || ''),
+        agencyId: String(row.agency_id || ''),
+      })),
     });
   },
 );

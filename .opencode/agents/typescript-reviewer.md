@@ -7,7 +7,7 @@ tools:
   grep: true
   glob: true
   bash: true
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.4
 ---
 
 You are a senior TypeScript engineer ensuring high standards of type-safe, idiomatic TypeScript and JavaScript.
