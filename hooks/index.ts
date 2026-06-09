@@ -8,7 +8,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { User, Agency, BatchItem, SubscriptionPlan } from '../types';
 import { getAccessibleAgencies, resolveDefaultAgencyContext } from '../services/authService';
-import { api, ApiError } from '../services/apiClient';
+import { api, ApiError, type BatchResultsQuery } from '../services/apiClient';
 
 // --------------------------
 // useApiData - Carga datos desde la API al montar
@@ -187,7 +187,7 @@ interface UseBatchProcessorReturn {
   updateResult: (updatedItem: BatchItem) => void;
   removeResults: (ids: string[]) => Promise<void>;
   clearResults: (localOnly?: boolean) => void;
-  loadResults: (agencyId?: string) => Promise<void>;
+  loadResults: (query?: string | BatchResultsQuery) => Promise<void>;
   successCount: number;
   errorCount: number;
 }
@@ -196,9 +196,9 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [batchResults, setBatchResults] = useState<BatchItem[]>([]);
 
-  const loadResults = useCallback(async (agencyId?: string) => {
+  const loadResults = useCallback(async (query?: string | BatchResultsQuery) => {
     try {
-      const results = await api.getBatchResults(agencyId);
+      const results = await api.getBatchResults(query);
       setBatchResults(results);
     } catch (err) {
       console.error('Error cargando resultados batch:', err);

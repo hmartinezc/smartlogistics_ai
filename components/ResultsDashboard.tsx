@@ -18,6 +18,7 @@ import {
   Grid,
   List,
   Globe,
+  MoreVertical,
 } from './Icons';
 import ValidationForm from './ValidationForm';
 import PageHeader from './PageHeader';
@@ -43,6 +44,11 @@ interface ResultsDashboardProps {
   onClearHistory?: () => void;
   onUpdateItem?: (item: BatchItem) => void; // Call back to update parent
   currentAgency?: Agency;
+  operationDateRange?: {
+    startDate: string;
+    endDate: string;
+  };
+  onOperationDateRangeChange?: (range: { startDate: string; endDate: string }) => void;
 }
 
 type ExportMode = 'native' | 'client';
@@ -103,6 +109,12 @@ const formatDateKey = (date: Date): string => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const getRelativeDateKey = (offsetDays: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return formatDateKey(date);
 };
 
 const toDateKey = (dateValue?: string): string => {
@@ -344,12 +356,19 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   onClearHistory,
   onUpdateItem,
   currentAgency,
+  operationDateRange,
+  onOperationDateRangeChange,
 }) => {
+  const appliedDateRange = operationDateRange || {
+    startDate: getRelativeDateKey(-1),
+    endDate: getRelativeDateKey(0),
+  };
   const [viewingItem, setViewingItem] = useState<BatchItem | null>(null);
   const [selectedAwb, setSelectedAwb] = useState('ALL');
   const [awbSearch, setAwbSearch] = useState('');
   const [globalSearch, setGlobalSearch] = useState('');
   const deferredGlobalSearch = useDeferredValue(globalSearch);
+  const [draftDateRange, setDraftDateRange] = useState(appliedDateRange);
   const [processedDateFilter, setProcessedDateFilter] = useState('');
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [mawbFilter, setMawbFilter] = useState('');
@@ -363,6 +382,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [openColumnFilter, setOpenColumnFilter] = useState<ColumnFilterKey | null>(null);
   const [isAwbMenuOpen, setIsAwbMenuOpen] = useState(false);
   const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
+  const [isDateRangeMenuOpen, setIsDateRangeMenuOpen] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [downloadNotice, setDownloadNotice] = useState<{
     tone: 'error' | 'warning' | 'success';
@@ -373,6 +394,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const awbMenuRef = useRef<HTMLDivElement | null>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const groupMenuRef = useRef<HTMLDivElement | null>(null);
+  const dateRangeMenuRef = useRef<HTMLDivElement | null>(null);
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null);
   const awbSearchInputRef = useRef<HTMLInputElement | null>(null);
   const activeFilterCount = [
     selectedAwb !== 'ALL',
@@ -389,6 +412,15 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const selectedGroupOption =
     GROUP_OPTIONS.find((option) => option.key === groupBy) || GROUP_OPTIONS[0];
   const hasClientMapping = hasClientFieldMappings(currentAgency?.integrationConfig);
+  const operationDateRangeLabel = `${appliedDateRange.startDate} a ${appliedDateRange.endDate}`;
+  const draftDateRangeInvalid = Boolean(
+    draftDateRange.startDate &&
+      draftDateRange.endDate &&
+      draftDateRange.startDate > draftDateRange.endDate,
+  );
+  const draftDateRangeDirty =
+    draftDateRange.startDate !== appliedDateRange.startDate ||
+    draftDateRange.endDate !== appliedDateRange.endDate;
 
   const finalizeDownload = useCallback(
     async ({
@@ -640,7 +672,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const allGroupsCollapsed =
     groupedResults.length > 0 && collapsedGroupCount === groupedResults.length;
 
-  const filteredSuccessResults = awbFilteredResults.filter(
+  const filteredSuccessResults = filteredResults.filter(
     (item) => item.status === 'SUCCESS' && item.result,
   );
   const filteredPiecesCount = filteredResults.reduce(
@@ -662,8 +694,17 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     setOpenColumnFilter(null);
     setIsAwbMenuOpen(false);
     setIsGroupMenuOpen(false);
+    setIsDateRangeMenuOpen(false);
+    setIsActionsMenuOpen(false);
     setCollapsedGroupIds(new Set());
   };
+
+  useEffect(() => {
+    setDraftDateRange({
+      startDate: appliedDateRange.startDate,
+      endDate: appliedDateRange.endDate,
+    });
+  }, [appliedDateRange.endDate, appliedDateRange.startDate]);
 
   useEffect(() => {
     if (selectedAwb !== 'ALL' && !awbCounts.has(selectedAwb)) {
@@ -687,6 +728,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       const target = event.target;
       if (target instanceof Node && !awbMenuRef.current.contains(target)) {
         setIsAwbMenuOpen(false);
+        setIsDateRangeMenuOpen(false);
+        setIsActionsMenuOpen(false);
       }
     };
 
@@ -727,12 +770,54 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       const target = event.target;
       if (target instanceof Node && !groupMenuRef.current.contains(target)) {
         setIsGroupMenuOpen(false);
+        setIsDateRangeMenuOpen(false);
+        setIsActionsMenuOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isGroupMenuOpen]);
+
+  useEffect(() => {
+    if (!isDateRangeMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!dateRangeMenuRef.current) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && !dateRangeMenuRef.current.contains(target)) {
+        setIsDateRangeMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDateRangeMenuOpen]);
+
+  useEffect(() => {
+    if (!isActionsMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!actionsMenuRef.current) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && !actionsMenuRef.current.contains(target)) {
+        setIsActionsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isActionsMenuOpen]);
 
   useEffect(() => {
     if (groupBy === 'none') {
@@ -756,6 +841,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     setIsAwbMenuOpen(false);
     setOpenColumnFilter(null);
     setIsGroupMenuOpen(false);
+    setIsDateRangeMenuOpen(false);
+    setIsActionsMenuOpen(false);
   };
 
   const handleSelectGroup = (nextGroupBy: GroupByKey) => {
@@ -764,6 +851,38 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     setIsGroupMenuOpen(false);
     setOpenColumnFilter(null);
     setIsAwbMenuOpen(false);
+    setIsDateRangeMenuOpen(false);
+    setIsActionsMenuOpen(false);
+  };
+
+  const applyDraftDateWindow = (days: number) => {
+    setDraftDateRange({
+      startDate: getRelativeDateKey(-(days - 1)),
+      endDate: getRelativeDateKey(0),
+    });
+  };
+
+  const isDraftDateWindowActive = (days: number): boolean =>
+    draftDateRange.startDate === getRelativeDateKey(-(days - 1)) &&
+    draftDateRange.endDate === getRelativeDateKey(0);
+
+  const getDateWindowButtonClass = (days: number): string =>
+    `rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+      isDraftDateWindowActive(days)
+        ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-indigo-200 dark:shadow-none'
+        : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300'
+    }`;
+
+  const handleApplyDateRange = () => {
+    if (draftDateRangeInvalid || !draftDateRange.startDate || !draftDateRange.endDate) {
+      return;
+    }
+
+    onOperationDateRangeChange?.({
+      startDate: draftDateRange.startDate,
+      endDate: draftDateRange.endDate,
+    });
+    setIsDateRangeMenuOpen(false);
   };
 
   const toggleGroupCollapsed = (groupId: string) => {
@@ -1319,7 +1438,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         icon={<FileText className="h-3.5 w-3.5" />}
         badge="Historial"
         title="Historial de extracciones"
-        subtitle="Revisa, filtra y exporta los resultados del procesamiento de facturas."
+        subtitle={`Revisa, filtra y exporta los registros del rango ${operationDateRangeLabel}.`}
       />
       {/* Header Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4 xl:gap-6">
@@ -1329,7 +1448,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           </div>
           <div className="min-w-0">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-              Archivos Acumulados
+              Archivos del rango
             </p>
             <p className="text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">
               {results.length}
@@ -1377,7 +1496,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       </div>
 
       {/* Action Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-white">
             Historial
@@ -1388,14 +1507,17 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Mostrando {filteredResults.length} de {results.length} registros
+            Mostrando {filteredResults.length} de {results.length} registros del rango{' '}
+            <span className="font-semibold text-slate-700 dark:text-slate-200">
+              {operationDateRangeLabel}
+            </span>
             {groupBy !== 'none' &&
               ` en ${groupedResults.length} ${groupedResults.length === 1 ? 'grupo' : 'grupos'} por ${selectedGroupOption.label}`}
           </p>
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
-          <div className="relative w-full sm:w-64 lg:w-72">
+        <div className="flex w-full flex-col gap-2 md:flex-row md:flex-wrap md:items-center xl:w-auto xl:justify-end">
+          <div className="relative min-w-0 md:min-w-[300px] md:flex-1 xl:w-80 xl:flex-none">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
@@ -1416,15 +1538,19 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               </button>
             )}
           </div>
+
           <div className="relative" ref={awbMenuRef}>
             <button
               type="button"
+              title={selectedAwbLabel}
               onClick={() => {
                 setOpenColumnFilter(null);
                 setIsGroupMenuOpen(false);
+                setIsDateRangeMenuOpen(false);
+                setIsActionsMenuOpen(false);
                 setIsAwbMenuOpen((current) => !current);
               }}
-              className="group flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left shadow-sm transition-colors hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-500/50 dark:hover:bg-slate-900/70 sm:w-[260px] xl:w-[220px]"
+              className="group flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left shadow-sm transition-colors hover:border-indigo-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-500/50 dark:hover:bg-slate-900/70 md:w-[250px] xl:w-[220px]"
               aria-haspopup="listbox"
               aria-expanded={isAwbMenuOpen}
             >
@@ -1491,6 +1617,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       <button
                         key={awb}
                         type="button"
+                        title={awb}
                         onClick={() => handleSelectAwb(awb)}
                         className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
                       >
@@ -1509,50 +1636,235 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
           </div>
 
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 sm:justify-start"
-            >
-              <X className="w-4 h-4" />
-              Limpiar filtros
-            </button>
-          )}
-          {results.length > 0 && onClearHistory && (
+          <div className="relative" ref={dateRangeMenuRef}>
             <HistoryTooltipAnchor
-              tooltipTitle="Acción"
-              tooltipValue="Limpiar historial"
+              tooltipTitle="Rango"
+              tooltipValue={operationDateRangeLabel}
               className="inline-flex"
             >
               <button
-                onClick={onClearHistory}
-                aria-label="Limpiar historial"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+                type="button"
+                title={`Rango cargado: ${operationDateRangeLabel}`}
+                onClick={() => {
+                  setOpenColumnFilter(null);
+                  setIsAwbMenuOpen(false);
+                  setIsGroupMenuOpen(false);
+                  setIsActionsMenuOpen(false);
+                  setIsDateRangeMenuOpen((current) => !current);
+                }}
+                className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 ${isDateRangeMenuOpen ? 'border-indigo-300 bg-indigo-50 text-indigo-600 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-indigo-200' : ''}`}
+                aria-label={`Rango cargado: ${operationDateRangeLabel}`}
+                aria-haspopup="dialog"
+                aria-expanded={isDateRangeMenuOpen}
               >
-                <Trash2 className="w-5 h-5" />
+                <Calendar className="h-5 w-5" />
               </button>
             </HistoryTooltipAnchor>
-          )}
-          <button
-            onClick={onBack}
-            className="flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+
+            {isDateRangeMenuOpen && (
+              <div className="absolute right-0 z-30 mt-2 w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40 sm:w-[360px]">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                    Rango de procesamiento
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {operationDateRangeLabel}
+                  </p>
+                </div>
+
+                <div className="space-y-3 p-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Desde
+                      <input
+                        type="date"
+                        value={draftDateRange.startDate}
+                        onChange={(event) =>
+                          setDraftDateRange((current) => ({
+                            ...current,
+                            startDate: event.target.value,
+                          }))
+                        }
+                        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-shadow focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                      />
+                    </label>
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Hasta
+                      <input
+                        type="date"
+                        value={draftDateRange.endDate}
+                        onChange={(event) =>
+                          setDraftDateRange((current) => ({
+                            ...current,
+                            endDate: event.target.value,
+                          }))
+                        }
+                        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-shadow focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyDraftDateWindow(1)}
+                      className={getDateWindowButtonClass(1)}
+                    >
+                      Hoy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDraftDateWindow(2)}
+                      className={getDateWindowButtonClass(2)}
+                    >
+                      Últimos 2 días
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDraftDateWindow(7)}
+                      className={getDateWindowButtonClass(7)}
+                    >
+                      7 días
+                    </button>
+                  </div>
+
+                  {draftDateRangeInvalid && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300">
+                      La fecha inicial no puede ser mayor que la fecha final.
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraftDateRange(appliedDateRange);
+                        setIsDateRangeMenuOpen(false);
+                      }}
+                      className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyDateRange}
+                      disabled={
+                        draftDateRangeInvalid ||
+                        !draftDateRange.startDate ||
+                        !draftDateRange.endDate ||
+                        !onOperationDateRangeChange
+                      }
+                      className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {draftDateRangeDirty ? 'Aplicar rango' : 'Aplicar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <HistoryTooltipAnchor
+            tooltipTitle="Exportar"
+            tooltipValue={
+              isExporting
+                ? 'Exportando MAWB...'
+                : selectedAwb === 'ALL'
+                  ? 'Selecciona una MAWB para exportar'
+                  : `Exportar MAWB ${selectedAwb}`
+            }
+            className="inline-flex shrink-0"
           >
-            Procesar más
-            <ArrowRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => void handleDownloadAll()}
-            disabled={selectedAwb === 'ALL' || filteredSuccessResults.length === 0 || isExporting}
-            className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />{' '}
-            {isExporting
-              ? 'Exportando...'
-              : selectedAwb === 'ALL'
-                ? 'Selecciona MAWB'
-                : 'Exportar MAWB'}
-          </button>
+            <button
+              type="button"
+              onClick={() => void handleDownloadAll()}
+              disabled={selectedAwb === 'ALL' || filteredSuccessResults.length === 0 || isExporting}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={
+                selectedAwb === 'ALL'
+                  ? 'Selecciona una MAWB para exportar'
+                  : `Exportar MAWB ${selectedAwb}`
+              }
+              title={
+                selectedAwb === 'ALL'
+                  ? 'Selecciona una MAWB para exportar'
+                  : `Exportar MAWB ${selectedAwb}`
+              }
+            >
+              <Download className={`h-4 w-4 ${isExporting ? 'animate-pulse' : ''}`} />
+            </button>
+          </HistoryTooltipAnchor>
+
+          <div className="relative" ref={actionsMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setOpenColumnFilter(null);
+                setIsAwbMenuOpen(false);
+                setIsGroupMenuOpen(false);
+                setIsDateRangeMenuOpen(false);
+                setIsActionsMenuOpen((current) => !current);
+              }}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+              aria-label="Acciones de historial"
+              aria-haspopup="menu"
+              aria-expanded={isActionsMenuOpen}
+              title="Acciones"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+
+            {isActionsMenuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 z-30 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
+              >
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                    Acciones
+                  </p>
+                </div>
+                <div className="space-y-1 p-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsActionsMenuOpen(false);
+                      onBack();
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    role="menuitem"
+                  >
+                    <ArrowRight className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-semibold">Procesar más</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    disabled={!hasActiveFilters}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    role="menuitem"
+                  >
+                    <X className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-semibold">Limpiar filtros</span>
+                  </button>
+                  {results.length > 0 && onClearHistory && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        onClearHistory();
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                      role="menuitem"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="text-sm font-semibold">Limpiar historial</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1693,7 +2005,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           {results.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400 sm:p-12">
               <FileText className="w-12 h-12 mb-4 opacity-20" />
-              <p>No hay facturas procesadas en esta sesión.</p>
+              <p>No hay facturas procesadas en este rango.</p>
             </div>
           ) : filteredResults.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400 sm:p-12">

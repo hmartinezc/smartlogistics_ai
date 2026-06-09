@@ -43,7 +43,7 @@ export const isOperationDateInRange = (
 ): boolean => operationDate >= startDate && operationDate <= endDate;
 
 export const getBatchItemOperationDate = (item: BatchItem): string =>
-  getOperationDateKey(item.createdAt || item.processedAt);
+  getOperationDateKey(item.processedAt || item.createdAt);
 
 export const buildInvoicedAwbRecords = (
   results: BatchItem[],

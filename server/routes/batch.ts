@@ -18,6 +18,7 @@ const batch = new Hono();
 const AUDITABLE_STATUSES = new Set(['SUCCESS', 'ERROR']);
 const DEFAULT_BATCH_LIST_LIMIT = 100;
 const MAX_BATCH_LIST_LIMIT = 500;
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function parseBatchListLimit(value: string | undefined): number {
   const parsed = Number(value || DEFAULT_BATCH_LIST_LIMIT);
@@ -27,6 +28,20 @@ function parseBatchListLimit(value: string | undefined): number {
   }
 
   return Math.min(parsed, MAX_BATCH_LIST_LIMIT);
+}
+
+function isValidDateKey(value: string): boolean {
+  if (!DATE_KEY_PATTERN.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
 }
 
 function parseBatchResultJson(row: Record<string, unknown>): {
@@ -135,7 +150,7 @@ function buildAuditStatement(
   };
 }
 
-// GET /api/batch — Listar resultados (con filtro opcional por agencia)
+// GET /api/batch — Listar resultados (con filtro opcional por agencia y rango procesado)
 batch.get('/', async (c) => {
   try {
     const authUser = await requireAuth(c);
@@ -144,40 +159,73 @@ batch.get('/', async (c) => {
     }
 
     const db = getDb();
-    const agencyId = c.req.query('agencyId');
-    const limit = parseBatchListLimit(c.req.query('limit'));
+    const agencyId = c.req.query('agencyId')?.trim();
+    const processedFrom = c.req.query('processedFrom')?.trim();
+    const processedTo = c.req.query('processedTo')?.trim();
+    const rawLimit = c.req.query('limit');
+    const hasProcessedRange = Boolean(processedFrom || processedTo);
 
-    let result;
+    if (hasProcessedRange) {
+      if (!processedFrom || !processedTo) {
+        return c.json({ error: 'processedFrom y processedTo deben enviarse juntos.' }, 400);
+      }
+
+      if (!isValidDateKey(processedFrom) || !isValidDateKey(processedTo)) {
+        return c.json(
+          { error: 'processedFrom y processedTo deben tener formato YYYY-MM-DD válido.' },
+          400,
+        );
+      }
+
+      if (processedFrom > processedTo) {
+        return c.json({ error: 'processedFrom no puede ser mayor que processedTo.' }, 400);
+      }
+    }
+
+    const whereParts: string[] = [];
+    const args: InValue[] = [];
+
     if (agencyId && agencyId !== 'GLOBAL') {
       const accessError = ensureAgencyAccess(c, authUser, agencyId);
       if (accessError) {
         return accessError;
       }
 
-      result = await db.execute({
-        sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
-              FROM batch_items WHERE agency_id = ? ORDER BY created_at DESC LIMIT ?`,
-        args: [agencyId, limit],
-      });
+      whereParts.push('agency_id = ?');
+      args.push(agencyId);
     } else if (authUser.role !== 'ADMIN') {
       if (authUser.agencyIds.length === 0) {
         return c.json([]);
       }
 
-      result = await db.execute({
-        sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
-              FROM batch_items
-              WHERE agency_id IN (${authUser.agencyIds.map(() => '?').join(',')})
-              ORDER BY created_at DESC LIMIT ?`,
-        args: [...authUser.agencyIds, limit],
-      });
-    } else {
-      result = await db.execute({
-        sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
-              FROM batch_items ORDER BY created_at DESC LIMIT ?`,
-        args: [limit],
-      });
+      whereParts.push(`agency_id IN (${authUser.agencyIds.map(() => '?').join(',')})`);
+      args.push(...authUser.agencyIds);
     }
+
+    if (processedFrom && processedTo) {
+      whereParts.push('substr(COALESCE(processed_at, created_at), 1, 10) >= ?');
+      args.push(processedFrom);
+      whereParts.push('substr(COALESCE(processed_at, created_at), 1, 10) <= ?');
+      args.push(processedTo);
+    }
+
+    const whereClause = whereParts.length > 0 ? ` WHERE ${whereParts.join(' AND ')}` : '';
+    const shouldApplyLimit = !hasProcessedRange || Boolean(rawLimit);
+    const limitClause = shouldApplyLimit ? ' LIMIT ?' : '';
+    const orderClause = hasProcessedRange
+      ? ' ORDER BY COALESCE(processed_at, created_at) DESC, created_at DESC'
+      : ' ORDER BY created_at DESC';
+    const queryArgs = [...args];
+
+    if (limitClause) {
+      queryArgs.push(parseBatchListLimit(rawLimit));
+    }
+
+    const result = await db.execute({
+      sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
+            FROM batch_items${whereClause}${orderClause}${limitClause}`,
+      args: queryArgs,
+    });
 
     return c.json(result.rows.map(buildBatchItem));
   } catch (error) {

@@ -70,6 +70,13 @@ export class ApiError extends Error {
   }
 }
 
+export interface BatchResultsQuery {
+  agencyId?: string;
+  processedFrom?: string;
+  processedTo?: string;
+  limit?: number;
+}
+
 // ── Auth ──
 
 interface LoginResponse {
@@ -283,9 +290,20 @@ export const api = {
   },
 
   // ── Batch ──
-  async getBatchResults(agencyId?: string): Promise<import('../types').BatchItem[]> {
-    const query = agencyId ? `?agencyId=${agencyId}` : '';
-    return request(`/batch${query}`);
+  async getBatchResults(
+    queryInput?: string | BatchResultsQuery,
+  ): Promise<import('../types').BatchItem[]> {
+    const params = typeof queryInput === 'string' ? { agencyId: queryInput } : queryInput || {};
+    const search = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        search.set(key, String(value));
+      }
+    });
+
+    const query = search.toString();
+    return request(`/batch${query ? `?${query}` : ''}`);
   },
 
   async saveBatchResults(items: import('../types').BatchItem[]): Promise<void> {

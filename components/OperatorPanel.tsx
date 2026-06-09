@@ -37,6 +37,8 @@ interface OperatorPanelProps {
   results: BatchItem[];
   currentAgencyId: string;
   currentAgency?: Agency;
+  operationDate: string;
+  onOperationDateChange: (date: string) => void;
 }
 
 type ExportMode = 'native' | 'client';
@@ -90,8 +92,9 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
   results,
   currentAgencyId,
   currentAgency,
+  operationDate,
+  onOperationDateChange,
 }) => {
-  const [operationDate, setOperationDate] = useState<string>(getOperationDateKey());
   const [exportingMawb, setExportingMawb] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<{
     tone: 'error' | 'warning' | 'success';
@@ -141,13 +144,13 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
 
   const handleDaySelect = (day: number) => {
     const val = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    setOperationDate(val);
+    onOperationDateChange(val);
     setIsDatePickerOpen(false);
   };
 
   const handleGoToday = () => {
     const today = getOperationDateKey();
-    setOperationDate(today);
+    onOperationDateChange(today);
     const [y, m] = today.split('-').map(Number);
     setViewYear(y);
     setViewMonth(m - 1);

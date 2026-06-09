@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AgentType, AppState, BatchItem, User, Agency } from './types';
 import {
   useAuth,
@@ -32,6 +32,11 @@ import {
   resolveLandingState,
 } from './services/authService';
 import { normalizeInvoiceDataAirwaybills } from './shared/airwaybillFormat';
+import {
+  getOperationDateKey,
+  getOperationDateRange,
+  shiftOperationDateKey,
+} from './services/operationalService';
 import { generateId } from './utils/helpers';
 
 interface AppProps {
@@ -40,9 +45,23 @@ interface AppProps {
   onClose?: () => void;
 }
 
+const getDefaultHistoryDateRange = () => {
+  const today = getOperationDateKey();
+  return {
+    startDate: shiftOperationDateKey(today, -1),
+    endDate: today,
+  };
+};
+
 function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const [appState, setAppState] = useState<AppState>(AppState.LOGIN);
   const [selectedFormat, setSelectedFormat] = useState<AgentType>('AGENT_GENERIC_A');
+  const [panelOperationDate, setPanelOperationDate] = useState<string>(() => getOperationDateKey());
+  const panelOperationDateRange = useMemo(
+    () => getOperationDateRange(panelOperationDate),
+    [panelOperationDate],
+  );
+  const [historyDateRange, setHistoryDateRange] = useState(getDefaultHistoryDateRange);
 
   // Hooks — datos cargados desde API (libSQL/Turso)
   const [isDarkMode, toggleDarkMode] = useDarkMode();
@@ -78,16 +97,50 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const { currentAgencyId, setCurrentAgencyId, availableAgencies, currentAgency } =
     useAgencyContext(currentUser, agencies);
 
+  const buildPanelBatchQuery = useCallback(
+    () => ({
+      agencyId: currentAgencyId && currentAgencyId !== 'GLOBAL' ? currentAgencyId : undefined,
+      processedFrom: panelOperationDateRange.startDate,
+      processedTo: panelOperationDateRange.endDate,
+    }),
+    [currentAgencyId, panelOperationDateRange.endDate, panelOperationDateRange.startDate],
+  );
+
+  const buildHistoryBatchQuery = useCallback(
+    () => ({
+      agencyId: currentAgencyId && currentAgencyId !== 'GLOBAL' ? currentAgencyId : undefined,
+      processedFrom: historyDateRange.startDate,
+      processedTo: historyDateRange.endDate,
+    }),
+    [currentAgencyId, historyDateRange.endDate, historyDateRange.startDate],
+  );
+
   // Cargar resultados batch cuando cambia la agencia
   useEffect(() => {
     if (isAuthenticated && currentAgencyId) {
+      const shouldUseOperationalRange =
+        appState === AppState.DASHBOARD_PANEL || appState === AppState.HISTORY_RESULTS;
       const shouldLoadAllResults =
         currentUser?.role === 'ADMIN' && appState === AppState.DASHBOARD_ADMIN;
       loadResults(
-        shouldLoadAllResults || currentAgencyId === 'GLOBAL' ? undefined : currentAgencyId,
+        shouldUseOperationalRange
+          ? appState === AppState.HISTORY_RESULTS
+            ? buildHistoryBatchQuery()
+            : buildPanelBatchQuery()
+          : shouldLoadAllResults || currentAgencyId === 'GLOBAL'
+            ? undefined
+            : currentAgencyId,
       );
     }
-  }, [appState, currentUser?.role, isAuthenticated, currentAgencyId, loadResults]);
+  }, [
+    appState,
+    buildHistoryBatchQuery,
+    buildPanelBatchQuery,
+    currentAgencyId,
+    currentUser?.role,
+    isAuthenticated,
+    loadResults,
+  ]);
 
   useEffect(() => {
     if (!sessionReady) return; // Esperar a que se restaure la sesión
@@ -330,8 +383,17 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     }
   };
 
+  const handleRefreshHistoryResults = async () => {
+    setIsCleaningData(true);
+    try {
+      await loadResults(currentAgencyId ? buildHistoryBatchQuery() : undefined);
+    } finally {
+      setIsCleaningData(false);
+    }
+  };
+
   const handleOpenHistoryResults = () => {
-    void handleRefreshBatchResults();
+    void handleRefreshHistoryResults();
     setAppState(AppState.HISTORY_RESULTS);
   };
 
@@ -434,6 +496,8 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                     results={batchResults}
                     currentAgencyId={currentAgencyId}
                     currentAgency={currentAgency}
+                    operationDate={panelOperationDate}
+                    onOperationDateChange={setPanelOperationDate}
                   />
                 )}
                 {appState === AppState.USER_MANAGEMENT && currentUser?.role === 'ADMIN' && (
@@ -479,7 +543,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                     currentAgency={currentAgency}
                     userRole={currentUser?.role}
                     onViewHistory={handleOpenHistoryResults}
-                    onResultsUpdated={handleRefreshBatchResults}
+                    onResultsUpdated={handleRefreshHistoryResults}
                     onConfirm={confirm}
                   />
                 )}
@@ -497,6 +561,8 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                   <ResultsDashboard
                     results={batchResults}
                     currentAgency={currentAgency}
+                    operationDateRange={historyDateRange}
+                    onOperationDateRangeChange={setHistoryDateRange}
                     onBack={handleBackToProcessSelection}
                     onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
                     onUpdateItem={handleUpdateResult}
