@@ -4,8 +4,12 @@
 
 import { Hono } from 'hono';
 import { sanitizeHawbFormatPattern } from '../../shared/airwaybillFormat.js';
-import { normalizeIntegrationConfig } from '../../shared/integrationConfig.js';
+import {
+  normalizeIntegrationConfig,
+  redactIntegrationConfigSecrets,
+} from '../../shared/integrationConfig.js';
 import { getDb } from '../db.js';
+import type { AuthUser } from '../security.js';
 import { ensureAgencyAccess, requireAuth, requireRole } from '../security.js';
 
 const agencies = new Hono();
@@ -37,7 +41,9 @@ function parseIntegrationConfig(value: unknown) {
 }
 
 // Helper: reconstruir Agency desde DB row
-function buildAgency(row: Record<string, unknown>) {
+function buildAgency(row: Record<string, unknown>, authUser?: AuthUser) {
+  const integrationConfig = parseIntegrationConfig(row.integration_config);
+
   return {
     id: String(row.id),
     name: String(row.name),
@@ -51,7 +57,10 @@ function buildAgency(row: Record<string, unknown>) {
     hawbFormatPattern:
       sanitizeHawbFormatPattern(row.hawb_format_pattern ? String(row.hawb_format_pattern) : null) ||
       undefined,
-    integrationConfig: parseIntegrationConfig(row.integration_config),
+    integrationConfig:
+      authUser?.role === 'ADMIN'
+        ? integrationConfig
+        : redactIntegrationConfigSecrets(integrationConfig),
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : undefined,
   };
@@ -75,6 +84,8 @@ agencies.get('/', async (c) => {
                 a.plan_id,
                 a.current_usage,
                 a.is_active,
+                a.hawb_format_pattern,
+                a.integration_config,
                 a.created_at,
                 a.updated_at,
                 COALESCE(GROUP_CONCAT(DISTINCT ae.email), '') AS emails
@@ -87,7 +98,7 @@ agencies.get('/', async (c) => {
           args: [authUser.id],
         });
 
-  return c.json(result.rows.map(buildAgency));
+  return c.json(result.rows.map((row) => buildAgency(row, authUser)));
 });
 
 // GET /api/agencies/:id
@@ -112,7 +123,7 @@ agencies.get('/:id', async (c) => {
     return c.json({ error: 'Agencia no encontrada' }, 404);
   }
 
-  return c.json(buildAgency(result.rows[0]));
+  return c.json(buildAgency(result.rows[0], authUser));
 });
 
 // POST /api/agencies — Crear agencia
@@ -177,7 +188,7 @@ agencies.post('/', async (c) => {
     sql: `${AGENCY_SELECT} WHERE a.id = ? GROUP BY a.id`,
     args: [body.id],
   });
-  return c.json(buildAgency(hydrated.rows[0]), 201);
+  return c.json(buildAgency(hydrated.rows[0], authUser), 201);
 });
 
 // PUT /api/agencies/:id — Actualizar agencia
@@ -277,7 +288,7 @@ agencies.put('/:id', async (c) => {
     sql: `${AGENCY_SELECT} WHERE a.id = ? GROUP BY a.id`,
     args: [id],
   });
-  return c.json(buildAgency(hydrated.rows[0]));
+  return c.json(buildAgency(hydrated.rows[0], authUser));
 });
 
 // DELETE /api/agencies/:id
@@ -346,7 +357,7 @@ agencies.patch('/:id/usage', async (c) => {
     sql: `${AGENCY_SELECT} WHERE a.id = ? GROUP BY a.id`,
     args: [id],
   });
-  return c.json(buildAgency(hydrated.rows[0]));
+  return c.json(buildAgency(hydrated.rows[0], authUser));
 });
 
 export default agencies;

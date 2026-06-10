@@ -71,10 +71,33 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Subscription Logic Calculation
   // If Global, we show aggregate or hide this specific widget? Let's hide specific usage for Global view.
+  const currentMonthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
+  const monthlyProcessedCount = useMemo(() => {
+    if (!currentAgency) {
+      return 0;
+    }
+
+    return results.filter((result) => {
+      const processedAt = result.processedAt || result.createdAt;
+      if (!processedAt || result.agencyId !== currentAgency.id) {
+        return false;
+      }
+
+      return (
+        processedAt.slice(0, 7) === currentMonthKey &&
+        (result.status === 'SUCCESS' || result.status === 'ERROR')
+      );
+    }).length;
+  }, [currentAgency, currentMonthKey, results]);
+
   const usagePercent =
-    currentAgency && currentPlan ? (currentAgency.currentUsage / currentPlan.limit) * 100 : 0;
+    currentAgency && currentPlan ? (monthlyProcessedCount / currentPlan.limit) * 100 : 0;
   const isOverLimit =
-    currentAgency && currentPlan ? currentAgency.currentUsage > currentPlan.limit : false;
+    currentAgency && currentPlan ? monthlyProcessedCount > currentPlan.limit : false;
 
   // Incident Logic: Status Error OR Low Confidence (<75)
   const incidentsCount = awbSummary.filter((row) => row.status !== 'MATCHED').length;
@@ -119,7 +142,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
               <span
                 className={`text-xs font-bold ${isOverLimit ? 'text-red-500' : 'text-indigo-600'}`}
               >
-                {currentAgency.currentUsage} / {currentPlan.limit} págs
+                {monthlyProcessedCount} / {currentPlan.limit} págs
               </span>
             </div>
             <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
@@ -131,7 +154,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({
             {isOverLimit && (
               <div className="mt-1 text-[10px] text-red-500 font-medium flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> Excedente aplicado:{' '}
-                {currentAgency.currentUsage - currentPlan.limit} págs extra
+                {monthlyProcessedCount - currentPlan.limit} págs extra
               </div>
             )}
           </div>

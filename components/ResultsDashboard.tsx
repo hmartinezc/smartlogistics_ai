@@ -34,21 +34,29 @@ import {
   buildBatchExportDocuments,
   enrichBatchItemsForExport,
 } from '../services/productMatchService';
-import { ApiError } from '../services/apiClient';
+import { api, ApiError } from '../services/apiClient';
 import { hasClientFieldMappings } from '../shared/integrationConfig';
 import { executeIntegrationExport } from '../services/integrationExportService';
+
+type HistoryReviewRequest = {
+  itemId: string;
+  requestId: string;
+};
 
 interface ResultsDashboardProps {
   results: BatchItem[];
   onBack: () => void;
   onClearHistory?: () => void;
   onUpdateItem?: (item: BatchItem) => void; // Call back to update parent
+  onMarkItemReviewed?: (id: string) => Promise<BatchItem>;
   currentAgency?: Agency;
   operationDateRange?: {
     startDate: string;
     endDate: string;
   };
   onOperationDateRangeChange?: (range: { startDate: string; endDate: string }) => void;
+  reviewRequest?: HistoryReviewRequest | null;
+  onReviewRequestConsumed?: () => void;
 }
 
 type ExportMode = 'native' | 'client';
@@ -355,13 +363,16 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   onBack,
   onClearHistory,
   onUpdateItem,
+  onMarkItemReviewed,
   currentAgency,
   operationDateRange,
   onOperationDateRangeChange,
+  reviewRequest,
+  onReviewRequestConsumed,
 }) => {
   const appliedDateRange = operationDateRange || {
     startDate: getRelativeDateKey(-1),
-    endDate: getRelativeDateKey(0),
+    endDate: getRelativeDateKey(1),
   };
   const [viewingItem, setViewingItem] = useState<BatchItem | null>(null);
   const [selectedAwb, setSelectedAwb] = useState('ALL');
@@ -374,6 +385,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [mawbFilter, setMawbFilter] = useState('');
   const [invoiceFilter, setInvoiceFilter] = useState('');
   const [hawbFilter, setHawbFilter] = useState('');
+  const [reviewItemIdFilter, setReviewItemIdFilter] = useState('');
   const [groupBy, setGroupBy] = useState<GroupByKey>('none');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(
@@ -391,12 +403,17 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   } | null>(null);
   const [exportModal, setExportModal] = useState<ExportModalState | null>(null);
   const [selectedExportMode, setSelectedExportMode] = useState<ExportMode>('native');
+  const [quickReviewItem, setQuickReviewItem] = useState<BatchItem | null>(null);
+  const [quickReviewPdfUrl, setQuickReviewPdfUrl] = useState<string | null>(null);
+  const [isQuickReviewPdfLoading, setIsQuickReviewPdfLoading] = useState(false);
+  const [quickReviewPdfError, setQuickReviewPdfError] = useState<string | null>(null);
   const awbMenuRef = useRef<HTMLDivElement | null>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const groupMenuRef = useRef<HTMLDivElement | null>(null);
   const dateRangeMenuRef = useRef<HTMLDivElement | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement | null>(null);
   const awbSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const handledReviewRequestIdRef = useRef<string | null>(null);
   const activeFilterCount = [
     selectedAwb !== 'ALL',
     globalSearch.trim().length > 0,
@@ -405,6 +422,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     mawbFilter.trim().length > 0,
     invoiceFilter.trim().length > 0,
     hawbFilter.trim().length > 0,
+    reviewItemIdFilter.length > 0,
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
   const successCount = results.filter((r) => r.status === 'SUCCESS').length;
@@ -415,8 +433,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const operationDateRangeLabel = `${appliedDateRange.startDate} a ${appliedDateRange.endDate}`;
   const draftDateRangeInvalid = Boolean(
     draftDateRange.startDate &&
-      draftDateRange.endDate &&
-      draftDateRange.startDate > draftDateRange.endDate,
+    draftDateRange.endDate &&
+    draftDateRange.startDate > draftDateRange.endDate,
   );
   const draftDateRangeDirty =
     draftDateRange.startDate !== appliedDateRange.startDate ||
@@ -528,6 +546,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     const normalizedHawbFilter = hawbFilter.trim().toLowerCase();
 
     return awbFilteredResults.filter((item) => {
+      if (reviewItemIdFilter && item.id !== reviewItemIdFilter) {
+        return false;
+      }
+
       if (normalizedGlobalSearch) {
         const searchableValues = [
           item.fileName,
@@ -599,6 +621,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     invoiceFilter,
     mawbFilter,
     processedDateFilter,
+    reviewItemIdFilter,
   ]);
 
   const sortedResults = useMemo(() => {
@@ -690,6 +713,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     setMawbFilter('');
     setInvoiceFilter('');
     setHawbFilter('');
+    setReviewItemIdFilter('');
     setAwbSearch('');
     setOpenColumnFilter(null);
     setIsAwbMenuOpen(false);
@@ -698,6 +722,139 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     setIsActionsMenuOpen(false);
     setCollapsedGroupIds(new Set());
   };
+
+  const closeQuickReviewModal = useCallback(() => {
+    setQuickReviewItem(null);
+    setQuickReviewPdfUrl(null);
+    setQuickReviewPdfError(null);
+    setIsQuickReviewPdfLoading(false);
+  }, []);
+
+  const openQuickReviewItem = useCallback((item: BatchItem) => {
+    setViewingItem(null);
+    setSelectedAwb('ALL');
+    setGlobalSearch('');
+    setProcessedDateFilter('');
+    setInvoiceDateFilter('');
+    setMawbFilter('');
+    setInvoiceFilter('');
+    setHawbFilter('');
+    setAwbSearch('');
+    setOpenColumnFilter(null);
+    setIsAwbMenuOpen(false);
+    setIsGroupMenuOpen(false);
+    setIsDateRangeMenuOpen(false);
+    setIsActionsMenuOpen(false);
+    setGroupBy('none');
+    setCollapsedGroupIds(new Set());
+    setReviewItemIdFilter(item.id);
+    setQuickReviewItem(item);
+  }, []);
+
+  useEffect(() => {
+    if (!reviewRequest || handledReviewRequestIdRef.current === reviewRequest.requestId) {
+      return;
+    }
+
+    const requestedItem = results.find((item) => item.id === reviewRequest.itemId);
+    if (!requestedItem) {
+      return;
+    }
+
+    handledReviewRequestIdRef.current = reviewRequest.requestId;
+    openQuickReviewItem(requestedItem);
+    onReviewRequestConsumed?.();
+  }, [onReviewRequestConsumed, openQuickReviewItem, results, reviewRequest]);
+
+  useEffect(() => {
+    if (!quickReviewItem) {
+      return;
+    }
+
+    const updatedItem = results.find((item) => item.id === quickReviewItem.id);
+    if (updatedItem && updatedItem !== quickReviewItem) {
+      setQuickReviewItem(updatedItem);
+    }
+  }, [quickReviewItem, results]);
+
+  useEffect(() => {
+    return () => {
+      if (quickReviewPdfUrl) {
+        URL.revokeObjectURL(quickReviewPdfUrl);
+      }
+    };
+  }, [quickReviewPdfUrl]);
+
+  useEffect(() => {
+    if (!quickReviewItem) {
+      setQuickReviewPdfUrl(null);
+      setQuickReviewPdfError(null);
+      setIsQuickReviewPdfLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setQuickReviewPdfUrl(null);
+    setQuickReviewPdfError(null);
+    setIsQuickReviewPdfLoading(true);
+
+    api
+      .getDocumentPreviewBlobUrl(quickReviewItem.id)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        setQuickReviewPdfUrl(url);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setQuickReviewPdfError(
+          error instanceof ApiError ? error.message : 'PDF no disponible para este documento.',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsQuickReviewPdfLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quickReviewItem?.id]);
+
+  useEffect(() => {
+    if (!quickReviewItem || quickReviewItem.reviewedAt || !onMarkItemReviewed) {
+      return;
+    }
+
+    let cancelled = false;
+    onMarkItemReviewed(quickReviewItem.id)
+      .then((reviewedItem) => {
+        if (!cancelled) {
+          setQuickReviewItem(reviewedItem);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setDownloadNotice({
+          tone: 'error',
+          message:
+            error instanceof ApiError
+              ? error.message
+              : 'No se pudo marcar la incidencia como revisada.',
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onMarkItemReviewed, quickReviewItem?.id, quickReviewItem?.reviewedAt]);
 
   useEffect(() => {
     setDraftDateRange({
@@ -855,23 +1012,33 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     setIsActionsMenuOpen(false);
   };
 
-  const applyDraftDateWindow = (days: number) => {
+  const applyDraftDateOffsetWindow = (startOffsetDays: number, endOffsetDays: number) => {
     setDraftDateRange({
-      startDate: getRelativeDateKey(-(days - 1)),
-      endDate: getRelativeDateKey(0),
+      startDate: getRelativeDateKey(startOffsetDays),
+      endDate: getRelativeDateKey(endOffsetDays),
     });
   };
 
-  const isDraftDateWindowActive = (days: number): boolean =>
-    draftDateRange.startDate === getRelativeDateKey(-(days - 1)) &&
-    draftDateRange.endDate === getRelativeDateKey(0);
+  const applyDraftDateWindow = (days: number) => {
+    applyDraftDateOffsetWindow(-(days - 1), 0);
+  };
 
-  const getDateWindowButtonClass = (days: number): string =>
+  const isDraftDateOffsetWindowActive = (startOffsetDays: number, endOffsetDays: number): boolean =>
+    draftDateRange.startDate === getRelativeDateKey(startOffsetDays) &&
+    draftDateRange.endDate === getRelativeDateKey(endOffsetDays);
+
+  const isDraftDateWindowActive = (days: number): boolean =>
+    isDraftDateOffsetWindowActive(-(days - 1), 0);
+
+  const getDateRangeButtonClass = (isActive: boolean): string =>
     `rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-      isDraftDateWindowActive(days)
+      isActive
         ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-indigo-200 dark:shadow-none'
         : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300'
     }`;
+
+  const getDateWindowButtonClass = (days: number): string =>
+    getDateRangeButtonClass(isDraftDateWindowActive(days));
 
   const handleApplyDateRange = () => {
     if (draftDateRangeInvalid || !draftDateRange.startDate || !draftDateRange.endDate) {
@@ -1714,10 +1881,10 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyDraftDateWindow(2)}
-                      className={getDateWindowButtonClass(2)}
+                      onClick={() => applyDraftDateOffsetWindow(-1, 1)}
+                      className={getDateRangeButtonClass(isDraftDateOffsetWindowActive(-1, 1))}
                     >
-                      Últimos 2 días
+                      Hoy -1/+1
                     </button>
                     <button
                       type="button"
@@ -1998,6 +2165,103 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {quickReviewItem &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Revisión rápida de ${quickReviewItem.fileName}`}
+              className="flex h-[92vh] w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 dark:border-slate-800 sm:px-5">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-500 dark:text-indigo-300">
+                    Revisión rápida
+                  </p>
+                  <h3 className="mt-1 truncate text-lg font-bold text-slate-900 dark:text-white">
+                    {quickReviewItem.fileName}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${quickReviewItem.status === 'ERROR' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'}`}
+                    >
+                      {quickReviewItem.status === 'ERROR'
+                        ? 'Error de extracción'
+                        : 'Baja confianza'}
+                    </span>
+                    {quickReviewItem.reviewedAt && (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                        Revisada
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeQuickReviewModal}
+                  aria-label="Cerrar revisión rápida"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(420px,1fr)]">
+                <div className="min-h-[320px] border-b border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-950 xl:border-b-0 xl:border-r">
+                  {isQuickReviewPdfLoading ? (
+                    <div className="flex h-full min-h-[320px] items-center justify-center text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      Cargando PDF...
+                    </div>
+                  ) : quickReviewPdfUrl ? (
+                    <iframe
+                      className="h-full min-h-[320px] w-full"
+                      src={quickReviewPdfUrl}
+                      title={`PDF ${quickReviewItem.fileName}`}
+                    />
+                  ) : (
+                    <div className="flex h-full min-h-[320px] items-center justify-center px-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                      {quickReviewPdfError || 'PDF no disponible para este documento.'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-h-0 overflow-hidden bg-white dark:bg-slate-900">
+                  {quickReviewItem.result ? (
+                    <ValidationForm
+                      variant="embedded"
+                      data={quickReviewItem.result}
+                      onSave={(updatedData) => {
+                        const updatedItem = {
+                          ...quickReviewItem,
+                          result: updatedData,
+                        };
+                        onUpdateItem?.(updatedItem);
+                        closeQuickReviewModal();
+                      }}
+                      onCancel={closeQuickReviewModal}
+                    />
+                  ) : (
+                    <div className="flex h-full min-h-[320px] flex-col items-center justify-center px-6 text-center">
+                      <AlertCircle className="mb-3 h-10 w-10 text-rose-500" />
+                      <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                        {quickReviewItem.status === 'ERROR'
+                          ? 'Extracción con error'
+                          : 'Sin extracción editable'}
+                      </h4>
+                      <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+                        {quickReviewItem.error ||
+                          'Este documento no tiene datos extraídos para editar.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* Results Table */}
       <div className="flex min-h-[320px] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">

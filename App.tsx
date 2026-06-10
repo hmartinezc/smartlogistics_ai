@@ -45,11 +45,16 @@ interface AppProps {
   onClose?: () => void;
 }
 
+type HistoryReviewRequest = {
+  itemId: string;
+  requestId: string;
+};
+
 const getDefaultHistoryDateRange = () => {
   const today = getOperationDateKey();
   return {
     startDate: shiftOperationDateKey(today, -1),
-    endDate: today,
+    endDate: shiftOperationDateKey(today, 1),
   };
 };
 
@@ -62,6 +67,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     [panelOperationDate],
   );
   const [historyDateRange, setHistoryDateRange] = useState(getDefaultHistoryDateRange);
+  const [pendingHistoryReview, setPendingHistoryReview] = useState<HistoryReviewRequest | null>(
+    null,
+  );
 
   // Hooks — datos cargados desde API (libSQL/Turso)
   const [isDarkMode, toggleDarkMode] = useDarkMode();
@@ -81,6 +89,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     setBatchFiles,
     addResults,
     updateResult,
+    markResultReviewed,
     removeResults,
     clearResults,
     loadResults,
@@ -292,6 +301,23 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     updateResult(updatedItem);
   };
 
+  const handleMarkResultReviewed = useCallback(
+    (id: string) => markResultReviewed(id),
+    [markResultReviewed],
+  );
+
+  const handleOpenIncidentReview = useCallback(
+    (item: BatchItem, range: { startDate: string; endDate: string }) => {
+      setHistoryDateRange(range);
+      setPendingHistoryReview({
+        itemId: item.id,
+        requestId: generateId('history-review'),
+      });
+      setAppState(AppState.HISTORY_RESULTS);
+    },
+    [],
+  );
+
   const handleBatchComplete = async (batchId: string, newResults: BatchItem[]) => {
     if (completedBatchIdsRef.current.has(batchId)) {
       return;
@@ -405,6 +431,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     if (appState === AppState.BATCH_RUNNING && target !== AppState.BATCH_RUNNING) {
       if (!(await confirm('¿Estás seguro? El proceso actual se detendrá.'))) return;
     }
+    if (target !== AppState.HISTORY_RESULTS) {
+      setPendingHistoryReview(null);
+    }
     setAppState(target);
   };
 
@@ -498,6 +527,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                     currentAgency={currentAgency}
                     operationDate={panelOperationDate}
                     onOperationDateChange={setPanelOperationDate}
+                    onReviewIncident={handleOpenIncidentReview}
                   />
                 )}
                 {appState === AppState.USER_MANAGEMENT && currentUser?.role === 'ADMIN' && (
@@ -566,6 +596,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                     onBack={handleBackToProcessSelection}
                     onClearHistory={currentUser?.role === 'ADMIN' ? handleClearHistory : undefined}
                     onUpdateItem={handleUpdateResult}
+                    reviewRequest={pendingHistoryReview}
+                    onReviewRequestConsumed={() => setPendingHistoryReview(null)}
+                    onMarkItemReviewed={handleMarkResultReviewed}
                   />
                 )}
                 {appState === AppState.DATA_CLEANUP && (

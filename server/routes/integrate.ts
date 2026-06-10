@@ -15,8 +15,10 @@ import type {
 } from '../../types.js';
 import { getDb } from '../db.js';
 import { ensureAgencyAccess, requireAuth, requireRole } from '../security.js';
+import { validateExternalEndpointTarget } from '../services/egressGuard.js';
 
 const integrate = new Hono();
+const EXTERNAL_DELIVERY_TIMEOUT_MS = 15_000;
 
 type IntegrationPayload = {
   agencyId: string;
@@ -165,6 +167,29 @@ async function deliverToExternalEndpoint(input: {
 
   const safeIntegrationConfig = integrationConfig as AgencyIntegrationConfig;
   const endpointConfig = safeIntegrationConfig.endpoint;
+  const endpointValidation = await validateExternalEndpointTarget(endpointConfig.url);
+
+  if (!endpointValidation.ok) {
+    const deliveryId = await persistIntegrationDeliveryLog({
+      agencyId: input.agencyId,
+      eventType: input.eventType,
+      source: input.source,
+      exportReference: input.exportReference,
+      exportFilename: input.exportFilename,
+      endpointUrl: endpointConfig.url,
+      requestDocumentCount: input.documents.length,
+      usedClientMapping: input.useClientMapping,
+      success: false,
+      error: endpointValidation.error,
+    });
+
+    return {
+      ok: false,
+      error: endpointValidation.error || 'Endpoint de integración no permitido.',
+      usedClientMapping: input.useClientMapping,
+      deliveryId,
+    };
+  }
 
   const payload = applyFieldMappingsToDocuments(
     input.documents,
@@ -177,15 +202,24 @@ async function deliverToExternalEndpoint(input: {
     ...buildAuthHeaders(endpointConfig),
   };
 
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), EXTERNAL_DELIVERY_TIMEOUT_MS);
+
   try {
     const response = await fetch(endpointConfig.url, {
       method: endpointConfig.method,
       headers,
       body: JSON.stringify(payload),
+      redirect: 'manual',
+      signal: abortController.signal,
     });
 
     const responseBody = truncateResponseBody(await response.text());
-    const success = response.ok;
+    const isRedirect = response.status >= 300 && response.status < 400;
+    const success = response.ok && !isRedirect;
+    const responseError = isRedirect
+      ? 'Endpoint respondió con redirección no permitida.'
+      : `Endpoint respondió ${response.status}`;
     const deliveryId = await persistIntegrationDeliveryLog({
       agencyId: input.agencyId,
       eventType: input.eventType,
@@ -198,19 +232,26 @@ async function deliverToExternalEndpoint(input: {
       responseStatus: response.status,
       responseBody,
       success,
-      error: success ? undefined : `Endpoint respondió ${response.status}`,
+      error: success ? undefined : responseError,
     });
 
     return {
       ok: success,
       statusCode: response.status,
       responseBody,
-      error: success ? undefined : `Endpoint respondió ${response.status}`,
+      error: success ? undefined : responseError,
       usedClientMapping: input.useClientMapping,
       deliveryId,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error desconocido';
+    const detail =
+      error instanceof Error && error.name === 'AbortError'
+        ? `Timeout al enviar al endpoint despues de ${EXTERNAL_DELIVERY_TIMEOUT_MS / 1000}s.`
+        : error instanceof Error
+          ? error.message
+          : 'Error desconocido';
+    const message = 'No se pudo entregar al endpoint configurado.';
+    console.warn('Fallo de integración externa.', { detail, endpointUrl: endpointConfig.url });
     const deliveryId = await persistIntegrationDeliveryLog({
       agencyId: input.agencyId,
       eventType: input.eventType,
@@ -221,7 +262,7 @@ async function deliverToExternalEndpoint(input: {
       requestDocumentCount: input.documents.length,
       usedClientMapping: input.useClientMapping,
       success: false,
-      error: message,
+      error: detail,
     });
 
     return {
@@ -230,6 +271,8 @@ async function deliverToExternalEndpoint(input: {
       usedClientMapping: input.useClientMapping,
       deliveryId,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

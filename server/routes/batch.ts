@@ -77,6 +77,8 @@ function buildBatchItem(row: Record<string, unknown>) {
     processedAt: row.processed_at ? String(row.processed_at) : undefined,
     user: row.user_email ? String(row.user_email) : undefined,
     agencyId: row.agency_id ? String(row.agency_id) : undefined,
+    reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined,
+    reviewedBy: row.reviewed_by_email ? String(row.reviewed_by_email) : undefined,
   };
 }
 
@@ -222,7 +224,7 @@ batch.get('/', async (c) => {
     }
 
     const result = await db.execute({
-      sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, created_at
+      sql: `SELECT id, file_name, status, result_json, error, processed_at, user_email, agency_id, reviewed_at, reviewed_by_email, created_at
             FROM batch_items${whereClause}${orderClause}${limitClause}`,
       args: queryArgs,
     });
@@ -392,6 +394,46 @@ batch.put('/:id', async (c) => {
   } else {
     await db.execute(updateStatement);
   }
+
+  const result = await db.execute({ sql: 'SELECT * FROM batch_items WHERE id = ?', args: [id] });
+  if (result.rows.length === 0) {
+    return c.json({ error: 'Item no encontrado' }, 404);
+  }
+
+  return c.json(buildBatchItem(result.rows[0]));
+});
+
+// PATCH /api/batch/:id/reviewed — Marcar una incidencia como revisada sin tocar extracción
+batch.patch('/:id/reviewed', async (c) => {
+  const authUser = await requireAuth(c);
+  if (authUser instanceof Response) {
+    return authUser;
+  }
+
+  const id = c.req.param('id');
+  const db = getDb();
+
+  const existing = await db.execute({
+    sql: 'SELECT agency_id FROM batch_items WHERE id = ?',
+    args: [id],
+  });
+  if (existing.rows.length === 0) {
+    return c.json({ error: 'Item no encontrado' }, 404);
+  }
+
+  const agencyId = String(existing.rows[0].agency_id || '');
+  const accessError = ensureAgencyAccess(c, authUser, agencyId);
+  if (accessError) {
+    return accessError;
+  }
+
+  await db.execute({
+    sql: `UPDATE batch_items SET
+            reviewed_at = COALESCE(reviewed_at, datetime('now')),
+            reviewed_by_email = COALESCE(reviewed_by_email, ?)
+          WHERE id = ?`,
+    args: [authUser.email, id],
+  });
 
   const result = await db.execute({ sql: 'SELECT * FROM batch_items WHERE id = ?', args: [id] });
   if (result.rows.length === 0) {

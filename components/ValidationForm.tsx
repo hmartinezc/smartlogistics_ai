@@ -17,9 +17,27 @@ interface ValidationFormProps {
   data: InvoiceData;
   onSave: (data: InvoiceData) => void;
   onCancel: () => void;
+  variant?: 'page' | 'embedded';
 }
 
-const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSave, onCancel }) => {
+function parseCompactVariety(value: string): { name: string; stems?: string } {
+  const match = value.match(/^(.*?):(\d+(?:[.,]\d+)?)$/);
+  if (!match) {
+    return { name: value };
+  }
+
+  return {
+    name: match[1].trim(),
+    stems: match[2],
+  };
+}
+
+const ValidationForm: React.FC<ValidationFormProps> = ({
+  data: initialData,
+  onSave,
+  onCancel,
+  variant = 'page',
+}) => {
   const [formData, setFormData] = React.useState<InvoiceData>(initialData);
   const [calculatedPieces, setCalculatedPieces] = useState(0);
   const [calculatedEq, setCalculatedEq] = useState(0);
@@ -97,11 +115,13 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
     'w-full bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-700 dark:text-slate-200 text-xs font-medium py-1 outline-none transition-colors';
   const labelBase =
     'text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider';
+  const containerClass =
+    variant === 'embedded'
+      ? `w-full h-full bg-white dark:bg-slate-900 overflow-hidden flex flex-col ${hasCriticalErrors ? 'ring-2 ring-rose-300 dark:ring-rose-500/50' : ''}`
+      : `w-full max-w-6xl mx-auto bg-white dark:bg-slate-900 rounded-lg shadow-xl overflow-hidden flex flex-col h-[85vh] border ${hasCriticalErrors ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'}`;
 
   return (
-    <div
-      className={`w-full max-w-6xl mx-auto bg-white dark:bg-slate-900 rounded-lg shadow-xl overflow-hidden flex flex-col h-[85vh] border ${hasCriticalErrors ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'}`}
-    >
+    <div className={containerClass}>
       {/* 1. COMPACT TOOLBAR */}
       <div className="h-14 px-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 shrink-0 z-20">
         <div className="flex items-center gap-4">
@@ -369,14 +389,23 @@ const ValidationForm: React.FC<ValidationFormProps> = ({ data: initialData, onSa
                         {/* SHOW VARIETIES IF PRESENT */}
                         {item.varieties && item.varieties.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {item.varieties.map((v, i) => (
-                              <span
-                                key={i}
-                                className="text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-600"
-                              >
-                                {v}
-                              </span>
-                            ))}
+                            {item.varieties.map((v, i) => {
+                              const variety = parseCompactVariety(v);
+
+                              return (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-600"
+                                >
+                                  <span>{variety.name}</span>
+                                  {variety.stems && (
+                                    <span className="font-mono font-bold text-indigo-600 dark:text-indigo-300">
+                                      {variety.stems}
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

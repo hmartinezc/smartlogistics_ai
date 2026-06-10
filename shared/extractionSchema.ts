@@ -82,7 +82,7 @@ export const invoiceExtractionSchema: Schema = {
             type: SchemaType.ARRAY,
             items: { type: SchemaType.STRING },
             description:
-              'If the item has sub-lines describing varieties without their own piece count, list them here.',
+              'If the item has sub-lines without their own piece count, list them here. Use compact PRODUCT:stems entries when stems are printed per variety.',
           },
           hts: { type: SchemaType.STRING },
           nandina: { type: SchemaType.STRING },

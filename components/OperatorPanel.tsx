@@ -39,6 +39,13 @@ interface OperatorPanelProps {
   currentAgency?: Agency;
   operationDate: string;
   onOperationDateChange: (date: string) => void;
+  onReviewIncident?: (
+    item: BatchItem,
+    range: {
+      startDate: string;
+      endDate: string;
+    },
+  ) => void;
 }
 
 type ExportMode = 'native' | 'client';
@@ -94,6 +101,7 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
   currentAgency,
   operationDate,
   onOperationDateChange,
+  onReviewIncident,
 }) => {
   const [exportingMawb, setExportingMawb] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<{
@@ -577,11 +585,16 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
                   item.status === 'ERROR'
                     ? item.error || 'El documento no pudo ser procesado.'
                     : `Confianza ${item.result?.confidenceScore ?? 0}% en ${item.result?.mawb?.trim() || 'SIN MAWB'}`;
+                const isReviewed = Boolean(item.reviewedAt);
 
                 return (
-                  <div
+                  <button
                     key={item.id}
-                    className="rounded-2xl border border-amber-100 bg-white px-4 py-3 shadow-sm dark:border-amber-500/20 dark:bg-slate-900/70"
+                    type="button"
+                    onClick={() => onReviewIncident?.(item, operationDateRange)}
+                    disabled={!onReviewIncident}
+                    aria-label={`Revisar incidencia ${item.fileName}`}
+                    className="w-full rounded-2xl border border-amber-100 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:cursor-default disabled:hover:translate-y-0 disabled:hover:border-amber-100 disabled:hover:shadow-sm dark:border-amber-500/20 dark:bg-slate-900/70 dark:focus:ring-offset-slate-950"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -592,16 +605,23 @@ const OperatorPanel: React.FC<OperatorPanelProps> = ({
                           {item.processedAt ? formatDateTime(item.processedAt) : 'Sin fecha'}
                         </p>
                       </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${item.status === 'ERROR' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'}`}
-                      >
-                        {incidentType}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${item.status === 'ERROR' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'}`}
+                        >
+                          {incidentType}
+                        </span>
+                        {isReviewed && (
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                            Revisada
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
                       {incidentDetail}
                     </p>
-                  </div>
+                  </button>
                 );
               })}
             </div>

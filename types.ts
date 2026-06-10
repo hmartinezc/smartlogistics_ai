@@ -3,7 +3,7 @@ export interface InvoiceItem {
   totalPieces: number; // TOTAL PIECES
   eqFull: number; // EQ-FULL BOXES
   productDescription: string; // PRODUCT DESCRIPTION
-  varieties?: string[]; // NEW: List of varieties included in this box/item
+  varieties?: string[]; // Varieties included in this box/item; mixed boxes may use PRODUCT:stems.
   hts: string; // HTS
   nandina: string; // NANDINA
   totalStems: number; // TOTAL-UNT STEMS
@@ -152,6 +152,8 @@ export interface BatchItem {
   processedAt?: string; // ISO Date
   user?: string; // User who processed the file
   agencyId?: string; // Agency context where this was processed
+  reviewedAt?: string; // ISO Date when an incident was reviewed
+  reviewedBy?: string; // User email who reviewed the incident
 }
 
 export interface DocumentProcessingAuditEntry {

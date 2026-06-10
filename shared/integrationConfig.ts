@@ -144,7 +144,7 @@ export const INTEGRATION_FIELD_DEFINITIONS: IntegrationFieldDefinition[] = [
     path: 'lineItems[].varieties',
     label: 'Item Varieties',
     section: 'lineItems',
-    description: 'Variedades detectadas.',
+    description: 'Variedades detectadas; cajas mixtas pueden usar PRODUCTO:tallos.',
   },
   {
     path: 'lineItems[].hts',
@@ -322,7 +322,43 @@ export function isValidIntegrationEndpointUrl(url: string): boolean {
 
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const ipv4Parts = hostname.split('.').map((part) => Number(part));
+    const isIPv4 =
+      ipv4Parts.length === 4 &&
+      ipv4Parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+      return false;
+    }
+
+    if (isIPv4) {
+      const [first, second] = ipv4Parts;
+      if (
+        first === 10 ||
+        first === 127 ||
+        (first === 169 && second === 254) ||
+        (first === 172 && second >= 16 && second <= 31) ||
+        (first === 192 && second === 168)
+      ) {
+        return false;
+      }
+    }
+
+    if (
+      hostname === '::1' ||
+      hostname.startsWith('fe80:') ||
+      hostname.startsWith('fc') ||
+      hostname.startsWith('fd')
+    ) {
+      return false;
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -362,6 +398,29 @@ export function hasEnabledIntegrationEndpoint(
   }
 
   return config.endpoint.enabled && isValidIntegrationEndpointUrl(config.endpoint.url);
+}
+
+export function redactIntegrationConfigSecrets(
+  config: AgencyIntegrationConfig | null | undefined,
+): AgencyIntegrationConfig | undefined {
+  if (!config) {
+    return undefined;
+  }
+
+  return {
+    fieldMappings: { ...config.fieldMappings },
+    endpoint: {
+      ...config.endpoint,
+      bearerToken: '',
+      apiKeyValue: '',
+      basicUsername: '',
+      basicPassword: '',
+      headers: config.endpoint.headers.map((header) => ({
+        ...header,
+        value: '',
+      })),
+    },
+  };
 }
 
 function mapObjectValue(

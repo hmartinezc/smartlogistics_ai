@@ -248,6 +248,7 @@ LEGACY_CACHE_TEST_DOCUMENT_WORKER_CONCURRENCY=1 npm run docker:up:legacy-cache-t
 - Monta persistencia en `/app/data` si usas la BD local
 - El repositorio incluye `Dockerfile`, `docker-compose.yml`, `.dockerignore` y `.env.example`
 - La receta operativa completa está en `docs/CoolifyDeployment.md`
+- El registro rapido de decisiones productivas, limites y ajustes recientes esta en `docs/ProductionReadinessNotes.md`
 
 ### Configuración Exacta en Coolify
 
@@ -260,7 +261,7 @@ Usa estos valores literalmente:
 | **Build Command**            | no aplica si usas Compose |
 | **Start Command**            | no aplica si usas Compose |
 | **Port**                     | `3001`                    |
-| **Healthcheck Path**         | `/api/health`             |
+| **Healthcheck Path**         | `/api/ready`              |
 | **Persistent Volume**        | `/app/data`               |
 | **Node Version recomendada** | `20`                      |
 
@@ -335,7 +336,7 @@ Si prefieres Nixpacks, usa como fallback:
 4. Usa `Docker Compose` para levantar la app y MinIO juntos
 5. No expongas los puertos de MinIO públicamente salvo que necesites administrar la consola
 6. Expón el puerto `3001` o configura `PORT` explícitamente
-7. Verifica el healthcheck en `/api/health`
+7. Verifica el readiness check en `/api/ready`; `/api/health` queda como liveness básico
 8. Ejecuta `npm run db:seed` solo si necesitas rehidratar una base nueva
 9. No expongas Vite dev server en producción; solo el proceso de Hono
 10. Si mantienes BD local, asegúrate de incluir backup periódico del volumen
@@ -345,12 +346,27 @@ Si prefieres Nixpacks, usa como fallback:
 1. Copia los valores de `.env.example` a las variables del servicio en Coolify.
 2. Monta un volumen persistente en `/app/data`.
 3. Despliega usando `docker-compose.yml`.
-4. Confirma `200 OK` en `/api/health`.
-5. Valida login, agencias y extracción IA.
-6. Verifica un caso de baja confianza donde Gemini reporte motivos y el backend conserve solo discrepancias matemáticas confirmadas.
-7. Verifica que `50.5` y `50.50` no disparen `VALUE_TOTAL_MISMATCH`.
+4. Confirma `200 OK` en `/api/health` y `/api/ready`.
+5. Si la base nació vacía, entra con `admin@smart.com / 1234` y cambia la contraseña antes de compartir la URL.
+6. Valida login, agencias y extracción IA.
+7. Verifica que integraciones externas rechacen `localhost`, `127.0.0.1` y redes privadas.
+8. Verifica un caso de baja confianza donde Gemini reporte motivos y el backend conserve solo discrepancias matemáticas confirmadas.
+9. Verifica que `50.5` y `50.50` no disparen `VALUE_TOTAL_MISMATCH`.
 
-Detalle completo: `docs/CoolifyDeployment.md`
+### Healthchecks
+
+- `GET /api/health`: liveness simple del proceso HTTP.
+- `GET /api/ready`: readiness de producción; valida base de datos, MinIO y worker documental.
+
+Docker y Coolify usan `/api/ready` para evitar marcar sano un contenedor que todavía no puede procesar documentos.
+
+### Backup mínimo
+
+- Respaldar juntos los volúmenes `app_data` y `minio_data`.
+- Probar restore levantando un entorno temporal y validando `/api/ready`, login, historial y preview de PDF.
+- Si usas Turso remoto, respaldar Turso por separado y mantener `minio_data` como evidencia/documentos.
+
+Detalle completo: `docs/CoolifyDeployment.md` y `docs/ProductionReadinessNotes.md`
 
 ### Riesgo pendiente conocido
 
@@ -363,9 +379,11 @@ Detalle completo: `docs/CoolifyDeployment.md`
 - Esquema y seed centralizados en `server/schema.ts` y `server/seed.ts`
 - Cliente HTTP centralizado en `services/apiClient.ts`
 - Documentación técnica principal en `docs/DatabaseSchema.md`
+- Registro de readiness/produccion en `docs/ProductionReadinessNotes.md`
 
 ## Documentacion clave
 
+- `docs/ProductionReadinessNotes.md`
 - `docs/DatabaseSchema.md`
 - `docs/GuiaReplicacionArquitectura.md`
 - `docs/AIAgentsFutureUpgradePlan.md`

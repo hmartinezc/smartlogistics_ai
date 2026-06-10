@@ -155,17 +155,19 @@ Maneja sesiones con expiración de 8 horas.
 
 Cada fila es un documento procesado. El campo `result_json` guarda el `InvoiceData` completo como JSON, incluyendo `confidenceScore` y, cuando aplica, `confidenceReasons` y `confidenceAudit`.
 
-| Columna        | Tipo | Restricción                                                  | Descripción                            |
-| -------------- | ---- | ------------------------------------------------------------ | -------------------------------------- |
-| `id`           | TEXT | **PRIMARY KEY**                                              | UUID del item                          |
-| `file_name`    | TEXT | NOT NULL                                                     | Nombre del archivo original            |
-| `status`       | TEXT | NOT NULL, CHECK(`PENDING`, `PROCESSING`, `SUCCESS`, `ERROR`) | Estado del procesamiento               |
-| `result_json`  | TEXT | nullable                                                     | JSON con datos extraídos (InvoiceData) |
-| `error`        | TEXT | nullable                                                     | Mensaje de error si falló              |
-| `processed_at` | TEXT | nullable                                                     | Fecha de procesamiento                 |
-| `user_email`   | TEXT | nullable                                                     | Email del usuario que procesó          |
-| `agency_id`    | TEXT | **FK** → `agencies.id`                                       | Agencia propietaria                    |
-| `created_at`   | TEXT | DEFAULT now                                                  | Fecha de creación                      |
+| Columna             | Tipo | Restricción                                                  | Descripción                                |
+| ------------------- | ---- | ------------------------------------------------------------ | ------------------------------------------ |
+| `id`                | TEXT | **PRIMARY KEY**                                              | UUID del item                              |
+| `file_name`         | TEXT | NOT NULL                                                     | Nombre del archivo original                |
+| `status`            | TEXT | NOT NULL, CHECK(`PENDING`, `PROCESSING`, `SUCCESS`, `ERROR`) | Estado del procesamiento                   |
+| `result_json`       | TEXT | nullable                                                     | JSON con datos extraídos (InvoiceData)     |
+| `error`             | TEXT | nullable                                                     | Mensaje de error si falló                  |
+| `processed_at`      | TEXT | nullable                                                     | Fecha de procesamiento                     |
+| `user_email`        | TEXT | nullable                                                     | Email del usuario que procesó              |
+| `agency_id`         | TEXT | **FK** → `agencies.id`                                       | Agencia propietaria                        |
+| `reviewed_at`       | TEXT | nullable                                                     | Fecha en que una incidencia fue revisada   |
+| `reviewed_by_email` | TEXT | nullable                                                     | Email del usuario que revisó la incidencia |
+| `created_at`        | TEXT | DEFAULT now                                                  | Fecha de creación                          |
 
 **Índices:** `idx_batch_items_agency`, `idx_batch_items_status`, `idx_batch_items_agency_created` en `(agency_id, created_at DESC)`, `idx_batch_items_agency_status_processed` en `(agency_id, status, processed_at)`
 

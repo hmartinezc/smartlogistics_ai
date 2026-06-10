@@ -1013,27 +1013,184 @@ function scoreFromReasons(reasons: ConfidenceReason[]): number {
   return clampScore(100 - reasons.reduce((sum, reason) => sum + reason.penalty, 0));
 }
 
-function getDistinctVarieties(values: Array<string | undefined>): string[] {
-  const seen = new Set<string>();
-  const varieties: string[] = [];
+const MIXED_PRODUCT_DESCRIPTION = 'MIXTAS';
+const STEM_SUFFIX_PATTERN = /\s*:\s*-?\d+(?:[.,]\d+)?\s*$/;
+const PRODUCT_FAMILY_PATTERNS: Array<{ family: string; pattern: RegExp }> = [
+  { family: 'ROSES', pattern: /\b(ROSA|ROSAS|ROSE|ROSES)\b/ },
+  { family: 'RUSCUS', pattern: /\bRUSCUS\b/ },
+  { family: 'GYPSO', pattern: /\b(GYPSO|GYPSOPHILA|GIPSO)\b/ },
+  { family: 'LISIANTHUS', pattern: /\b(LISIANTHUS|EUSTOMA)\b/ },
+  { family: 'ALSTROEMERIA', pattern: /\bALSTROEMERIA\b/ },
+  { family: 'ASTER', pattern: /\bASTER\b/ },
+  { family: 'TRACHELLIUM', pattern: /\bTRACHELLIUM\b/ },
+  { family: 'LILIES', pattern: /\b(LILY|LILIES|LIRIO|LIRIOS)\b/ },
+  { family: 'SUNFLOWER', pattern: /\b(SUNFLOWER|GIRASOL|GIRASOLES)\b/ },
+  { family: 'STOCK', pattern: /\b(STOCK|MATTHIOLA)\b/ },
+  { family: 'HYDRANGEA', pattern: /\b(HYDRANGEA|HORTENSIA|HORTENSIAS)\b/ },
+  { family: 'CARNATION', pattern: /\b(CARNATION|CARNATIONS|CLAVEL|CLAVELES)\b/ },
+  { family: 'DIANTHUS', pattern: /\bDIANTHUS\b/ },
+  { family: 'PROTEA', pattern: /\bPROTEA\b/ },
+  { family: 'LEUCADENDRON', pattern: /\bLEUCADENDRON\b/ },
+  { family: 'EUCALYPTUS', pattern: /\bEUCALYPTUS\b/ },
+  { family: 'SOLIDAGO', pattern: /\bSOLIDAGO\b/ },
+  { family: 'LIMONIUM', pattern: /\bLIMONIUM\b/ },
+  { family: 'HYPERICUM', pattern: /\bHYPERICUM\b/ },
+  { family: 'DELPHINIUM', pattern: /\bDELPHINIUM\b/ },
+  { family: 'SNAPDRAGON', pattern: /\b(SNAPDRAGON|ANTIRRHINUM)\b/ },
+  { family: 'GERBERA', pattern: /\bGERBERA\b/ },
+  { family: 'CHRYSANTHEMUM', pattern: /\b(CHRYSANTHEMUM|MUMS?|POMPON)\b/ },
+  { family: 'ORCHID', pattern: /\b(ORCHID|ORQUIDEA|ORQUIDEAS)\b/ },
+  { family: 'TULIP', pattern: /\b(TULIP|TULIPS|TULIPAN|TULIPANES)\b/ },
+  { family: 'PEONY', pattern: /\b(PEONY|PEONIA|PEONIAS)\b/ },
+  { family: 'RANUNCULUS', pattern: /\bRANUNCULUS\b/ },
+  { family: 'ANEMONE', pattern: /\bANEMONE\b/ },
+  { family: 'AMMI', pattern: /\bAMMI\b/ },
+  { family: 'ERYNGIUM', pattern: /\bERYNGIUM\b/ },
+];
+
+function parseStemSuffix(value: string): { name: string; stems?: number } {
+  const match = value.match(/^(.*?)\s*:\s*(-?\d+(?:[.,]\d+)?)\s*$/);
+  if (!match) {
+    return { name: value.trim() };
+  }
+
+  const stems = Number(match[2].replace(',', '.'));
+  return {
+    name: match[1].trim(),
+    stems: Number.isFinite(stems) ? stems : undefined,
+  };
+}
+
+function formatStemCount(value: number | undefined): string | null {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return String(roundNumber(value));
+}
+
+function formatVarietyEntry(
+  description: string | undefined,
+  stems: number | undefined,
+): string | undefined {
+  const trimmed = description?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const stemCount = formatStemCount(stems);
+  return stemCount ? `${trimmed}:${stemCount}` : trimmed;
+}
+
+function getVarietyIdentity(value: string): string {
+  return value.replace(STEM_SUFFIX_PATTERN, '').trim().toUpperCase();
+}
+
+function normalizeProductFamilyText(value: string): string {
+  return getVarietyIdentity(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function getKnownProductFamily(value: string): string | null {
+  const normalized = normalizeProductFamilyText(value);
+
+  for (const entry of PRODUCT_FAMILY_PATTERNS) {
+    if (entry.pattern.test(normalized)) {
+      return entry.family;
+    }
+  }
+
+  return null;
+}
+
+function getKnownProductFamilyCount(varieties: string[]): number {
+  const families = new Set<string>();
+
+  for (const variety of varieties) {
+    const family = getKnownProductFamily(variety);
+    if (family) {
+      families.add(family);
+    }
+  }
+
+  return families.size;
+}
+
+function getDistinctMixedVarieties(values: Array<string | undefined>): string[] {
+  const entriesByIdentity = new Map<string, { name: string; stems?: number }>();
+  const orderedIdentities: string[] = [];
 
   for (const value of values) {
     const trimmed = value?.trim();
-    if (!trimmed || seen.has(trimmed)) {
+    if (!trimmed) {
       continue;
     }
 
-    seen.add(trimmed);
-    varieties.push(trimmed);
+    const parsed = parseStemSuffix(trimmed);
+    const identity = getVarietyIdentity(parsed.name);
+    if (!identity) {
+      continue;
+    }
+
+    const existing = entriesByIdentity.get(identity);
+    if (!existing) {
+      orderedIdentities.push(identity);
+      entriesByIdentity.set(identity, parsed);
+      continue;
+    }
+
+    if (parsed.stems !== undefined) {
+      existing.stems = roundNumber((existing.stems || 0) + parsed.stems);
+    }
   }
 
-  return varieties;
+  return orderedIdentities.flatMap((identity) => {
+    const entry = entriesByIdentity.get(identity);
+    if (!entry) {
+      return [];
+    }
+
+    const stemCount = formatStemCount(entry.stems);
+    return [stemCount ? `${entry.name}:${stemCount}` : entry.name];
+  });
+}
+
+function hasVarietyIdentity(
+  values: string[] | undefined,
+  identityValue: string | undefined,
+): boolean {
+  const identity = getVarietyIdentity(identityValue || '');
+  if (!identity) {
+    return false;
+  }
+
+  return (values || []).some((value) => getVarietyIdentity(value) === identity);
 }
 
 function isPositiveZeroPieceChildRow(item: InvoiceData['lineItems'][number]): boolean {
   return (
     Number(item.totalPieces) <= 0 &&
     ((Number(item.totalStems) || 0) > 0 || (Number(item.totalValue) || 0) > 0)
+  );
+}
+
+function normalizeTaxCode(value: string | undefined): string {
+  return (value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+}
+
+function hasDifferentTaxCode(
+  parent: InvoiceData['lineItems'][number],
+  child: InvoiceData['lineItems'][number],
+): boolean {
+  const parentHts = normalizeTaxCode(parent.hts);
+  const childHts = normalizeTaxCode(child.hts);
+  const parentNandina = normalizeTaxCode(parent.nandina);
+  const childNandina = normalizeTaxCode(child.nandina);
+
+  return (
+    (parentHts.length > 0 && childHts.length > 0 && parentHts !== childHts) ||
+    (parentNandina.length > 0 && childNandina.length > 0 && parentNandina !== childNandina)
   );
 }
 
@@ -1047,19 +1204,38 @@ function mergeChildRowIntoParent(
   const totalValue = roundNumber(
     (Number(parent.totalValue) || 0) + (Number(child.totalValue) || 0),
   );
+  const parentVarietyEntries =
+    parent.productDescription === MIXED_PRODUCT_DESCRIPTION
+      ? parent.varieties || []
+      : hasVarietyIdentity(parent.varieties, parent.productDescription)
+        ? parent.varieties || []
+        : [
+            formatVarietyEntry(parent.productDescription, Number(parent.totalStems) || undefined),
+            ...(parent.varieties || []),
+          ];
+  const childVarietyEntries = [
+    formatVarietyEntry(child.productDescription, Number(child.totalStems) || undefined),
+    ...(child.varieties || []),
+  ];
+  const mixedVarieties = getDistinctMixedVarieties([
+    ...parentVarietyEntries,
+    ...childVarietyEntries,
+  ]);
+  const knownProductFamilyCount = getKnownProductFamilyCount(mixedVarieties);
+  const isMixedComposition =
+    parent.productDescription === MIXED_PRODUCT_DESCRIPTION ||
+    knownProductFamilyCount > 1 ||
+    (knownProductFamilyCount === 0 && hasDifferentTaxCode(parent, child));
 
   return {
     ...parent,
     hts: parent.hts || child.hts,
     nandina: parent.nandina || child.nandina,
+    productDescription: isMixedComposition ? MIXED_PRODUCT_DESCRIPTION : parent.productDescription,
     totalStems,
     totalValue,
     unitPrice: totalStems > 0 ? roundNumber(totalValue / totalStems, 6) : parent.unitPrice,
-    varieties: getDistinctVarieties([
-      ...(parent.varieties || []),
-      child.productDescription,
-      ...(child.varieties || []),
-    ]),
+    varieties: mixedVarieties,
   };
 }
 

@@ -8,6 +8,8 @@ import { invalidateProductMatchCatalogCache } from './productMatchCatalogCache';
 // ============================================
 
 const API_BASE = '/api';
+const DOCUMENT_UPLOAD_CHUNK_MAX_FILES = 40;
+const DOCUMENT_UPLOAD_CHUNK_MAX_BYTES = 90 * 1024 * 1024;
 
 // Almacén de sessionId en memoria (también en localStorage como backup)
 let _sessionId: string | null = null;
@@ -68,6 +70,66 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+type DocumentUploadInput = {
+  files: File[];
+  agencyId: string;
+  format: import('../types').AgentType;
+  batchId?: string;
+};
+
+function createDocumentUploadBatchId(): string {
+  const randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
+  return randomUUID
+    ? randomUUID()
+    : `batch-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function chunkDocumentUploadFiles(files: File[]): File[][] {
+  const chunks: File[][] = [];
+  let currentChunk: File[] = [];
+  let currentBytes = 0;
+
+  for (const file of files) {
+    const fileSize = Math.max(0, file.size);
+    const exceedsFileCount = currentChunk.length >= DOCUMENT_UPLOAD_CHUNK_MAX_FILES;
+    const exceedsByteBudget =
+      currentChunk.length > 0 && currentBytes + fileSize > DOCUMENT_UPLOAD_CHUNK_MAX_BYTES;
+
+    if (exceedsFileCount || exceedsByteBudget) {
+      chunks.push(currentChunk);
+      currentChunk = [];
+      currentBytes = 0;
+    }
+
+    currentChunk.push(file);
+    currentBytes += fileSize;
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks;
+}
+
+async function uploadDocumentChunk(
+  input: DocumentUploadInput,
+): Promise<import('../types').DocumentUploadResponse> {
+  const formData = new FormData();
+  formData.append('agencyId', input.agencyId);
+  formData.append('format', input.format);
+  if (input.batchId) {
+    formData.append('batchId', input.batchId);
+  }
+
+  input.files.forEach((file) => formData.append('files', file));
+
+  return request('/documents/upload', {
+    method: 'POST',
+    body: formData,
+  });
 }
 
 export interface BatchResultsQuery {
@@ -320,6 +382,12 @@ export const api = {
     });
   },
 
+  async markBatchItemReviewed(id: string): Promise<import('../types').BatchItem> {
+    return request(`/batch/${id}/reviewed`, {
+      method: 'PATCH',
+    });
+  },
+
   async deleteBatchItems(
     ids: string[],
   ): Promise<{ ok: boolean; count: number; deletedIds: string[] }> {
@@ -444,25 +512,46 @@ export const api = {
     return request(`/documents/status/${encodeURIComponent(id)}`);
   },
 
-  async uploadDocuments(input: {
-    files: File[];
-    agencyId: string;
-    format: import('../types').AgentType;
-    batchId?: string;
-  }): Promise<import('../types').DocumentUploadResponse> {
-    const formData = new FormData();
-    formData.append('agencyId', input.agencyId);
-    formData.append('format', input.format);
-    if (input.batchId) {
-      formData.append('batchId', input.batchId);
+  async uploadDocuments(
+    input: DocumentUploadInput,
+  ): Promise<import('../types').DocumentUploadResponse> {
+    const chunks = chunkDocumentUploadFiles(input.files);
+    const sharedBatchId =
+      input.batchId || (chunks.length > 1 ? createDocumentUploadBatchId() : undefined);
+    const combined: import('../types').DocumentUploadResponse = {
+      batchId: sharedBatchId || '',
+      count: 0,
+      jobs: [],
+      errors: [],
+    };
+
+    for (const files of chunks) {
+      try {
+        const response = await uploadDocumentChunk({
+          ...input,
+          files,
+          batchId: sharedBatchId,
+        });
+
+        combined.batchId = combined.batchId || response.batchId;
+        combined.count += response.count;
+        combined.jobs.push(...response.jobs);
+        combined.errors.push(...(response.errors || []));
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status === 401 || error.status === 403) {
+          throw error;
+        }
+
+        combined.errors.push(
+          ...files.map((file) => ({
+            fileName: file.name,
+            error: error.message,
+          })),
+        );
+      }
     }
 
-    input.files.forEach((file) => formData.append('files', file));
-
-    return request('/documents/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    return combined;
   },
 
   async processDocuments(input: {

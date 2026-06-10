@@ -30,7 +30,7 @@
 
 ## Runtime And Data
 
-- Backend entrypoint is `server/index.ts`; route modules mount under `/api/*` and `/api/health` is the healthcheck.
+- Backend entrypoint is `server/index.ts`; route modules mount under `/api/*`. `/api/health` is liveness and `/api/ready` is the production/Docker readiness check.
 - Database defaults to local libSQL/SQLite at `file:./data/smart-invoice.db`; set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` only for remote Turso.
 - `GEMINI_API_KEY` is required for backend document extraction; `server/routes/ai.ts` also accepts `API_KEY` as a fallback.
 - Seed credentials for a fresh DB are `admin@smart.com`, `operador@smart.com`, and `supervisor@smart.com`, all with password `1234`.
@@ -50,5 +50,6 @@
 
 - Docker deploy is the preferred Coolify path; the `Dockerfile` uses Node 20, builds `dist/`, exposes `3001`, and runs `npm run start`.
 - For local SQLite in Docker/Coolify, mount persistence at `/app/data`; otherwise `smart-invoice.db`, WAL, and SHM files are lost on container recreation.
-- Coolify healthcheck path is `/api/health`; the app serves SPA and API from the same Hono process in production, not a separate Vite server.
+- Coolify healthcheck path is `/api/ready`; the app serves SPA and API from the same Hono process in production, not a separate Vite server.
+- Production readiness decisions, current rate limits, document upload limits, and future iteration notes live in `docs/ProductionReadinessNotes.md`.
 - Keep `README.md` and `docs/CoolifyDeployment.md` synchronized when changing port, env vars, healthcheck, Docker behavior, or persistence path.

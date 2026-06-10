@@ -13,11 +13,17 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { randomUUID } from 'node:crypto';
 import { getDb, closeDb } from './db.js';
+import { rateLimit, securityHeaders } from './httpHardening.js';
 import { ensureProductMatchMasterSeed } from './productMatchMasterSeed.js';
 import { runMigrations } from './schema.js';
 import { runSeed } from './seed.js';
 import { cleanupExpiredGeminiExtractionEvents } from './services/geminiExtractionEvents.js';
-import { startDocumentWorker, type DocumentWorkerHandle } from './workers/documentWorker.js';
+import { ensureInvoiceBucket, isMinioConfigured } from './services/minioService.js';
+import {
+  getDocumentWorkerRuntimeConfig,
+  startDocumentWorker,
+  type DocumentWorkerHandle,
+} from './workers/documentWorker.js';
 
 // Rutas
 import authRoutes from './routes/auth.js';
@@ -40,6 +46,64 @@ import path from 'node:path';
 const app = new Hono();
 let documentWorker: DocumentWorkerHandle | null = null;
 
+type ReadinessCheck = {
+  ok: boolean;
+  error?: string;
+};
+
+type ReadinessResponse = {
+  checks: {
+    db: ReadinessCheck;
+    minio: ReadinessCheck;
+    worker: ReadinessCheck;
+  };
+  status: 'ok' | 'degraded';
+  time: string;
+};
+
+function getPublicErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function buildReadinessResponse(): Promise<ReadinessResponse> {
+  const checks: ReadinessResponse['checks'] = {
+    db: { ok: false },
+    minio: { ok: false },
+    worker: { ok: false },
+  };
+
+  try {
+    await getDb().execute('SELECT 1');
+    checks.db = { ok: true };
+  } catch (error) {
+    checks.db = { ok: false, error: getPublicErrorMessage(error) };
+  }
+
+  try {
+    if (!isMinioConfigured()) {
+      throw new Error('MinIO no está configurado.');
+    }
+    await ensureInvoiceBucket();
+    checks.minio = { ok: true };
+  } catch (error) {
+    checks.minio = { ok: false, error: getPublicErrorMessage(error) };
+  }
+
+  const workerConfig = getDocumentWorkerRuntimeConfig();
+  checks.worker =
+    !workerConfig.enabled || workerConfig.active
+      ? { ok: true }
+      : { ok: false, error: 'Document worker no está activo.' };
+
+  const ok = Object.values(checks).every((check) => check.ok);
+
+  return {
+    checks,
+    status: ok ? 'ok' : 'degraded',
+    time: new Date().toISOString(),
+  };
+}
+
 app.onError((error, c) => {
   const errorId = randomUUID();
   console.error(`[${errorId}] Error no controlado en API:`, error);
@@ -54,12 +118,24 @@ app.onError((error, c) => {
 });
 
 // ── CORS (solo necesario en desarrollo; en producción el SPA y la API comparten origen) ──
+app.use('*', securityHeaders());
 app.use(
   '/api/*',
   cors({
     origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
     credentials: true,
   }),
+);
+
+// ── Rate limits de protección para rutas sensibles/no masivas ──
+app.use('/api/auth/login', rateLimit({ keyPrefix: 'auth-login', max: 20, windowMs: 15 * 60_000 }));
+app.use(
+  '/api/ai-review/*',
+  rateLimit({ keyPrefix: 'ai-review', max: 30, windowMs: 60 * 60_000 }),
+);
+app.use(
+  '/api/integrate/*',
+  rateLimit({ keyPrefix: 'integrate', max: 120, windowMs: 60 * 60_000 }),
 );
 
 // ── Montar rutas de API ──
@@ -81,6 +157,12 @@ app.route('/api/integrate', integrateRoutes);
 app.get('/api/health', (c) =>
   c.json({ status: 'ok', db: 'libsql', time: new Date().toISOString() }),
 );
+
+// ── Readiness check: valida dependencias necesarias para procesar documentos ──
+app.get('/api/ready', async (c) => {
+  const readiness = await buildReadinessResponse();
+  return c.json(readiness, readiness.status === 'ok' ? 200 : 503);
+});
 
 // ── Servir archivos estáticos del SPA en producción ──
 const distPath = path.resolve(process.cwd(), 'dist');

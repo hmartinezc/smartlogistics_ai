@@ -34,7 +34,8 @@ interface DocumentProcessingWorkspaceProps {
   onConfirm: (message: string) => Promise<boolean>;
 }
 
-const MAX_FILES = 40;
+const MAX_FILES = 200;
+const UPLOAD_CHUNK_SIZE = 40;
 const WORKER_PARALLELISM = 5;
 const POLL_INTERVAL_MS = 3000;
 
@@ -392,14 +393,30 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
         return;
       }
 
+      if (response.count === 0) {
+        setUploadErrors(response.errors || []);
+        setNotice({
+          type: 'error',
+          text: 'No se pudo cargar ningun documento.',
+        });
+        return;
+      }
+
       setActiveBatchId(response.batchId);
       setJobs(response.jobs);
       setUploadErrors(response.errors || []);
       setSelectedFiles([]);
-      setNotice({
-        type: 'success',
-        text: `${response.count} documentos cargados. Cuando inicies el lote, el worker procesará hasta ${WORKER_PARALLELISM} PDFs a la vez.`,
-      });
+      setNotice(
+        response.errors?.length
+          ? {
+              type: 'info',
+              text: `${response.count} documentos cargados. ${response.errors.length} quedaron con error de carga.`,
+            }
+          : {
+              type: 'success',
+              text: `${response.count} documentos cargados. Cuando inicies el lote, el worker procesará hasta ${WORKER_PARALLELISM} PDFs a la vez.`,
+            },
+      );
     } catch (error) {
       if (currentAgencyIdRef.current === agencyIdAtStart) {
         setErrorNotice(error, 'No se pudieron cargar los documentos.');
@@ -606,10 +623,9 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
               </div>
 
               <div className="mb-5 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm font-medium text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200">
-                Flujo recomendado: carga el lote una vez y envialo a la cola. El worker procesa
-                hasta {` ${WORKER_PARALLELISM} `}PDFs al mismo tiempo y deja el resto en estado En
-                cola, asi no hace falta reintentar manualmente mientras veas estados En cola o
-                Procesando.
+                Flujo recomendado: carga el lote una vez y envialo a la cola. La carga se divide en
+                grupos de hasta {` ${UPLOAD_CHUNK_SIZE} `}PDFs; luego el worker procesa hasta
+                {` ${WORKER_PARALLELISM} `}al mismo tiempo y deja el resto en estado En cola.
               </div>
 
               <label
@@ -632,8 +648,7 @@ const DocumentProcessingWorkspace: React.FC<DocumentProcessingWorkspaceProps> = 
                   Seleccionar documentos
                 </div>
                 <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  PDF · hasta {MAX_FILES} por lote · el worker procesa {WORKER_PARALLELISM} a la
-                  vez
+                  PDF · hasta {MAX_FILES} por lote · carga en grupos de {UPLOAD_CHUNK_SIZE}
                 </div>
                 <input
                   type="file"

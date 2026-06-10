@@ -299,11 +299,239 @@ describe('genai-router-files extraction', () => {
     assert.equal(run.result.lineItems[0].totalStems, 150);
     assert.equal(run.result.lineItems[0].totalValue, 66);
     assert.equal(run.result.lineItems[0].unitPrice, 0.44);
+    assert.equal(
+      run.result.lineItems[0].productDescription,
+      'LISIANTHUS 70cm WHITE (Eustoma grandiflorum)',
+    );
     assert.deepEqual(run.result.lineItems[0].varieties, [
-      'LISIANTHUS 70cm PURPLE (Eustoma grandiflorum)',
-      'LISIANTHUS 70cm MISTY BLUE (Eustoma grandiflorum)',
-      'LISIANTHUS 70cm PINK (Eustoma grandiflorum)',
+      'LISIANTHUS 70cm WHITE (Eustoma grandiflorum):50',
+      'LISIANTHUS 70cm PURPLE (Eustoma grandiflorum):50',
+      'LISIANTHUS 70cm MISTY BLUE (Eustoma grandiflorum):30',
+      'LISIANTHUS 70cm PINK (Eustoma grandiflorum):20',
     ]);
+  });
+
+  it('marks TESSA mixed physical boxes as MIXTAS with compact stem varieties', async () => {
+    const invoiceWithMixedTessaRows: InvoiceData = {
+      ...baseInvoice,
+      lineItems: [
+        {
+          boxType: 'QB',
+          eqFull: 0.25,
+          hts: '0603.11.006',
+          nandina: '0603.10.4000',
+          productDescription: 'ROSAS',
+          totalPieces: 1,
+          totalStems: 125,
+          totalValue: 18.75,
+          unitPrice: 0.15,
+        },
+        {
+          boxType: 'QB',
+          eqFull: 0,
+          hts: 'A0604200060',
+          nandina: '0604.20.00.00',
+          productDescription: 'RUSCUS',
+          totalPieces: 0,
+          totalStems: 25,
+          totalValue: 2.5,
+          unitPrice: 0.1,
+        },
+        {
+          boxType: 'QB',
+          eqFull: 0,
+          hts: '0603.19.0000',
+          nandina: '0603.19.00.00',
+          productDescription: 'GYPSO',
+          totalPieces: 0,
+          totalStems: 50,
+          totalValue: 12,
+          unitPrice: 0.24,
+        },
+      ],
+      totalEq: 0.25,
+      totalPieces: 1,
+      totalStems: 200,
+      totalValue: 33.25,
+    };
+    const fake = createFakeAi((callIndex) =>
+      callIndex === 1
+        ? response({ confidence: 0.98, tipoFactura: 'TESSA' })
+        : response(invoiceWithMixedTessaRows),
+    );
+
+    const run = await generateInvoiceWithGenaiRouterFilesDetailed({
+      agentType: 'AGENT_GENERIC_A',
+      ai: fake.fakeAi,
+      document: {
+        buffer: Buffer.from('%PDF-test'),
+        mimeType: 'application/pdf',
+      },
+    });
+
+    assert.equal(run.result.lineItems.length, 1);
+    assert.equal(run.result.lineItems[0].productDescription, 'MIXTAS');
+    assert.equal(run.result.lineItems[0].totalPieces, 1);
+    assert.equal(run.result.lineItems[0].eqFull, 0.25);
+    assert.equal(run.result.lineItems[0].totalStems, 200);
+    assert.equal(run.result.lineItems[0].totalValue, 33.25);
+    assert.equal(run.result.lineItems[0].unitPrice, 0.16625);
+    assert.deepEqual(run.result.lineItems[0].varieties, ['ROSAS:125', 'RUSCUS:25', 'GYPSO:50']);
+  });
+
+  it('aggregates repeated TESSA child products inside MIXTAS varieties', async () => {
+    const invoiceWithRepeatedMixedRows: InvoiceData = {
+      ...baseInvoice,
+      lineItems: [
+        {
+          boxType: 'HB',
+          eqFull: 14.5,
+          hts: '06.04.20.00',
+          nandina: '06.04.20.00',
+          productDescription: 'ROSAS',
+          totalPieces: 29,
+          totalStems: 696,
+          totalValue: 104.4,
+          unitPrice: 0.15,
+        },
+        {
+          boxType: 'HB',
+          eqFull: 0,
+          hts: 'A0603193000',
+          nandina: '0604.20.00.00',
+          productDescription: 'ROSAS',
+          totalPieces: 0,
+          totalStems: 116,
+          totalValue: 17.4,
+          unitPrice: 0.15,
+        },
+        {
+          boxType: 'HB',
+          eqFull: 0,
+          hts: 'A0603105000',
+          nandina: '0603.19.10.00',
+          productDescription: 'ROSAS',
+          totalPieces: 0,
+          totalStems: 116,
+          totalValue: 11.6,
+          unitPrice: 0.1,
+        },
+        {
+          boxType: 'HB',
+          eqFull: 0,
+          hts: '0604.20.00',
+          nandina: '0604.90.00',
+          productDescription: 'ROSAS',
+          totalPieces: 0,
+          totalStems: 174,
+          totalValue: 26.1,
+          unitPrice: 0.15,
+        },
+        {
+          boxType: 'HB',
+          eqFull: 0,
+          hts: '0603.11.0060',
+          nandina: '0603.10.4000',
+          productDescription: 'ROSAS',
+          totalPieces: 0,
+          totalStems: 6844,
+          totalValue: 1026.6,
+          unitPrice: 0.15,
+        },
+        {
+          boxType: 'HB',
+          eqFull: 0,
+          hts: 'A0604200060',
+          nandina: '0604.20.00.00',
+          productDescription: 'RUSCUS',
+          totalPieces: 0,
+          totalStems: 3306,
+          totalValue: 469.8,
+          unitPrice: 0.1421,
+        },
+      ],
+      totalEq: 14.5,
+      totalPieces: 29,
+      totalStems: 11252,
+      totalValue: 1655.9,
+    };
+    const fake = createFakeAi((callIndex) =>
+      callIndex === 1
+        ? response({ confidence: 0.98, tipoFactura: 'TESSA' })
+        : response(invoiceWithRepeatedMixedRows),
+    );
+
+    const run = await generateInvoiceWithGenaiRouterFilesDetailed({
+      agentType: 'AGENT_GENERIC_A',
+      ai: fake.fakeAi,
+      document: {
+        buffer: Buffer.from('%PDF-test'),
+        mimeType: 'application/pdf',
+      },
+    });
+
+    assert.equal(run.result.lineItems.length, 1);
+    assert.equal(run.result.lineItems[0].productDescription, 'MIXTAS');
+    assert.equal(run.result.lineItems[0].totalPieces, 29);
+    assert.equal(run.result.lineItems[0].eqFull, 14.5);
+    assert.equal(run.result.lineItems[0].totalStems, 11252);
+    assert.equal(run.result.lineItems[0].totalValue, 1655.9);
+    assert.deepEqual(run.result.lineItems[0].varieties, ['ROSAS:7946', 'RUSCUS:3306']);
+  });
+
+  it('keeps same-family child rows under the parent instead of marking MIXTAS', async () => {
+    const invoiceWithSameFamilyRows: InvoiceData = {
+      ...baseInvoice,
+      lineItems: [
+        {
+          boxType: 'HB',
+          eqFull: 0.5,
+          hts: '0603.11.006',
+          nandina: '0603.10.4000',
+          productDescription: 'ROSAS 60CM',
+          totalPieces: 1,
+          totalStems: 125,
+          totalValue: 18.75,
+          unitPrice: 0.15,
+        },
+        {
+          boxType: 'HB',
+          eqFull: 0,
+          hts: '0603.19.0000',
+          nandina: '0603.19.00.00',
+          productDescription: 'ROSAS 70CM',
+          totalPieces: 0,
+          totalStems: 125,
+          totalValue: 18.75,
+          unitPrice: 0.15,
+        },
+      ],
+      totalEq: 0.5,
+      totalPieces: 1,
+      totalStems: 250,
+      totalValue: 37.5,
+    };
+    const fake = createFakeAi((callIndex) =>
+      callIndex === 1
+        ? response({ confidence: 0.98, tipoFactura: 'PARENT_CHILD_COMPOSITION' })
+        : response(invoiceWithSameFamilyRows),
+    );
+
+    const run = await generateInvoiceWithGenaiRouterFilesDetailed({
+      agentType: 'AGENT_GENERIC_A',
+      ai: fake.fakeAi,
+      document: {
+        buffer: Buffer.from('%PDF-test'),
+        mimeType: 'application/pdf',
+      },
+    });
+
+    assert.equal(run.result.lineItems.length, 1);
+    assert.equal(run.result.lineItems[0].productDescription, 'ROSAS 60CM');
+    assert.equal(run.result.lineItems[0].totalPieces, 1);
+    assert.equal(run.result.lineItems[0].totalStems, 250);
+    assert.equal(run.result.lineItems[0].totalValue, 37.5);
+    assert.deepEqual(run.result.lineItems[0].varieties, ['ROSAS 60CM:125', 'ROSAS 70CM:125']);
   });
 
   it('deletes the Gemini file when classification fails', async () => {

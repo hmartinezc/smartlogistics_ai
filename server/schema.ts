@@ -259,6 +259,8 @@ const SCHEMA_STATEMENTS: string[] = [
     processed_at   TEXT,
     user_email     TEXT,
     agency_id      TEXT REFERENCES agencies(id),
+    reviewed_at    TEXT,
+    reviewed_by_email TEXT,
     created_at     TEXT DEFAULT (datetime('now'))
   )`,
 
@@ -407,6 +409,8 @@ export async function runMigrations(db: Client): Promise<void> {
 
   await ensureColumn(db, 'document_jobs', 'locked_by', 'TEXT');
   await ensureColumn(db, 'document_jobs', 'lock_expires_at', 'TEXT');
+  await ensureColumn(db, 'batch_items', 'reviewed_at', 'TEXT');
+  await ensureColumn(db, 'batch_items', 'reviewed_by_email', 'TEXT');
   await ensureColumn(db, 'agencies', 'hawb_format_pattern', 'TEXT');
   await ensureColumn(db, 'agencies', 'integration_config', 'TEXT');
   await ensureTableExists(db, 'gemini_prompt_caches', GEMINI_PROMPT_CACHES_TABLE_SQL);

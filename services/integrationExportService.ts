@@ -22,8 +22,15 @@ export async function executeIntegrationExport(options: {
   exportFilename?: string;
 }): Promise<IntegrationExportExecutionResult> {
   const integrationConfig = options.agency?.integrationConfig;
+  const hasClientMapping = hasClientFieldMappings(integrationConfig);
   const canUseClientMapping = Boolean(
-    options.useClientMapping && hasClientFieldMappings(integrationConfig),
+    options.useClientMapping && hasClientMapping,
+  );
+  const shouldDeliverToEndpoint = Boolean(
+    options.agency?.id &&
+      integrationConfig?.endpoint.enabled &&
+      integrationConfig.endpoint.url &&
+      (canUseClientMapping || !hasClientMapping),
   );
 
   const exportedDocuments = applyFieldMappingsToDocuments(
@@ -33,7 +40,7 @@ export async function executeIntegrationExport(options: {
   );
 
   let deliveryResult: IntegrationEndpointResponse | undefined;
-  if (options.agency?.id && integrationConfig?.endpoint.enabled && integrationConfig.endpoint.url) {
+  if (shouldDeliverToEndpoint && options.agency?.id) {
     try {
       deliveryResult = await api.sendToIntegration({
         agencyId: options.agency.id,

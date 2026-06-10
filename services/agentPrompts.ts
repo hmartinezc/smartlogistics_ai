@@ -58,6 +58,7 @@ export const HEADER_FOOTER_RULES = `
 - **DO NOT FIX OR AUTO-CORRECT THE FOOTER.** If the image says Total=10 but lines sum to 8, YOU MUST RETURN 10. I need to detect the error.
 - **INVOICE TOTAL VALUE:** Keep \`invoice.totalValue\` as the printed invoice total, even if line-item math shows the document total is wrong.
 - **INVOICE NUMBER FALLBACK:** If the "Invoice No." field is blank/missing but a "Packing No.", "Packing List", or similar document number is printed, use that value as \`invoiceNumber\` and add a MISSING_FIELD confidence reason explaining that the invoice number was missing and Packing No. was used as fallback.
+- **AIRWAYBILLS:** For MAWB and HAWB, transcribe character-by-character exactly as printed. Preserve all letters, digits, leading zeros, internal zeros and separators; never shorten or remove zeros from airwaybill numbers.
 `;
 
 // --------------------------
@@ -241,6 +242,8 @@ If a row has valid Pieces/Type (e.g., "2 EB"), and the **NEXT ROWS** have **EMPT
     - Keep it grouped under the previous parent row because it has no independent Pieces/Type.
     - Sum its 'totalStems' into the parent row's 'totalStems'.
     - Sum its calculated 'totalValue' into the parent row's 'totalValue'.
+    - Preserve the per-variety stem breakdown in 'varieties' as compact entries like "ROSAS:125" and "RUSCUS:25", including the parent row when stems are printed.
+    - Backend makes the final MIXTAS decision. Your priority is preserving every printed child product description with its stems/value so no composition data is lost.
     - Keep the unitPrice from the printed row when it matches the parent.
     - If grouped child prices differ from the parent, calculate each amount separately, sum the amounts, set the merged row's unitPrice = totalValue / totalStems, and treat the grouping as an AMBIGUOUS_TABLE confidence concern.
     - NEVER create a separate line item with totalPieces=0 for this case.
@@ -376,6 +379,7 @@ HEADER/FOOTER:
 - invoice.totalPieces, invoice.totalEq/full boxes, totalStems and invoice.totalValue must be the values printed in the footer/header when present.
 - Do not auto-correct invoice-level totals. We need backend validation to detect mismatches.
 - If Invoice No. is missing, use Packing No./Packing List as invoiceNumber and add MISSING_FIELD.
+- For MAWB and HAWB, transcribe character-by-character exactly as printed. Preserve all letters, digits, leading zeros, internal zeros and separators; never shorten or remove zeros from airwaybill numbers.
 
 BOX TYPES:
 - Normalize aliases: FB/F/FULL/PL/P=FB factor 1.0; HB/H/HALF=HB factor 0.5; QB/Q/QUARTER=QB factor 0.25; EB/E/OCTAVO=EB factor 0.125; DS/D/SPLIT=DS factor 0.0625.
@@ -397,7 +401,7 @@ TABLE PATTERNS:
 - Global box summary ("PIEZAS: 4HB", "12 QB", logistics block with MASTER/HOUSE/DAE/AEROLINEA/CARGUERA): parse logistics fields, remove logistics tokens from productDescription, use the global box type/pieces when rows have stems/value but no row-level box.
 - Never return a positive commercial line with totalPieces=0. Group rows or allocate pieces conservatively.
 - Category headers (for example ROSES centered above varieties): create one parent line for the physical box group, add child varieties, sum stems/value, use printed Pieces/Box Type. Do not replace normal product rows with generic category names.
-- Child/composition rows with blank pieces/type: attach to previous physical parent. Add child stems/value only when parent totals do not already include them; otherwise do not double-count.
+- Child/composition rows with blank pieces/type: attach to previous physical parent. Preserve printed child stem breakdown as compact varieties like PRODUCT:stems, or as immediate totalPieces=0 child rows when row-level stems/value are printed. Add child stems/value only when parent totals do not already include them; otherwise do not double-count. Backend makes the final MIXTAS decision.
 - Utopia/FBE/bunch format: infer boxType from FBE/Boxes; if PRICE * bunches = TOTAL, printed price is per bunch, so normalize unitPrice per stem.
 - Summary row with financial data only: do not create a summary line; copy shared description/HTS/NANDINA/unitPrice to detail rows and distribute stems/value.
 

@@ -74,9 +74,10 @@ const COMMON_EXTRACTION_RULES = `
 Return strict JSON matching the provided schema. Use only visual evidence.
 Keep invoice-level totalPieces, totalEq, totalStems and totalValue exactly as printed; backend validates math later.
 If Invoice No. is missing but Packing No./Packing List is printed, use it as invoiceNumber and add MISSING_FIELD.
+For MAWB and HAWB, transcribe character-by-character exactly as printed. Preserve all letters, digits, leading zeros, internal zeros and separators; never shorten or remove zeros from airwaybill numbers.
 Normalize box types: FB/F/FX/FULL/P/PL=FB, HB/H/1/2/HALF=HB, QB/Q/1/4/QUARTER/QRT=QB, EB/E/1/8/OCTAVO/OCT=EB, DS/D/1/16/SPLIT=DS.
-lineItem.eqFull = totalPieces * factor. Never return a positive commercial line with totalPieces=0.
-Rows with blank pieces/type but positive stems/value are child/composition rows of the previous physical parent; never output them as separate zero-piece lineItems.
+lineItem.eqFull = totalPieces * factor. Never return an independent positive commercial line with totalPieces=0.
+Rows with blank pieces/type but positive stems/value are child/composition rows of the previous physical parent. Preserve them as immediate totalPieces=0 child rows when row-level stems/value are printed, or merge them into parent varieties as compact PRODUCT:stems entries only when the visual grouping is unambiguous. Backend makes the final MIXTAS decision deterministically.
 If a table has a dedicated Color/Colour column, do not place those values in productDescription or varieties. Ignore placeholder color values such as NINGUNO, NONE, N/A, or blank. Keep color-like words only when they are printed inside the Description/Product text itself.
 Ignore zero placeholders only when pieces, stems and value are all zero/blank.
 If printed box type is unknown, infer only when row/footer math proves a known factor; otherwise mark AMBIGUOUS_TABLE or MISSING_FIELD.
@@ -176,6 +177,8 @@ Sum stems/value across variety rows for the physical group; use weighted unitPri
 ${COMMON_EXTRACTION_RULES}
 Format focus: parent/child composition rows.
 Child rows with blank pieces/type attach to the previous parent.
+When child rows print stems, preserve the breakdown as compact varieties like ROSAS:125 and RUSCUS:25.
+Backend makes the final MIXTAS decision. Your priority is preserving every printed child product description with its stems/value so no composition data is lost.
 Before adding child stems/value, test whether keeping the parent printed stems/value already matches the document subtotal/footer.
 Add child stems/value only when parent totals do not already include them; otherwise do not double-count.
 If grouping is ambiguous, mark AMBIGUOUS_TABLE.
@@ -226,6 +229,8 @@ Format focus: TESSA Commercial Invoice Print customer template.
 Use this category when the table shows columns like *PIECE TYPE, TOTAL PIECES, EQ-FULL BOXES, PRODUCT DESCRIPTION, HTS, NANDINA, TOTAL-UNT STEMS, UNIT-PRICE PER/STEM and TOTAL VALUE-USD.
 If product/stems/price/value appear on the same row as piece/type/EQ, extract that row directly.
 If QB/HB/etc rows have piece/type/EQ while one shared financial line contains product, HTS, NANDINA, stems, unit price and value, treat the shared line as the product/financial summary, not as an extra lineItem.
+If a TESSA row has blank piece/type/EQ but positive TOTAL-UNT STEMS or VALUE, it is composition of the previous physical row. Preserve PRODUCT:stems in varieties or output it as an immediate totalPieces=0 child row for backend merge.
+For TESSA composition boxes, one parent row may be followed by one or more blank piece/type child rows. Preserve every child row's product, stems, price and value; backend will merge those rows and decide whether the parent becomes MIXTAS.
 For a shared ROSES summary, assign QB rows using 100 stems per QB piece first, then put the remaining stems on HB/larger-EQ rows so row stems sum exactly to the printed TOTAL-UNT STEMS.
 For a single positive box row, keep the printed row stems/value when present and calculate eqFull from piece/type.
 Use the printed footer TOTAL pieces, EQ, stems and value as invoice totals.

@@ -7,6 +7,8 @@ Esta aplicacion se despliega con Docker Compose cuando se usa MinIO local/S3-com
 - la base local libSQL/SQLite en `data/smart-invoice.db` cuando no se usa Turso remoto
 - MinIO queda como servicio interno para almacenar PDFs fuera de SQLite
 
+Para decisiones productivas recientes, limites reales de carga documental, rate limits activos y checklist rapido, ver tambien `docs/ProductionReadinessNotes.md`.
+
 ## Estrategia recomendada
 
 Usa primero SQLite local con volumen persistente en Coolify. Es la opcion mas barata y mas simple para este proyecto.
@@ -47,7 +49,7 @@ Nota operativa:
 | Campo            | Valor            |
 | ---------------- | ---------------- |
 | Port             | `3001`           |
-| Healthcheck Path | `/api/health`    |
+| Healthcheck Path | `/api/ready`     |
 | Restart Policy   | `unless-stopped` |
 | Base Directory   | `/`              |
 
@@ -125,7 +127,7 @@ Sin ese volumen perderas la base al recrear el contenedor.
 1. Configura variables.
 2. Configura volumen `/app/data`.
 3. Despliega.
-4. Espera healthcheck `200 OK` en `/api/health`.
+4. Espera healthcheck `200 OK` en `/api/ready`.
 5. Inicia sesion con el usuario seed solo si la base es nueva.
 
 Credenciales seed iniciales:
@@ -133,7 +135,7 @@ Credenciales seed iniciales:
 - `admin@smart.com`
 - password inicial: `1234`
 
-Cambiarlas despues del primer acceso es recomendable si el entorno dejara de ser solo interno.
+Cambia esa contraseña inmediatamente despues del primer acceso si la base fue creada desde cero. Si la base ya existe, el seed no resetea la contraseña.
 
 ## Seed de base de datos
 
@@ -143,19 +145,21 @@ El servidor ya ejecuta migraciones y seed idempotente al arrancar. Usa `npm run 
 
 ## Checklist de validacion post-deploy
 
-1. `GET /api/health` responde `200`.
-2. La pantalla de login carga sin errores.
-3. `admin@smart.com / 1234` entra si la base fue creada desde cero.
-4. Puedes listar agencias y planes.
-5. La extraccion IA funciona con `GEMINI_API_KEY` valida y `GEMINI_EXTRACTION_SDK=genai-router-files`, usando Files API, clasificador en `medium` y extractor especializado sin cache.
-6. Para comparar legacy contra el SDK nuevo sin cache, usa `POST /api/ai/compare` con un PDF y revisa `legacy`, `genaiRouterFiles` y `diff.summary`.
-7. Para comparar contra el baseline operativo, usa `GEMINI_EXTRACTION_SDK=legacy` o el override `docker-compose.legacy.yml`.
-8. Si quieres probar cache explicito fuera del modo estable, usa `GEMINI_EXTRACTION_SDK=genai` o `GEMINI_EXTRACTION_SDK=legacy-cache` y activa `GEMINI_PROMPT_CACHE_USE_FOR_EXTRACTION=true`; `POST /api/documents/process` devuelve `promptCaches` y los logs de Gemini registran uso de cache.
-9. Los documentos puestos en cola pasan de `QUEUED` a `PROCESSING` y luego a `SUCCESS` o `ERROR`.
-10. Tras reiniciar el servicio, los datos siguen presentes si montaste `/app/data`.
-11. Un documento con `invoice.totalValue = 50.5` y suma de lineas `50.50` no queda marcado con `VALUE_TOTAL_MISMATCH`.
-12. Un documento con baja confianza visual puede seguir en revision aunque no existan discrepancias matematicas.
-13. Si Gemini devuelve `confidenceReasons`, el score persistido refleja solo discrepancias matematicas confirmadas por backend mas razones visuales/OCR no verificables.
+1. `GET /api/health` responde `200` como liveness basico.
+2. `GET /api/ready` responde `200` y valida DB, MinIO y worker.
+3. La pantalla de login carga sin errores.
+4. `admin@smart.com / 1234` entra si la base fue creada desde cero; cambia esa contraseña antes de compartir la URL.
+5. Puedes listar agencias y planes.
+6. La extraccion IA funciona con `GEMINI_API_KEY` valida y `GEMINI_EXTRACTION_SDK=genai-router-files`, usando Files API, clasificador en `medium` y extractor especializado sin cache.
+7. Para comparar legacy contra el SDK nuevo sin cache, usa `POST /api/ai/compare` con un PDF y revisa `legacy`, `genaiRouterFiles` y `diff.summary`.
+8. Para comparar contra el baseline operativo, usa `GEMINI_EXTRACTION_SDK=legacy` o el override `docker-compose.legacy.yml`.
+9. Si quieres probar cache explicito fuera del modo estable, usa `GEMINI_EXTRACTION_SDK=genai` o `GEMINI_EXTRACTION_SDK=legacy-cache` y activa `GEMINI_PROMPT_CACHE_USE_FOR_EXTRACTION=true`; `POST /api/documents/process` devuelve `promptCaches` y los logs de Gemini registran uso de cache.
+10. Los documentos puestos en cola pasan de `QUEUED` a `PROCESSING` y luego a `SUCCESS` o `ERROR`.
+11. Tras reiniciar el servicio, los datos siguen presentes si montaste `/app/data`.
+12. Verifica que una integracion externa con `localhost`, `127.0.0.1` o red privada sea rechazada.
+13. Un documento con `invoice.totalValue = 50.5` y suma de lineas `50.50` no queda marcado con `VALUE_TOTAL_MISMATCH`.
+14. Un documento con baja confianza visual puede seguir en revision aunque no existan discrepancias matematicas.
+15. Si Gemini devuelve `confidenceReasons`, el score persistido refleja solo discrepancias matematicas confirmadas por backend mas razones visuales/OCR no verificables.
 
 ## Troubleshooting rapido
 
@@ -166,6 +170,7 @@ Revisa:
 - que el puerto del servicio sea `3001`
 - que `npm run start` sea el comando efectivo si no usas Dockerfile
 - que no falte `dist/` en la imagen
+- que `/api/ready` pueda validar MinIO, la base de datos y el worker
 
 ### La app levanta pero no guarda datos
 
@@ -199,5 +204,12 @@ En ese modo el volumen local deja de ser obligatorio para la base.
 - Para empezar en Hetzner: SQLite local + backup del volumen.
 - Para crecimiento: Turso remoto + mismo contenedor de aplicacion.
 - Para cambios de codigo: mantén `README.md` y este archivo sincronizados cuando cambien puertos, healthcheck o variables.
+
+## Backup y restauracion minima
+
+- Respaldar juntos los volumenes Docker `app_data` y `minio_data`; la base conserva metadata/jobs y MinIO conserva los PDFs.
+- Antes de cambios de schema o upgrades grandes, detener el servicio o tomar snapshot consistente del servidor/volumen.
+- Probar restore en un entorno temporal: levantar Compose, confirmar `/api/ready`, login, historial y preview de PDF.
+- Si usas Turso remoto, respaldar Turso por separado y mantener `minio_data` sincronizado.
 
 <!-- redeploy-check: Coolify Docker Compose + MinIO -->

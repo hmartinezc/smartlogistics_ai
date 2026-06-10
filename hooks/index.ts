@@ -185,6 +185,7 @@ interface UseBatchProcessorReturn {
   setBatchFiles: (files: File[]) => void;
   addResults: (results: BatchItem[]) => Promise<void>;
   updateResult: (updatedItem: BatchItem) => void;
+  markResultReviewed: (id: string) => Promise<BatchItem>;
   removeResults: (ids: string[]) => Promise<void>;
   clearResults: (localOnly?: boolean) => void;
   loadResults: (query?: string | BatchResultsQuery) => Promise<void>;
@@ -229,6 +230,14 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
     );
   }, []);
 
+  const markResultReviewed = useCallback(async (id: string) => {
+    const reviewedItem = await api.markBatchItemReviewed(id);
+    setBatchResults((prev) =>
+      prev.map((item) => (item.id === reviewedItem.id ? reviewedItem : item)),
+    );
+    return reviewedItem;
+  }, []);
+
   const removeResults = useCallback(async (ids: string[]) => {
     if (ids.length === 0) {
       return;
@@ -262,6 +271,7 @@ export function useBatchProcessor(): UseBatchProcessorReturn {
     setBatchFiles,
     addResults,
     updateResult,
+    markResultReviewed,
     removeResults,
     clearResults,
     loadResults,
