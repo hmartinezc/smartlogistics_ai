@@ -53,6 +53,26 @@ const getRelativeDateKey = (offsetDays: number): string => {
 
 const getRecordDateKey = (item: BatchItem): string => toDateKey(item.processedAt || item.createdAt);
 
+const normalizeSearchValue = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+};
+
+const compactSearchValue = (value: unknown): string =>
+  normalizeSearchValue(value).replace(/[^a-z0-9]/g, '');
+
+const buildSearchText = (values: unknown[]): string => {
+  const tokens = values.flatMap((value) => {
+    const normalized = normalizeSearchValue(value);
+    if (!normalized) return [];
+
+    const compact = compactSearchValue(normalized);
+    return compact && compact !== normalized ? [normalized, compact] : [normalized];
+  });
+
+  return tokens.join(' ');
+};
+
 interface ExtractedDataDateRange {
   startDate: string;
   endDate: string;
@@ -113,7 +133,8 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
       appliedDateRangeInvalid
         ? []
         : results.filter((item) => {
-            const normalizedQuery = deferredQuery.trim().toLowerCase();
+            const normalizedQuery = normalizeSearchValue(deferredQuery);
+            const compactQuery = compactSearchValue(deferredQuery);
             const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
             const itemDate = getRecordDateKey(item);
             const matchesDate =
@@ -134,7 +155,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
               return true;
             }
 
-            const haystack = [
+            const haystack = buildSearchText([
               item.fileName,
               item.agencyId,
               item.user,
@@ -143,12 +164,12 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
               item.result?.hawb,
               item.result?.shipperName,
               item.result?.consigneeName,
-            ]
-              .filter(Boolean)
-              .join(' ')
-              .toLowerCase();
+            ]);
 
-            return haystack.includes(normalizedQuery);
+            return (
+              haystack.includes(normalizedQuery) ||
+              (Boolean(compactQuery) && haystack.includes(compactQuery))
+            );
           }),
     [appliedDateFrom, appliedDateRangeInvalid, appliedDateTo, results, deferredQuery, statusFilter],
   );
@@ -490,7 +511,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar archivo, invoice, MAWB, agencia..."
+                  placeholder="Buscar archivo, invoice, MAWB, HAWB, agencia..."
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
