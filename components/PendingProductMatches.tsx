@@ -556,11 +556,6 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
       return;
     }
 
-    if (!normalizedDraft.productMatch) {
-      setErrorMessage('La descripción producto cliente es obligatoria.');
-      return;
-    }
-
     if (!normalizedDraft.htsMatch) {
       setErrorMessage('El HTS Match es obligatorio.');
       return;
@@ -570,7 +565,7 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
       agencyId,
       product: selectedItem.product,
       clientProductCode: normalizedDraft.clientProductCode,
-      productMatch: normalizedDraft.productMatch,
+      productMatch: normalizedDraft.clientProductCode,
       htsMatch: normalizedDraft.htsMatch,
       sourceHts: selectedItem.htsCandidates[0] || '',
     };
@@ -1059,10 +1054,10 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
                   )}
                 </label>
                 <input
-                  value={draft.productMatch}
-                  onChange={handleDraftChange('productMatch')}
-                  placeholder="Ej. Rosa Roja Premium"
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  value={draft.clientProductCode}
+                  readOnly
+                  placeholder="Se guardará igual al código producto cliente"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
               </div>
 

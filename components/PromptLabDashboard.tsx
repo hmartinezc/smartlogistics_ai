@@ -55,9 +55,13 @@ export default function PromptLabDashboard({ agencies }: PromptLabDashboardProps
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSavingExpected, setIsSavingExpected] = useState(false);
   const [isDeletingPdf, setIsDeletingPdf] = useState(false);
+  const [isCaseListCollapsed, setIsCaseListCollapsed] = useState(true);
 
   const selectedCase = detail?.case || cases.find((item) => item.id === selectedCaseId) || null;
   const latestAnalysis = detail?.analyses[0] || null;
+  const caseListColumnClasses = isCaseListCollapsed
+    ? 'xl:grid-cols-[88px_minmax(0,1fr)]'
+    : 'xl:grid-cols-[390px_minmax(0,1fr)]';
 
   const selectedAgency = useMemo(
     () => agencies.find((agency) => agency.id === agencyId) || null,
@@ -337,11 +341,13 @@ export default function PromptLabDashboard({ agencies }: PromptLabDashboardProps
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">
+      <div className={`grid gap-5 ${caseListColumnClasses}`}>
         <PromptLabCaseList
           cases={cases}
+          isCollapsed={isCaseListCollapsed}
           isLoading={isLoadingCases}
           onSelect={setSelectedCaseId}
+          onToggleCollapsed={() => setIsCaseListCollapsed((current) => !current)}
           selectedCaseId={selectedCaseId}
         />
 
