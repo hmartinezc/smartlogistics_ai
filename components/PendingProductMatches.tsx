@@ -22,12 +22,14 @@ import {
   AlertTriangle,
   Building,
   CheckCircle,
+  Eye,
   FileWarning,
   MoreVertical,
   Package,
   RefreshCw,
   Save,
   Search,
+  X,
   Zap,
 } from './Icons';
 import PageHeader from './PageHeader';
@@ -193,6 +195,8 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
   const draftEditedByUserRef = useRef(false);
   const draftItemKeyRef = useRef<string | null>(null);
   const loadSequenceRef = useRef(0);
+  const pdfPreviewRequestRef = useRef(0);
+  const pdfPreviewUrlRef = useRef<string | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [items, setItems] = useState<PendingProductMatchItem[]>([]);
@@ -210,6 +214,12 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
   const [listViewportHeight, setListViewportHeight] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [pdfPreviewExample, setPdfPreviewExample] = useState<
+    PendingProductMatchItem['examples'][number] | null
+  >(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false);
 
   activeAgencyRef.current = currentAgencyId;
   selectedKeyRef.current = selectedKey;
@@ -284,6 +294,16 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
   useEffect(() => {
     void loadPending();
   }, [loadPending]);
+
+  useEffect(() => {
+    return () => {
+      pdfPreviewRequestRef.current += 1;
+      if (pdfPreviewUrlRef.current) {
+        URL.revokeObjectURL(pdfPreviewUrlRef.current);
+        pdfPreviewUrlRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setQuery('');
@@ -437,6 +457,58 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
         [field]: event.target.value,
       }));
     };
+
+  const replacePdfPreviewUrl = useCallback((nextUrl: string | null) => {
+    setPdfPreviewUrl((current) => {
+      if (current && current !== nextUrl) {
+        URL.revokeObjectURL(current);
+      }
+
+      pdfPreviewUrlRef.current = nextUrl;
+      return nextUrl;
+    });
+  }, []);
+
+  const closePdfPreview = useCallback(() => {
+    pdfPreviewRequestRef.current += 1;
+    setPdfPreviewExample(null);
+    setPdfPreviewError(null);
+    setIsPdfPreviewLoading(false);
+    replacePdfPreviewUrl(null);
+  }, [replacePdfPreviewUrl]);
+
+  const handleOpenPdfPreview = async (
+    example: PendingProductMatchItem['examples'][number],
+  ): Promise<void> => {
+    const requestId = pdfPreviewRequestRef.current + 1;
+    pdfPreviewRequestRef.current = requestId;
+    setPdfPreviewExample(example);
+    setPdfPreviewError(null);
+    setIsPdfPreviewLoading(true);
+    replacePdfPreviewUrl(null);
+
+    try {
+      const url = await api.getDocumentPreviewBlobUrl(example.batchItemId);
+      if (pdfPreviewRequestRef.current !== requestId) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      replacePdfPreviewUrl(url);
+    } catch (error) {
+      if (pdfPreviewRequestRef.current !== requestId) {
+        return;
+      }
+
+      setPdfPreviewError(
+        error instanceof ApiError ? error.message : 'No se pudo cargar el PDF de esta factura.',
+      );
+    } finally {
+      if (pdfPreviewRequestRef.current === requestId) {
+        setIsPdfPreviewLoading(false);
+      }
+    }
+  };
 
   const handleSmartPrefill = async () => {
     if (!currentAgency || currentAgencyId === 'GLOBAL') {
@@ -1117,8 +1189,21 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
                       key={`${example.batchItemId}-${example.fileName}-${example.productDescription}`}
                       className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950"
                     >
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {example.fileName}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 text-sm font-semibold text-slate-900 dark:text-white">
+                          {example.fileName}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleOpenPdfPreview(example);
+                          }}
+                          className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300"
+                          aria-label={`Ver PDF de ${example.fileName}`}
+                          title="Ver PDF"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
                       </div>
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {example.invoiceNumber
@@ -1151,6 +1236,71 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
           )}
         </section>
       </div>
+
+      {pdfPreviewExample && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`PDF de ${pdfPreviewExample.fileName}`}
+          onClick={closePdfPreview}
+        >
+          <div
+            className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-semibold text-slate-900 dark:text-white">
+                  {pdfPreviewExample.fileName}
+                </h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {pdfPreviewExample.invoiceNumber
+                    ? `Factura ${pdfPreviewExample.invoiceNumber}`
+                    : 'Sin número de factura'}
+                  {pdfPreviewExample.hawb ? ` · HAWB ${pdfPreviewExample.hawb}` : ''}
+                  {pdfPreviewExample.hts ? ` · HTS ${pdfPreviewExample.hts}` : ''}
+                </p>
+                <p className="mt-1 truncate text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                  {pdfPreviewExample.productDescription}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closePdfPreview}
+                className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                aria-label="Cerrar PDF"
+                title="Cerrar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-[60vh] bg-slate-100 dark:bg-slate-900">
+              {isPdfPreviewLoading ? (
+                <div className="flex h-[70vh] items-center justify-center text-sm font-semibold text-slate-500 dark:text-slate-300">
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Cargando PDF...
+                </div>
+              ) : pdfPreviewError ? (
+                <div className="flex h-[70vh] items-center justify-center px-6 text-center text-sm font-semibold text-rose-600 dark:text-rose-300">
+                  {pdfPreviewError}
+                </div>
+              ) : pdfPreviewUrl ? (
+                <iframe
+                  title={`PDF ${pdfPreviewExample.fileName}`}
+                  src={pdfPreviewUrl}
+                  className="h-[70vh] w-full border-0 bg-white"
+                />
+              ) : (
+                <div className="flex h-[70vh] items-center justify-center text-sm font-semibold text-slate-500 dark:text-slate-300">
+                  PDF no disponible.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
