@@ -68,6 +68,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     [panelOperationDate],
   );
   const [historyDateRange, setHistoryDateRange] = useState(getDefaultHistoryDateRange);
+  const [dataCleanupDateRange, setDataCleanupDateRange] = useState(getDefaultHistoryDateRange);
   const [pendingHistoryReview, setPendingHistoryReview] = useState<HistoryReviewRequest | null>(
     null,
   );
@@ -125,25 +126,36 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
     [currentAgencyId, historyDateRange.endDate, historyDateRange.startDate],
   );
 
+  const buildDataCleanupBatchQuery = useCallback(
+    () => ({
+      agencyId: currentAgencyId && currentAgencyId !== 'GLOBAL' ? currentAgencyId : undefined,
+      processedFrom: dataCleanupDateRange.startDate,
+      processedTo: dataCleanupDateRange.endDate,
+    }),
+    [currentAgencyId, dataCleanupDateRange.endDate, dataCleanupDateRange.startDate],
+  );
+
   // Cargar resultados batch cuando cambia la agencia
   useEffect(() => {
     if (isAuthenticated && currentAgencyId) {
-      const shouldUseOperationalRange =
-        appState === AppState.DASHBOARD_PANEL || appState === AppState.HISTORY_RESULTS;
       const shouldLoadAllResults =
         currentUser?.role === 'ADMIN' && appState === AppState.DASHBOARD_ADMIN;
-      loadResults(
-        shouldUseOperationalRange
-          ? appState === AppState.HISTORY_RESULTS
-            ? buildHistoryBatchQuery()
-            : buildPanelBatchQuery()
-          : shouldLoadAllResults || currentAgencyId === 'GLOBAL'
-            ? undefined
-            : currentAgencyId,
-      );
+      const batchQuery =
+        appState === AppState.HISTORY_RESULTS
+          ? buildHistoryBatchQuery()
+          : appState === AppState.DASHBOARD_PANEL
+            ? buildPanelBatchQuery()
+            : appState === AppState.DATA_CLEANUP
+              ? buildDataCleanupBatchQuery()
+              : shouldLoadAllResults || currentAgencyId === 'GLOBAL'
+                ? undefined
+                : currentAgencyId;
+
+      loadResults(batchQuery);
     }
   }, [
     appState,
+    buildDataCleanupBatchQuery,
     buildHistoryBatchQuery,
     buildPanelBatchQuery,
     currentAgencyId,
@@ -405,7 +417,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
   const handleRefreshBatchResults = async () => {
     setIsCleaningData(true);
     try {
-      await loadResults(currentAgencyId === 'GLOBAL' ? undefined : currentAgencyId || undefined);
+      await loadResults(currentAgencyId ? buildDataCleanupBatchQuery() : undefined);
     } finally {
       setIsCleaningData(false);
     }
@@ -610,6 +622,8 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                   <ExtractedDataManager
                     results={batchResults}
                     isBusy={isCleaningData}
+                    operationDateRange={dataCleanupDateRange}
+                    onOperationDateRangeChange={setDataCleanupDateRange}
                     onRefresh={handleRefreshBatchResults}
                     onDeleteItems={handleDeleteBatchItems}
                   />

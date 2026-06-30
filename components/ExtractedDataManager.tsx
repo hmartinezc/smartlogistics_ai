@@ -44,18 +44,25 @@ const toDateKey = (dateValue?: string): string => {
   return formatDateKey(date);
 };
 
-const getRelativeDateKey = (daysAgo: number): string => {
+const getRelativeDateKey = (offsetDays: number): string => {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() - daysAgo);
+  date.setDate(date.getDate() + offsetDays);
   return formatDateKey(date);
 };
 
 const getRecordDateKey = (item: BatchItem): string => toDateKey(item.processedAt || item.createdAt);
 
+interface ExtractedDataDateRange {
+  startDate: string;
+  endDate: string;
+}
+
 interface ExtractedDataManagerProps {
   results: BatchItem[];
   isBusy?: boolean;
+  operationDateRange: ExtractedDataDateRange;
+  onOperationDateRangeChange: (range: ExtractedDataDateRange) => void;
   onRefresh: () => Promise<void> | void;
   onDeleteItems: (ids: string[]) => Promise<string | null>;
 }
@@ -63,6 +70,8 @@ interface ExtractedDataManagerProps {
 const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   results,
   isBusy = false,
+  operationDateRange,
+  onOperationDateRangeChange,
   onRefresh,
   onDeleteItems,
 }) => {
@@ -70,8 +79,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   const deferredQuery = useDeferredValue(query);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [draftDateRange, setDraftDateRange] = useState(operationDateRange);
   const [isDateFiltersOpen, setIsDateFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [previewItemId, setPreviewItemId] = useState<string | null>(null);
@@ -86,21 +94,33 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   const previewRequestRef = useRef(0);
   const previewPdfUrlRef = useRef<string | null>(null);
 
-  const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const appliedDateFrom = operationDateRange.startDate;
+  const appliedDateTo = operationDateRange.endDate;
+  const appliedDateRangeInvalid = Boolean(
+    appliedDateFrom && appliedDateTo && appliedDateFrom > appliedDateTo,
+  );
+  const draftDateRangeInvalid = Boolean(
+    draftDateRange.startDate &&
+    draftDateRange.endDate &&
+    draftDateRange.startDate > draftDateRange.endDate,
+  );
+  const draftDateRangeDirty =
+    draftDateRange.startDate !== operationDateRange.startDate ||
+    draftDateRange.endDate !== operationDateRange.endDate;
 
   const filteredResults = useMemo(
     () =>
-      dateRangeInvalid
+      appliedDateRangeInvalid
         ? []
         : results.filter((item) => {
             const normalizedQuery = deferredQuery.trim().toLowerCase();
             const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
             const itemDate = getRecordDateKey(item);
             const matchesDate =
-              (!dateFrom && !dateTo) ||
+              (!appliedDateFrom && !appliedDateTo) ||
               (Boolean(itemDate) &&
-                (!dateFrom || itemDate >= dateFrom) &&
-                (!dateTo || itemDate <= dateTo));
+                (!appliedDateFrom || itemDate >= appliedDateFrom) &&
+                (!appliedDateTo || itemDate <= appliedDateTo));
 
             if (!matchesStatus) {
               return false;
@@ -130,7 +150,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
 
             return haystack.includes(normalizedQuery);
           }),
-    [results, deferredQuery, statusFilter, dateFrom, dateTo, dateRangeInvalid],
+    [appliedDateFrom, appliedDateRangeInvalid, appliedDateTo, results, deferredQuery, statusFilter],
   );
 
   const filteredIds = filteredResults.map((item) => item.id);
@@ -147,12 +167,13 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   const pendingCount = results.filter((item) => item.status === 'PENDING').length;
   const selectedStatusOption =
     STATUS_OPTIONS.find((option) => option.value === statusFilter) || STATUS_OPTIONS[0];
-  const hasDateFilter = dateFrom.length > 0 || dateTo.length > 0;
-  const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'ALL' || hasDateFilter;
-  const dateFilterSummary = dateRangeInvalid
+  const hasDateFilter = appliedDateFrom.length > 0 || appliedDateTo.length > 0;
+  const hasClearableFilters = query.trim().length > 0 || statusFilter !== 'ALL';
+  const hasActiveFilters = hasClearableFilters || hasDateFilter;
+  const dateFilterSummary = appliedDateRangeInvalid
     ? 'Rango inválido'
     : hasDateFilter
-      ? `${filteredResults.length} registros en el rango`
+      ? `${filteredResults.length} registros entre ${appliedDateFrom} y ${appliedDateTo}`
       : 'Todos los días';
 
   const getStatusCount = (status: StatusFilter) => {
@@ -166,6 +187,10 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => results.some((item) => item.id === id)));
   }, [results]);
+
+  useEffect(() => {
+    setDraftDateRange(operationDateRange);
+  }, [operationDateRange]);
 
   useEffect(() => {
     if (!isStatusMenuOpen) {
@@ -318,16 +343,50 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     }
   };
 
-  const applyDateWindow = (days: number) => {
-    setDateFrom(getRelativeDateKey(days - 1));
-    setDateTo(getRelativeDateKey(0));
+  const applyDraftDateOffsetWindow = (startOffsetDays: number, endOffsetDays: number) => {
+    setDraftDateRange({
+      startDate: getRelativeDateKey(startOffsetDays),
+      endDate: getRelativeDateKey(endOffsetDays),
+    });
+  };
+
+  const applyDraftDateWindow = (days: number) => {
+    applyDraftDateOffsetWindow(-(days - 1), 0);
+  };
+
+  const isDraftDateOffsetWindowActive = (startOffsetDays: number, endOffsetDays: number): boolean =>
+    draftDateRange.startDate === getRelativeDateKey(startOffsetDays) &&
+    draftDateRange.endDate === getRelativeDateKey(endOffsetDays);
+
+  const isDraftDateWindowActive = (days: number): boolean =>
+    isDraftDateOffsetWindowActive(-(days - 1), 0);
+
+  const getDateRangeButtonClass = (isActive: boolean): string =>
+    `rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+      isActive
+        ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-indigo-200 dark:shadow-none'
+        : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300'
+    }`;
+
+  const getDateWindowButtonClass = (days: number): string =>
+    getDateRangeButtonClass(isDraftDateWindowActive(days));
+
+  const handleApplyDateRange = () => {
+    if (draftDateRangeInvalid || !draftDateRange.startDate || !draftDateRange.endDate) {
+      return;
+    }
+
+    closePdfPreview();
+    onOperationDateRangeChange({
+      startDate: draftDateRange.startDate,
+      endDate: draftDateRange.endDate,
+    });
+    setIsDateFiltersOpen(false);
   };
 
   const clearFilters = () => {
     setQuery('');
     setStatusFilter('ALL');
-    setDateFrom('');
-    setDateTo('');
   };
 
   useEffect(
@@ -524,7 +583,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 )}
               </div>
 
-              {hasActiveFilters && (
+              {hasClearableFilters && (
                 <button
                   onClick={clearFilters}
                   className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors inline-flex items-center gap-2"
@@ -538,7 +597,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDateFiltersOpen((current) => !current)}
-                  className={`relative inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border text-sm font-semibold transition-colors ${dateRangeInvalid ? 'border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300' : hasDateFilter ? 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900'}`}
+                  className={`relative inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border text-sm font-semibold transition-colors ${appliedDateRangeInvalid ? 'border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300' : hasDateFilter ? 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900'}`}
                   aria-label="Filtrar por fecha procesada"
                   aria-haspopup="dialog"
                   aria-expanded={isDateFiltersOpen}
@@ -547,7 +606,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                   <Calendar className="w-4 h-4" />
                   {hasDateFilter && (
                     <span
-                      className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-800 ${dateRangeInvalid ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                      className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-800 ${appliedDateRangeInvalid ? 'bg-amber-500' : 'bg-indigo-500'}`}
                     />
                   )}
                 </button>
@@ -578,9 +637,13 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                           Desde
                           <input
                             type="date"
-                            value={dateFrom}
-                            max={dateTo || undefined}
-                            onChange={(e) => setDateFrom(e.target.value)}
+                            value={draftDateRange.startDate}
+                            onChange={(e) =>
+                              setDraftDateRange((current) => ({
+                                ...current,
+                                startDate: e.target.value,
+                              }))
+                            }
                             className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                           />
                         </label>
@@ -588,9 +651,13 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                           Hasta
                           <input
                             type="date"
-                            value={dateTo}
-                            min={dateFrom || undefined}
-                            onChange={(e) => setDateTo(e.target.value)}
+                            value={draftDateRange.endDate}
+                            onChange={(e) =>
+                              setDraftDateRange((current) => ({
+                                ...current,
+                                endDate: e.target.value,
+                              }))
+                            }
                             className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                           />
                         </label>
@@ -599,32 +666,57 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                       <div className="grid grid-cols-3 gap-2">
                         <button
                           type="button"
-                          onClick={() => applyDateWindow(1)}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300"
+                          onClick={() => applyDraftDateWindow(1)}
+                          className={getDateWindowButtonClass(1)}
                         >
                           Hoy
                         </button>
                         <button
                           type="button"
-                          onClick={() => applyDateWindow(7)}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300"
+                          onClick={() => applyDraftDateOffsetWindow(-1, 1)}
+                          className={getDateRangeButtonClass(isDraftDateOffsetWindowActive(-1, 1))}
                         >
-                          7 días
+                          Hoy -1/+1
                         </button>
                         <button
                           type="button"
-                          onClick={() => applyDateWindow(30)}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-indigo-300"
+                          onClick={() => applyDraftDateWindow(7)}
+                          className={getDateWindowButtonClass(7)}
                         >
-                          30 días
+                          7 días
                         </button>
                       </div>
 
-                      {dateRangeInvalid && (
+                      {draftDateRangeInvalid && (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300">
                           La fecha inicial no puede ser mayor que la fecha final.
                         </div>
                       )}
+
+                      <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftDateRange(operationDateRange);
+                            setIsDateFiltersOpen(false);
+                          }}
+                          className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleApplyDateRange}
+                          disabled={
+                            draftDateRangeInvalid ||
+                            !draftDateRange.startDate ||
+                            !draftDateRange.endDate
+                          }
+                          className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {draftDateRangeDirty ? 'Aplicar rango' : 'Aplicar'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -705,7 +797,7 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                           !hasActiveFilters ||
                           filteredResults.length === 0 ||
                           isBusy ||
-                          dateRangeInvalid
+                          appliedDateRangeInvalid
                         }
                         className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-rose-500/10"
                       >
