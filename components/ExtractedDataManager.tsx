@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
 import { BatchItem } from '../types';
 import {
   AlertCircle,
@@ -6,7 +6,9 @@ import {
   Calendar,
   CheckCircle,
   ChevronDown,
+  Eye,
   FileText,
+  Loader2,
   MoreVertical,
   Package,
   RefreshCw,
@@ -15,6 +17,7 @@ import {
   X,
 } from './Icons';
 import PageHeader from './PageHeader';
+import { api, ApiError } from '../services/apiClient';
 import { getConfidenceColor } from '../utils/helpers';
 
 type StatusFilter = 'ALL' | BatchItem['status'];
@@ -71,11 +74,17 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
   const [dateTo, setDateTo] = useState('');
   const [isDateFiltersOpen, setIsDateFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [previewItemId, setPreviewItemId] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement | null>(null);
   const dateFiltersRef = useRef<HTMLDivElement | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement | null>(null);
+  const previewRequestRef = useRef(0);
+  const previewPdfUrlRef = useRef<string | null>(null);
 
   const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
@@ -240,6 +249,61 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     });
   };
 
+  const replacePreviewPdfUrl = useCallback((nextUrl: string | null) => {
+    setPreviewPdfUrl((current) => {
+      if (current && current !== nextUrl) {
+        URL.revokeObjectURL(current);
+      }
+
+      previewPdfUrlRef.current = nextUrl;
+      return nextUrl;
+    });
+  }, []);
+
+  const closePdfPreview = useCallback(() => {
+    previewRequestRef.current += 1;
+    setPreviewItemId(null);
+    setPreviewError(null);
+    setIsPreviewLoading(false);
+    replacePreviewPdfUrl(null);
+  }, [replacePreviewPdfUrl]);
+
+  const handleTogglePdfPreview = async (item: BatchItem): Promise<void> => {
+    if (previewItemId === item.id && (previewPdfUrl || previewError)) {
+      closePdfPreview();
+      return;
+    }
+
+    const requestId = previewRequestRef.current + 1;
+    previewRequestRef.current = requestId;
+    setPreviewItemId(item.id);
+    setPreviewError(null);
+    setIsPreviewLoading(true);
+    replacePreviewPdfUrl(null);
+
+    try {
+      const url = await api.getDocumentPreviewBlobUrl(item.id);
+      if (previewRequestRef.current !== requestId) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      replacePreviewPdfUrl(url);
+    } catch (error) {
+      if (previewRequestRef.current !== requestId) {
+        return;
+      }
+
+      setPreviewError(
+        error instanceof ApiError ? error.message : 'No se pudo cargar el PDF de este registro.',
+      );
+    } finally {
+      if (previewRequestRef.current === requestId) {
+        setIsPreviewLoading(false);
+      }
+    }
+  };
+
   const handleDelete = async (ids: string[]) => {
     setErrorMessage(null);
     const error = await onDeleteItems(ids);
@@ -249,6 +313,9 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     }
 
     setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    if (previewItemId && ids.includes(previewItemId)) {
+      closePdfPreview();
+    }
   };
 
   const applyDateWindow = (days: number) => {
@@ -262,6 +329,23 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
     setDateFrom('');
     setDateTo('');
   };
+
+  useEffect(
+    () => () => {
+      previewRequestRef.current += 1;
+      if (previewPdfUrlRef.current) {
+        URL.revokeObjectURL(previewPdfUrlRef.current);
+        previewPdfUrlRef.current = null;
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (previewItemId && !results.some((item) => item.id === previewItemId)) {
+      closePdfPreview();
+    }
+  }, [closePdfPreview, previewItemId, results]);
 
   return (
     <div className="max-w-7xl mx-auto p-8 space-y-6 h-full flex flex-col">
@@ -753,6 +837,23 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                       </span>
 
                       <button
+                        onClick={() => void handleTogglePdfPreview(item)}
+                        disabled={isPreviewLoading && previewItemId === item.id}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300"
+                        title={previewItemId === item.id ? 'Ocultar PDF' : 'Ver PDF'}
+                        type="button"
+                      >
+                        {isPreviewLoading && previewItemId === item.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
+                        <span className="hidden sm:inline">
+                          {previewItemId === item.id ? 'Ocultar PDF' : 'Ver PDF'}
+                        </span>
+                      </button>
+
+                      <button
                         onClick={() => handleDelete([item.id])}
                         disabled={isBusy}
                         className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-50"
@@ -833,6 +934,47 @@ const ExtractedDataManager: React.FC<ExtractedDataManagerProps> = ({
                       )}
                     </div>
                   </div>
+
+                  {previewItemId === item.id && (
+                    <div className="border-t border-slate-100 bg-slate-50/80 dark:border-slate-700/50 dark:bg-slate-900/30">
+                      <div className="flex items-center justify-between gap-3 px-5 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            PDF original
+                          </p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                            {item.fileName}
+                          </p>
+                        </div>
+                        <button
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                          onClick={closePdfPreview}
+                          title="Cerrar PDF"
+                          type="button"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="px-5 pb-5">
+                        {isPreviewLoading ? (
+                          <div className="flex h-[420px] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin text-indigo-500" />
+                            Cargando PDF...
+                          </div>
+                        ) : previewPdfUrl ? (
+                          <iframe
+                            className="h-[520px] w-full rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"
+                            src={previewPdfUrl}
+                            title={`PDF ${item.fileName}`}
+                          />
+                        ) : (
+                          <div className="flex h-[220px] items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">
+                            {previewError || 'PDF no disponible para este registro.'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Row 3: Meta — user + full timestamp (compact) */}
                   <div className="flex items-center gap-4 px-5 py-2 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-400 border-t border-slate-100 dark:border-slate-700/50 rounded-b-xl">

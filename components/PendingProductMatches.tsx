@@ -80,6 +80,13 @@ const SMART_MATCH_MIN_SCORE = 450;
 
 const formatCount = (value: number): string => value.toLocaleString('es-ES');
 
+const getExampleHawbs = (item: PendingProductMatchItem): string[] =>
+  Array.from(
+    new Set(
+      item.examples.map((example) => example.hawb).filter((hawb): hawb is string => Boolean(hawb)),
+    ),
+  );
+
 const normalizePendingDraft = (draft: PendingMatchDraft): PendingMatchDraft => ({
   clientProductCode: draft.clientProductCode.trim(),
   productMatch: draft.productMatch.trim(),
@@ -298,7 +305,12 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
       [
         item.product,
         item.htsCandidates.join(' '),
-        ...item.examples.map((example) => example.fileName),
+        ...item.examples.flatMap((example) => [
+          example.fileName,
+          example.invoiceNumber || '',
+          example.hawb || '',
+          example.productDescription,
+        ]),
       ]
         .join(' ')
         .toLowerCase()
@@ -746,7 +758,7 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar producto o HTS..."
+                  placeholder="Buscar producto, HTS o HAWB..."
                   className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                 />
               </div>
@@ -875,6 +887,7 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
                 {filteredItems.map((item, index) => {
                   const isSelected = item.key === selectedKey;
                   const smartSuggestion = smartSuggestions[item.key];
+                  const exampleHawbs = getExampleHawbs(item);
                   return (
                     <button
                       key={item.key}
@@ -909,6 +922,23 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
                               ? ` · Última detección ${formatDateTime(item.latestProcessedAt)}`
                               : ''}
                           </p>
+                          {exampleHawbs.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {exampleHawbs.slice(0, 3).map((hawb) => (
+                                <span
+                                  key={hawb}
+                                  className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 font-mono text-xs font-semibold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200"
+                                >
+                                  HAWB {hawb}
+                                </span>
+                              ))}
+                              {exampleHawbs.length > 3 && (
+                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                                  +{formatCount(exampleHawbs.length - 3)} más
+                                </span>
+                              )}
+                            </div>
+                          )}
                           {smartSuggestion && (
                             <p className="mt-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
                               Prellenado desde catálogo por coincidencia con "
@@ -1099,6 +1129,7 @@ const PendingProductMatches: React.FC<PendingProductMatchesProps> = ({
                         {example.invoiceNumber
                           ? `Factura ${example.invoiceNumber}`
                           : 'Sin número de factura'}
+                        {example.hawb ? ` · HAWB ${example.hawb}` : ''}
                         {example.hts ? ` · HTS ${example.hts}` : ''}
                       </div>
                       <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">

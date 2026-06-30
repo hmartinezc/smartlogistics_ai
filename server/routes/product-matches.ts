@@ -179,6 +179,7 @@ function buildPendingProductMatches(
       asText(parsedResult?.invoiceNumber),
       MAX_PENDING_DISPLAY_TEXT_LENGTH,
     );
+    const hawb = clampText(asText(parsedResult?.hawb), MAX_PENDING_DISPLAY_TEXT_LENGTH);
     const processedAt = asText(row.processed_at) || asText(row.created_at) || undefined;
     const processedTimestamp = toTimestamp(processedAt);
 
@@ -251,6 +252,7 @@ function buildPendingProductMatches(
           batchItemId,
           fileName,
           invoiceNumber: invoiceNumber || undefined,
+          hawb: hawb || undefined,
           productDescription,
           hts: hts || undefined,
         });

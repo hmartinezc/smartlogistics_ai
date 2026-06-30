@@ -667,6 +667,7 @@ export interface PendingProductMatchExample {
   batchItemId: string;
   fileName: string;
   invoiceNumber?: string;
+  hawb?: string;
   productDescription: string;
   hts?: string;
 }
