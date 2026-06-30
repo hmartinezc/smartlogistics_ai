@@ -23,14 +23,12 @@ export async function executeIntegrationExport(options: {
 }): Promise<IntegrationExportExecutionResult> {
   const integrationConfig = options.agency?.integrationConfig;
   const hasClientMapping = hasClientFieldMappings(integrationConfig);
-  const canUseClientMapping = Boolean(
-    options.useClientMapping && hasClientMapping,
-  );
+  const canUseClientMapping = Boolean(options.useClientMapping && hasClientMapping);
   const shouldDeliverToEndpoint = Boolean(
     options.agency?.id &&
-      integrationConfig?.endpoint.enabled &&
-      integrationConfig.endpoint.url &&
-      (canUseClientMapping || !hasClientMapping),
+    integrationConfig?.endpoint.enabled &&
+    integrationConfig.endpoint.url &&
+    (canUseClientMapping || !hasClientMapping),
   );
 
   const exportedDocuments = applyFieldMappingsToDocuments(

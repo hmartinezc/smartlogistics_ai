@@ -27,6 +27,7 @@ Aplicación React + Hono con base local libSQL/SQLite para procesar facturas, ad
 - `GEMINI_CACHED_GENERATE_TIMEOUT_MS`: opcional, timeout del camino con `cachedContent`, por defecto `180000`
 - `GEMINI_MAX_OUTPUT_TOKENS`: opcional, limite de salida de Gemini para controlar costo/latencia, por defecto `4096`
 - `GEMINI_AI_REVIEW_MODEL_ID`: opcional, modelo Gemini usado por la revisión IA; por defecto usa `gemini-3-flash-preview`
+- `GEMINI_PROMPT_LAB_REVIEW_MODEL_ID`: opcional, modelo Gemini usado por el validador de Prompt Lab AI; por defecto usa `GEMINI_MODEL_ID`
 - `GEMINI_ROUTER_MODEL_ID`: opcional, modelo del clasificador router en modo `genai-router-files`, por defecto `gemini-3.1-flash-lite`
 - `GEMINI_ROUTER_EXTRACTOR_MODEL_ID`: opcional, modelo extractor especializado en modo `genai-router-files`, por defecto `gemini-3-flash-preview`
 - `GEMINI_ROUTER_CLASSIFIER_CONFIDENCE_THRESHOLD`: opcional, umbral diagnostico de confianza del clasificador, por defecto `0.7`
@@ -283,6 +284,7 @@ Si prefieres Nixpacks, usa como fallback:
 | `GEMINI_GENERATE_TIMEOUT_MS`                              | `180000`                                        | No                                     |
 | `GEMINI_CACHED_GENERATE_TIMEOUT_MS`                       | `180000`                                        | No                                     |
 | `GEMINI_MAX_OUTPUT_TOKENS`                                | `4096`                                          | No                                     |
+| `GEMINI_PROMPT_LAB_REVIEW_MODEL_ID`                       | `gemini-3-flash-preview`                        | No                                     |
 | `GEMINI_ROUTER_MODEL_ID`                                  | `gemini-3.1-flash-lite`                         | No                                     |
 | `GEMINI_ROUTER_EXTRACTOR_MODEL_ID`                        | `gemini-3-flash-preview`                        | No                                     |
 | `GEMINI_ROUTER_CLASSIFIER_CONFIDENCE_THRESHOLD`           | `0.7`                                           | No                                     |

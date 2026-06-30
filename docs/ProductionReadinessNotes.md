@@ -45,6 +45,7 @@ Estas decisiones se dejaron asi porque el entorno local/productivo aun depende d
 | ----------------------------- | ------------------------------------- | ------------------------------------------------------ |
 | `POST /api/auth/login`        | 20 requests / 15 min por IP + session | Evitar fuerza bruta de login.                          |
 | `/api/ai-review/*`            | 30 requests / hora por IP + session   | Ruta admin/costosa, no flujo operativo masivo.         |
+| `/api/prompt-lab/*`           | 100 requests / hora por IP + session  | Laboratorio admin para pruebas repetidas de facturas.  |
 | `/api/integrate/*`            | 120 requests / hora por IP + session  | Protege llamadas salientes a terceros.                 |
 | `POST /api/documents/upload`  | Sin rate limit HTTP por hora          | El operador puede subir muchos documentos.             |
 | `POST /api/documents/process` | Sin rate limit HTTP por hora          | El operador puede enviar lotes grandes a cola.         |
@@ -131,7 +132,7 @@ Validaciones manuales recomendadas en Coolify:
 | Hay rate limit por hora para upload/proceso?            | No. Se quito para no bloquear operacion.                                                 |
 | Donde esta el control de carga real?                    | Tamaño por PDF/request, chunking cliente y worker en cola.                               |
 | Cuantos procesa el worker a la vez?                     | 5 por defecto, configurable con `DOCUMENT_WORKER_CONCURRENCY`.                           |
-| Cuales rutas siguen con rate limit?                     | Login, AI Review e integraciones externas.                                               |
+| Cuales rutas siguen con rate limit?                     | Login, AI Review, Prompt Lab e integraciones externas.                                   |
 | Que credenciales seed existen en DB nueva?              | `admin@smart.com`, `operador@smart.com`, `supervisor@smart.com`, password `1234`.        |
 | El seed resetea passwords en redeploy?                  | No, es idempotente si la DB ya existe.                                                   |
 | Se rotaron claves Gemini?                               | No.                                                                                      |

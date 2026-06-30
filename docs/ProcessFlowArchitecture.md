@@ -15,6 +15,7 @@ flowchart LR
   minio["MinIO / S3<br/>PDFs originales"]
   gemini["Google Gemini<br/>clasificacion + extraccion"]
   autopilot["AutoPilot AI<br/>agente revisor / validador"]
+  promptlab["Prompt Lab AI<br/>laboratorio de prompts"]
   integracion["Endpoint externo<br/>cliente / ERP / API"]
 
   usuario --> frontend
@@ -23,30 +24,33 @@ flowchart LR
   api --> minio
   api --> gemini
   api --> autopilot
+  api --> promptlab
   api --> integracion
   gemini --> api
   autopilot -->|"veredicto + recomendaciones"| api
+  promptlab -->|"diagnostico + propuesta V2"| api
   minio --> api
   db --> frontend
 ```
 
 ## 2. Componentes clave
 
-| Capa               | Componentes                                                                                                                                    | Responsabilidad                                                                                                                     |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Experiencia        | `App.tsx`, `Sidebar`, `LoginScreen`, `DocumentProcessingWorkspace`, `ResultsDashboard`, `OperatorPanel`, `AdminDashboard`, `AIReviewDashboard` | Navegacion por rol, seleccion de agencia, carga de PDFs, seguimiento de lotes, historial, paneles operativos/admin.                 |
-| Estado frontend    | `hooks/index.ts`                                                                                                                               | Sesion, agencia actual, carga de usuarios/agencias/planes, batch results, tema oscuro.                                              |
-| API client         | `services/apiClient.ts`                                                                                                                        | Centraliza llamadas `/api`, agrega `X-Session-Id`, maneja JSON/FormData, errores y cache de catalogos.                              |
-| Backend API        | `server/index.ts`, `server/routes/*`                                                                                                           | Monta rutas Hono, CORS, healthcheck, migraciones, seed, worker y SPA en produccion.                                                 |
-| Seguridad          | `server/security.ts`, `auth_sessions`                                                                                                          | Autenticacion por sesion, control de roles y acceso por agencia.                                                                    |
-| Persistencia       | `server/schema.ts`, `server/db.ts`                                                                                                             | Tablas de usuarios, agencias, planes, documentos, batches, auditoria, eventos Gemini, AutoPilot AI, integraciones y producto-match. |
-| Almacenamiento PDF | `server/services/minioService.ts`                                                                                                              | Guarda PDFs originales y copias de revision AutoPilot.                                                                              |
-| Extraccion IA      | `server/services/documentExtractionService.ts`, `services/agentPrompts.ts`, `shared/extractionSchema.ts`                                       | Construye prompts, selecciona SDK/modo, llama Gemini, fuerza JSON, registra tokens/costo/eventos.                                   |
-| Worker             | `server/workers/documentWorker.ts`                                                                                                             | Procesa `document_jobs` en background con concurrencia, locks, reintentos y auditoria.                                              |
-| Homologacion       | `product-matches`, `product_match_master`, `PendingProductMatches`, `ProductMatchCatalog`                                                      | Detecta productos sin match y permite crear/importar catalogos por agencia.                                                         |
-| Integracion        | `server/routes/integrate.ts`, `shared/integrationConfig.ts`                                                                                    | Mapea campos y envia documentos procesados a endpoints externos con logs.                                                           |
-| Mejora continua    | `server/routes/ai-review.ts`, `AIReviewDashboard`                                                                                              | Selecciona documentos costosos/relevantes, conserva evidencia, revisa PDF + JSON + eventos + prompts y propone mejoras.             |
-| Agente validador   | `POST /api/ai-review/items/:id/analyze`, `runReviewer()`                                                                                       | Valida una factura desde AutoPilot AI comparando PDF, JSON extraido, eventos Gemini y prompts usados.                               |
+| Capa               | Componentes                                                                                                                                    | Responsabilidad                                                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Experiencia        | `App.tsx`, `Sidebar`, `LoginScreen`, `DocumentProcessingWorkspace`, `ResultsDashboard`, `OperatorPanel`, `AdminDashboard`, `AIReviewDashboard` | Navegacion por rol, seleccion de agencia, carga de PDFs, seguimiento de lotes, historial, paneles operativos/admin.                             |
+| Estado frontend    | `hooks/index.ts`                                                                                                                               | Sesion, agencia actual, carga de usuarios/agencias/planes, batch results, tema oscuro.                                                          |
+| API client         | `services/apiClient.ts`                                                                                                                        | Centraliza llamadas `/api`, agrega `X-Session-Id`, maneja JSON/FormData, errores y cache de catalogos.                                          |
+| Backend API        | `server/index.ts`, `server/routes/*`                                                                                                           | Monta rutas Hono, CORS, healthcheck, migraciones, seed, worker y SPA en produccion.                                                             |
+| Seguridad          | `server/security.ts`, `auth_sessions`                                                                                                          | Autenticacion por sesion, control de roles y acceso por agencia.                                                                                |
+| Persistencia       | `server/schema.ts`, `server/db.ts`                                                                                                             | Tablas de usuarios, agencias, planes, documentos, batches, auditoria, eventos Gemini, AutoPilot AI, Prompt Lab, integraciones y producto-match. |
+| Almacenamiento PDF | `server/services/minioService.ts`                                                                                                              | Guarda PDFs originales y copias de revision AutoPilot.                                                                                          |
+| Extraccion IA      | `server/services/documentExtractionService.ts`, `services/agentPrompts.ts`, `shared/extractionSchema.ts`                                       | Construye prompts, selecciona SDK/modo, llama Gemini, fuerza JSON, registra tokens/costo/eventos.                                               |
+| Worker             | `server/workers/documentWorker.ts`                                                                                                             | Procesa `document_jobs` en background con concurrencia, locks, reintentos y auditoria.                                                          |
+| Homologacion       | `product-matches`, `product_match_master`, `PendingProductMatches`, `ProductMatchCatalog`                                                      | Detecta productos sin match y permite crear/importar catalogos por agencia.                                                                     |
+| Integracion        | `server/routes/integrate.ts`, `shared/integrationConfig.ts`                                                                                    | Mapea campos y envia documentos procesados a endpoints externos con logs.                                                                       |
+| Mejora continua    | `server/routes/ai-review.ts`, `AIReviewDashboard`                                                                                              | Selecciona documentos costosos/relevantes, conserva evidencia, revisa PDF + JSON + eventos + prompts y propone mejoras.                         |
+| Agente validador   | `POST /api/ai-review/items/:id/analyze`, `runReviewer()`                                                                                       | Valida una factura desde AutoPilot AI comparando PDF, JSON extraido, eventos Gemini y prompts usados.                                           |
+| Laboratorio IA     | `server/routes/prompt-lab.ts`, `PromptLabDashboard`                                                                                            | Permite subir una factura manual, guardar evidencia, ejecutar clasificador/extractor y documentar propuestas de ajuste.                         |
 
 ## 3. Flujo principal recomendado: procesamiento en cola
 
@@ -203,7 +207,48 @@ flowchart TD
 | Prompts usados      | `ai_prompt_snapshots` unidos por `prompt_hash`                                        |
 | Analisis del agente | `ai_review_analyses.analysis_json`                                                    |
 
-## 7. Funcionalidades del super producto
+## 7. Flujo Prompt Lab AI: laboratorio de prompts
+
+Prompt Lab AI es una vista admin dedicada a probar facturas subidas manualmente sin contaminar el historial operativo. Guarda el caso y el analisis para consulta futura, pero no crea `document_jobs`, `batch_items` ni integraciones.
+
+```mermaid
+flowchart TD
+  admin["Admin abre Prompt Lab AI<br/>PromptLabDashboard"]
+  upload["Carga PDF + agencia<br/>POST /api/prompt-lab/cases"]
+  storage["Guarda PDF en MinIO<br/>prompt-lab-ai/"]
+  case["Crea prompt_lab_cases<br/>estado CREATED"]
+  expected["Admin puede guardar<br/>notas o JSON esperado"]
+  analyze["Ejecutar validador<br/>POST /api/prompt-lab/cases/:id/analyze"]
+  extract["Corre router-files actual<br/>clasificador + extractor"]
+  snapshots["Construye snapshots<br/>classifier + router-extractor"]
+  validator["Agente validador<br/>PDF + JSON + categoria + prompts"]
+  verdict["OK / REVIEW_NEEDED /<br/>PROMPT_IMPROVEMENT / NEW_CATEGORY"]
+  store["Guarda prompt_lab_analyses<br/>extraccion + metricas + propuesta V2"]
+  deletePdf["Borrar PDF opcional<br/>DELETE /pdf"]
+
+  admin --> upload --> storage --> case
+  case --> expected --> analyze
+  case --> analyze --> extract --> snapshots --> validator --> verdict --> store
+  case --> deletePdf
+```
+
+### Que valida Prompt Lab AI
+
+- Si el clasificador eligio la categoria correcta.
+- Si el extractor especializado cubre el layout de la factura.
+- Si conviene ajustar `ROUTER_CLASSIFICATION_PROMPT`.
+- Si conviene ajustar el extractor de una categoria existente en `services/extractionRouterPrompts.ts`.
+- Si hace falta crear una categoria nueva.
+- Si el problema pertenece al schema o a reglas deterministicas del backend.
+- Costo, tokens y plan de validacion antes de proponer cambios.
+
+### V2: aprendizaje guiado documentado
+
+La V2 convierte un analisis aprobado en una propuesta versionada. Estados sugeridos: `DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `APPLIED`, `REJECTED`, `ROLLED_BACK`. Tipos sugeridos: `CLASSIFIER_PROMPT_ADJUSTMENT`, `EXTRACTOR_PROMPT_ADJUSTMENT`, `NEW_ROUTER_CATEGORY`, `SCHEMA_CHANGE`, `DETERMINISTIC_RULE_CHANGE`.
+
+Ninguna propuesta se aplica automaticamente. Antes de aprobar/aplicar se debe validar contra casos golden o regresion para evitar degradar facturas existentes.
+
+## 8. Funcionalidades del super producto
 
 ### Operacion diaria
 
@@ -258,7 +303,16 @@ flowchart TD
 - Genera analisis con veredicto, hallazgos, recomendaciones tecnicas, impacto de costo y plan de validacion.
 - Guarda analisis en `ai_review_analyses` sin modificar automaticamente prompts operativos.
 
-## 8. Modelo de datos esencial
+### Prompt Lab AI y aprendizaje guiado
+
+- Permite subir una factura nueva manualmente por agencia.
+- Guarda PDF en `prompt-lab-ai/` y metadata en `prompt_lab_cases`.
+- Ejecuta clasificador y extractor actual sin crear historial operativo.
+- Guarda extraccion, metricas, prompts y diagnostico en `prompt_lab_analyses`.
+- Permite borrar el PDF del caso sin borrar el analisis.
+- Documenta una propuesta V2 para ajustar prompts existentes o crear una categoria nueva con aprobacion humana.
+
+## 9. Modelo de datos esencial
 
 ```mermaid
 erDiagram
@@ -277,28 +331,31 @@ erDiagram
   gemini_extraction_events ||--o{ ai_prompt_snapshots : references
   ai_review_runs ||--o{ ai_review_items : contains
   ai_review_items ||--o{ ai_review_analyses : reviewed_by
+  agencies ||--o{ prompt_lab_cases : diagnoses
+  prompt_lab_cases ||--o{ prompt_lab_analyses : validated_by
 ```
 
-## 9. Rutas API por dominio
+## 10. Rutas API por dominio
 
-| Dominio            | Rutas                                                                                                                                                                                    |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Salud              | `GET /api/health`                                                                                                                                                                        |
-| Auth               | `POST /api/auth/login`, `GET /api/auth/session`, `DELETE /api/auth/session`                                                                                                              |
-| Usuarios           | `GET/POST /api/users`, `GET/PUT/DELETE /api/users/:id`                                                                                                                                   |
-| Agencias           | `GET/POST /api/agencies`, `GET/PUT/DELETE /api/agencies/:id`, `PATCH /api/agencies/:id/usage`                                                                                            |
-| Planes             | `GET /api/plans`                                                                                                                                                                         |
-| Documentos         | `GET /api/documents`, `POST /api/documents/upload`, `POST /api/documents/process`, `GET /api/documents/status/:id`, `GET /api/documents/:id/preview`, `DELETE /api/documents`            |
-| Extraccion directa | `POST /api/ai/extract`, `POST /api/ai/compare`, `GET /api/ai/cache-status`, `POST /api/ai/cache-warm`                                                                                    |
-| Batches            | `GET/POST/DELETE /api/batch`, `PUT /api/batch/:id`, `DELETE /api/batch/items`                                                                                                            |
-| Auditoria          | `GET /api/audit/document-processing`, `GET /api/audit/gemini-extraction-events`                                                                                                          |
-| AutoPilot AI       | `GET/POST /api/ai-review/runs`, `GET /api/ai-review/runs/latest`, `GET /api/ai-review/items/:id`, `GET /api/ai-review/items/:id/pdf`, `POST /api/ai-review/items/:id/analyze`            |
-| Producto-match     | `GET/POST /api/product-matches`, `GET/POST /api/product-matches/pending`, `POST /api/product-matches/bootstrap`, `GET /api/product-matches/template`, `POST /api/product-matches/import` |
-| Operacional        | `GET /api/operational/reconciliation`, `POST /api/operational/booked`                                                                                                                    |
-| Integracion        | `POST /api/integrate/test`, `POST /api/integrate/send`, `GET /api/integrate/logs/:agencyId`                                                                                              |
-| Settings           | `GET/PUT /api/settings/:key`                                                                                                                                                             |
+| Dominio            | Rutas                                                                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Salud              | `GET /api/health`                                                                                                                                                                                   |
+| Auth               | `POST /api/auth/login`, `GET /api/auth/session`, `DELETE /api/auth/session`                                                                                                                         |
+| Usuarios           | `GET/POST /api/users`, `GET/PUT/DELETE /api/users/:id`                                                                                                                                              |
+| Agencias           | `GET/POST /api/agencies`, `GET/PUT/DELETE /api/agencies/:id`, `PATCH /api/agencies/:id/usage`                                                                                                       |
+| Planes             | `GET /api/plans`                                                                                                                                                                                    |
+| Documentos         | `GET /api/documents`, `POST /api/documents/upload`, `POST /api/documents/process`, `GET /api/documents/status/:id`, `GET /api/documents/:id/preview`, `DELETE /api/documents`                       |
+| Extraccion directa | `POST /api/ai/extract`, `POST /api/ai/compare`, `GET /api/ai/cache-status`, `POST /api/ai/cache-warm`                                                                                               |
+| Batches            | `GET/POST/DELETE /api/batch`, `PUT /api/batch/:id`, `DELETE /api/batch/items`                                                                                                                       |
+| Auditoria          | `GET /api/audit/document-processing`, `GET /api/audit/gemini-extraction-events`                                                                                                                     |
+| AutoPilot AI       | `GET/POST /api/ai-review/runs`, `GET /api/ai-review/runs/latest`, `GET /api/ai-review/items/:id`, `GET /api/ai-review/items/:id/pdf`, `POST /api/ai-review/items/:id/analyze`                       |
+| Prompt Lab AI      | `GET/POST /api/prompt-lab/cases`, `GET /api/prompt-lab/cases/:id`, `GET/DELETE /api/prompt-lab/cases/:id/pdf`, `PATCH /api/prompt-lab/cases/:id/expected`, `POST /api/prompt-lab/cases/:id/analyze` |
+| Producto-match     | `GET/POST /api/product-matches`, `GET/POST /api/product-matches/pending`, `POST /api/product-matches/bootstrap`, `GET /api/product-matches/template`, `POST /api/product-matches/import`            |
+| Operacional        | `GET /api/operational/reconciliation`, `POST /api/operational/booked`                                                                                                                               |
+| Integracion        | `POST /api/integrate/test`, `POST /api/integrate/send`, `GET /api/integrate/logs/:agencyId`                                                                                                         |
+| Settings           | `GET/PUT /api/settings/:key`                                                                                                                                                                        |
 
-## 10. Como leer el flujo completo
+## 11. Como leer el flujo completo
 
 1. El usuario entra, se autentica y selecciona agencia.
 2. La UI consulta datos base: usuarios, agencias, planes, historiales y documentos.
@@ -311,5 +368,7 @@ erDiagram
    - detectar producto-match pendiente,
    - conciliar MAWB/facturado contra reservado,
    - exportar/enviar a integracion externa,
-   - alimentar AutoPilot AI para mejora continua.
+   - alimentar AutoPilot AI para mejora continua,
+   - crear casos en Prompt Lab AI para validar facturas nuevas antes de tocar prompts.
 8. En AutoPilot AI, el admin puede crear una muestra del dia y ejecutar el agente revisor para validar PDF, JSON, eventos y prompts antes de decidir mejoras.
+9. En Prompt Lab AI, el admin puede subir una factura nueva, guardar el analisis y preparar una propuesta V2 para aprendizaje guiado.

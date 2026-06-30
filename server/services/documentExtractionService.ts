@@ -29,7 +29,7 @@ import {
   type ExtractionPromptProfile,
 } from '../../services/agentPrompts.js';
 import {
-  getRouterCategoryConfig,
+  buildRouterExtractorPrompt,
   isRouterInvoiceCategory,
   ROUTER_CLASSIFICATION_PROMPT,
   routerClassificationSchema,
@@ -2015,21 +2015,6 @@ function shouldRetryRouterClassification(classification: RouterClassificationRes
     classification.category === 'UNKNOWN_GENERAL' ||
     classification.confidence < readGeminiRouterClassifierConfidenceThreshold()
   );
-}
-
-function buildRouterExtractorPrompt(agentType: AgentType, category: RouterInvoiceCategory): string {
-  if (category === 'UNKNOWN_GENERAL') {
-    return buildExtractionPrompt(agentType, { profile: 'compact' });
-  }
-
-  const config = getRouterCategoryConfig(category);
-
-  return [
-    'You are a specialist in perishable flower logistics invoice extraction.',
-    `Detected format: ${config.category}. ${config.description}`,
-    config.extractorPrompt,
-    'Return only strict JSON matching the provided response schema.',
-  ].join('\n');
 }
 
 async function uploadGeminiDocumentFile(input: {

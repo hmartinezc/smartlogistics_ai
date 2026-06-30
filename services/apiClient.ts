@@ -493,6 +493,98 @@ export const api = {
     return URL.createObjectURL(await response.blob());
   },
 
+  // ── Prompt Lab AI / Diagnóstico guardado ──
+  async getPromptLabCases(
+    params: {
+      agencyId?: string;
+      limit?: number;
+    } = {},
+  ): Promise<import('../types').PromptLabCaseListResponse> {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        search.set(key, String(value));
+      }
+    });
+
+    const query = search.toString();
+    return request(`/prompt-lab/cases${query ? `?${query}` : ''}`);
+  },
+
+  async createPromptLabCase(input: {
+    agencyId: string;
+    file: File;
+    format: import('../types').AgentType;
+    adminNotes?: string;
+    expectedJson?: string;
+  }): Promise<import('../types').PromptLabDetailResponse> {
+    const formData = new FormData();
+    formData.append('agencyId', input.agencyId);
+    formData.append('format', input.format);
+    formData.append('file', input.file);
+    if (input.adminNotes) {
+      formData.append('adminNotes', input.adminNotes);
+    }
+    if (input.expectedJson) {
+      formData.append('expectedJson', input.expectedJson);
+    }
+
+    return request('/prompt-lab/cases', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  async getPromptLabCase(id: string): Promise<import('../types').PromptLabDetailResponse> {
+    return request(`/prompt-lab/cases/${encodeURIComponent(id)}`);
+  },
+
+  async updatePromptLabExpected(input: {
+    id: string;
+    adminNotes?: string;
+    expectedJson?: string;
+  }): Promise<import('../types').PromptLabDetailResponse> {
+    return request(`/prompt-lab/cases/${encodeURIComponent(input.id)}/expected`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        adminNotes: input.adminNotes || '',
+        expectedJson: input.expectedJson || '',
+      }),
+    });
+  },
+
+  async analyzePromptLabCase(id: string): Promise<import('../types').PromptLabDetailResponse> {
+    return request(`/prompt-lab/cases/${encodeURIComponent(id)}/analyze`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async deletePromptLabCasePdf(id: string): Promise<import('../types').PromptLabDetailResponse> {
+    return request(`/prompt-lab/cases/${encodeURIComponent(id)}/pdf`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getPromptLabCasePdfBlobUrl(caseId: string): Promise<string> {
+    const sessionId = getSessionId();
+    const headers: Record<string, string> = {};
+    if (sessionId) {
+      headers['X-Session-Id'] = sessionId;
+    }
+
+    const response = await fetch(`${API_BASE}/prompt-lab/cases/${encodeURIComponent(caseId)}/pdf`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Error al cargar el PDF.' }));
+      throw new ApiError(body.error || response.statusText, response.status);
+    }
+
+    return URL.createObjectURL(await response.blob());
+  },
+
   // ── Documents / Background AI queue ──
   async getDocuments(
     params: import('../types').DocumentListQuery = {},

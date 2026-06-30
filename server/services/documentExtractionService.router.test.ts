@@ -224,6 +224,99 @@ describe('genai-router-files extraction', () => {
     assert.match(JSON.stringify(fake.generateInputs[1]), /TESSA Commercial Invoice Print/);
   });
 
+  it('accepts parent-child category and uses same-base product guidance', async () => {
+    const fake = createFakeAi((callIndex) =>
+      callIndex === 1
+        ? response({
+            confidence: 0.97,
+            tipoFactura: 'PARENT_CHILD_COMPOSITION',
+            visualSignals: ['parent row has pieces', 'child rows have blank pieces'],
+          })
+        : response(baseInvoice),
+    );
+
+    const run = await generateInvoiceWithGenaiRouterFilesDetailed({
+      agentType: 'AGENT_GENERIC_A',
+      ai: fake.fakeAi,
+      document: {
+        buffer: Buffer.from('%PDF-test'),
+        mimeType: 'application/pdf',
+      },
+    });
+
+    assert.equal(fake.generateCalls, 2);
+    assert.equal(run.metrics.routerCategory, 'PARENT_CHILD_COMPOSITION');
+    assert.match(JSON.stringify(fake.generateInputs[0]), /single PIECES TYPE column/);
+    assert.match(JSON.stringify(fake.generateInputs[1]), /same base flower product/);
+    assert.match(
+      JSON.stringify(fake.generateInputs[1]),
+      /normalize productDescription to the base product/,
+    );
+  });
+
+  it('uses category-header guidance for pieces/order columns without widening box ranges', async () => {
+    const fake = createFakeAi((callIndex) =>
+      callIndex === 1
+        ? response({
+            confidence: 0.96,
+            tipoFactura: 'CATEGORY_HEADER_COMPOSITION',
+            visualSignals: ['ROSES header', 'Pieces and Order columns'],
+          })
+        : response(baseInvoice),
+    );
+
+    const run = await generateInvoiceWithGenaiRouterFilesDetailed({
+      agentType: 'AGENT_GENERIC_A',
+      ai: fake.fakeAi,
+      document: {
+        buffer: Buffer.from('%PDF-test'),
+        mimeType: 'application/pdf',
+      },
+    });
+
+    const classifierPrompt = JSON.stringify(fake.generateInputs[0]);
+    const extractorPrompt = JSON.stringify(fake.generateInputs[1]);
+
+    assert.equal(fake.generateCalls, 2);
+    assert.equal(run.metrics.routerCategory, 'CATEGORY_HEADER_COMPOSITION');
+    assert.match(classifierPrompt, /ROSES above variety rows/);
+    assert.match(classifierPrompt, /Pieces plus Order/);
+    assert.doesNotMatch(classifierPrompt, /BOX_RANGES=BOX No\. or Order/);
+    assert.match(extractorPrompt, /never concatenate them/);
+    assert.match(extractorPrompt, /Pieces 6 with Order 10-15 means totalPieces=6/);
+  });
+
+  it('uses FBE guidance for stems per bunch and same-base product normalization', async () => {
+    const fake = createFakeAi((callIndex) =>
+      callIndex === 1
+        ? response({
+            confidence: 0.96,
+            tipoFactura: 'FBE_BUNCH_PRICE',
+            visualSignals: ['STEMS/BUNCH', 'STEMS/BOX', 'UNIT PRICE'],
+          })
+        : response(baseInvoice),
+    );
+
+    const run = await generateInvoiceWithGenaiRouterFilesDetailed({
+      agentType: 'AGENT_GENERIC_A',
+      ai: fake.fakeAi,
+      document: {
+        buffer: Buffer.from('%PDF-test'),
+        mimeType: 'application/pdf',
+      },
+    });
+
+    const classifierPrompt = JSON.stringify(fake.generateInputs[0]);
+    const extractorPrompt = JSON.stringify(fake.generateInputs[1]);
+
+    assert.equal(fake.generateCalls, 2);
+    assert.equal(run.metrics.routerCategory, 'FBE_BUNCH_PRICE');
+    assert.match(classifierPrompt, /STEMS\/BUNCH/);
+    assert.match(classifierPrompt, /STEMS\/BOX/);
+    assert.match(extractorPrompt, /STOCK MIXTO 70cm and STOCK WHITE 70cm normalize to STOCK/);
+    assert.match(extractorPrompt, /leave varieties empty/);
+  });
+
   it('merges positive zero-piece child rows into the previous parent line item', async () => {
     const invoiceWithChildRows: InvoiceData = {
       ...baseInvoice,

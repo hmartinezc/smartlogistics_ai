@@ -1,4 +1,6 @@
 import { Type as SchemaType, type Schema } from '@google/genai';
+import type { AgentType } from '../types';
+import { buildExtractionPrompt } from './agentPrompts';
 
 export const ROUTER_INVOICE_CATEGORIES = [
   'STANDARD_TABLE',
@@ -49,19 +51,21 @@ Classify the visible flower logistics invoice layout. Return only JSON.
 Use these signatures:
 STANDARD_TABLE=direct pieces/type/product/stems/price/value columns.
 BOX_RANGES=BOX No. single numbers/ranges plus TB/type.
-SPLIT_BOX_COLUMNS=separate QB/HB/FB quantity columns.
+SPLIT_BOX_COLUMNS=separate side-by-side QB/HB/FB quantity columns, not a single PIECES TYPE column containing HB/QB row values.
 EMBEDDED_BOX_PREFIX=description starts with pieces/type/EQ tokens.
 GLOBAL_BOX_SUMMARY=pieces/type only in a global note/logistics block.
-CATEGORY_HEADER_COMPOSITION=visual product header groups varieties.
-PARENT_CHILD_COMPOSITION=parent row has pieces/type, child rows blank.
-FBE_BUNCH_PRICE=Boxes/FBE/Bunch/Stems price format.
+CATEGORY_HEADER_COMPOSITION=visual product header groups varieties, such as ROSES above variety rows.
+PARENT_CHILD_COMPOSITION=parent row has pieces/type, following child rows leave pieces/type blank and continue the same visual product group.
+FBE_BUNCH_PRICE=Boxes/FBE/Bunch/Stems price format, including STEMS/BUNCH, STEMS/BOX, BUNCH, UNIT PRICE and TOTAL columns.
 SUMMARY_FINANCIAL_ONLY=detail rows have pieces/type/EQ; one summary row has product/stems/price/value.
 TESSA=Commercial Invoice Print grid used by the TESSA flow, with *PIECE TYPE, TOTAL PIECES, EQ-FULL BOXES, PRODUCT DESCRIPTION, TOTAL-UNT STEMS, UNIT-PRICE, TOTAL VALUE.
 Tie breakers:
 - Classify the commercial invoice table, not APHIS/phytosanitary/botanical summaries.
 - Prefer TESSA when the page title or table shows Commercial Invoice Print plus *PIECE TYPE / TOTAL PIECES / EQ-FULL BOXES / PRODUCT DESCRIPTION / TOTAL-UNT STEMS / UNIT-PRICE / TOTAL VALUE.
-- Prefer FBE_BUNCH_PRICE when FBE/Bunch/Stems price columns appear.
-- Prefer SPLIT_BOX_COLUMNS when visible quantity columns are named Quarter/Quaters/QB/QRT, Half/HB, Full/FB, even if stems/price/value columns also exist.
+- Prefer FBE_BUNCH_PRICE when FBE/Bunch/Stems price columns appear, or when the commercial table shows STEMS/BUNCH plus STEMS/BOX/BUNCH with UNIT PRICE and TOTAL.
+- Prefer CATEGORY_HEADER_COMPOSITION when a visible product header like ROSES sits above variety rows and the table has Pieces plus Order/range columns; use Pieces as physical quantity and Order only as reference validation.
+- Prefer PARENT_CHILD_COMPOSITION when a parent row has PIECES TYPE/TOTAL PIECES/PIECES and following rows in the same visual product group have blank PIECES TYPE/PIECES but positive stems/value, even if the parent row value is HB/QB/FB.
+- Prefer SPLIT_BOX_COLUMNS only when visible quantity columns are separate side-by-side headers named Quarter/Quaters/QB/QRT, Half/HB, Full/FB. Do not choose SPLIT_BOX_COLUMNS for a single PIECES TYPE column whose row values are HB/QB/FB.
 - Prefer BOX_RANGES when BOX No. contains ranges, even if other standard columns exist.
 - Prefer GLOBAL_BOX_SUMMARY when commercial rows lack row-level pieces/type but a note prints pieces/type.
 - Prefer SUMMARY_FINANCIAL_ONLY only when detail rows lack stems/price/value and a summary row has them.
@@ -74,6 +78,7 @@ const COMMON_EXTRACTION_RULES = `
 Return strict JSON matching the provided schema. Use only visual evidence.
 Keep invoice-level totalPieces, totalEq, totalStems and totalValue exactly as printed; backend validates math later.
 If Invoice No. is missing but Packing No./Packing List is printed, use it as invoiceNumber and add MISSING_FIELD.
+If both "R.U.C. No." and "FUE No." are printed, map "R.U.C. No." only to ruc and "FUE No." to dae. Never copy R.U.C. No. into dae; if FUE/DAE is missing, leave dae empty and add MISSING_FIELD instead of reusing ruc.
 For MAWB and HAWB, transcribe character-by-character exactly as printed. Preserve all letters, digits, leading zeros, internal zeros and separators; never shorten or remove zeros from airwaybill numbers.
 Normalize box types: FB/F/FX/FULL/P/PL=FB, HB/H/1/2/HALF=HB, QB/Q/1/4/QUARTER/QRT=QB, EB/E/1/8/OCTAVO/OCT=EB, DS/D/1/16/SPLIT=DS.
 lineItem.eqFull = totalPieces * factor. Never return an independent positive commercial line with totalPieces=0.
@@ -123,6 +128,9 @@ If the box type OCR is corrupted but footer math proves the factor, normalize it
 ${COMMON_EXTRACTION_RULES}
 Format focus: split box quantity columns.
 Columns like Quarter/QB, Half/HB and Full/FB represent box quantities.
+Use this category only when QB/HB/FB/Quarter/Half/Full are separate side-by-side quantity headers. If the document instead has a single PIECES TYPE column and blank continuation rows, follow parent/child composition rules even if this category was selected.
+Fallback for misclassified parent/child rows: when a physical parent row has pieces/type and following rows leave pieces/type blank, attach those rows to the parent instead of creating separate zero-piece lineItems.
+If that parent/child group is the same base flower product and only changes length, color, ASSORTED/OPEN wording, or scientific names, normalize productDescription to the base product and leave varieties empty.
 Split into separate lineItems only when stems/value are separable; otherwise use the dominant populated box type and mark AMBIGUOUS_TABLE.
 When stems are not row-level separable, apply fixed product rules first: Roses/Spray Roses QB=100 and HB=250; Gypsophila/Gypso QB=150; Alstroemeria QB=150; default QB=150 only for QB rows.
 If product rules do not cover all boxes, put remaining stems on the biggest EQ box; otherwise distribute by EQ proportion and adjust rounding so totalStems matches the footer exactly.
@@ -165,6 +173,8 @@ ${COMMON_EXTRACTION_RULES}
 Format focus: category header with variety composition.
 Use a visually separate header like ROSES as parent productDescription only when child rows below are varieties.
 Use printed Pieces/Box Type for each physical group and put child variety names in varieties.
+When separate Pieces and Order columns appear side by side, never concatenate them. Pieces is the physical quantity; Order is only a box/order reference.
+If Order is a range, use it only to validate Pieces by end-start+1. Examples: Pieces 2 with Order 1-2 means totalPieces=2; Pieces 6 with Order 10-15 means totalPieces=6. Never read these as 21-2 or 610-15.
 Do not replace normal product rows with generic headers.
 Sum stems/value across variety rows for the physical group; use weighted unitPrice when child prices differ.
 `.trim(),
@@ -177,7 +187,10 @@ Sum stems/value across variety rows for the physical group; use weighted unitPri
 ${COMMON_EXTRACTION_RULES}
 Format focus: parent/child composition rows.
 Child rows with blank pieces/type attach to the previous parent.
-When child rows print stems, preserve the breakdown as compact varieties like ROSAS:125 and RUSCUS:25.
+If the parent and child rows are the same base flower product and only differ by length, color, grade, ASSORTED/OPEN wording, or scientific names, normalize productDescription to the base product and leave varieties empty. Example: LISIANTHUS 60cm ASSORTED, LISIANTHUS 60cm PURPLE and LISIANTHUS OPEN 70cm MISTY BLUE all normalize to LISIANTHUS when they are separate physical rows/groups.
+For same-base product groups, count the parent row's printed stems/value as part of the group when the parent row has positive stems/value, then add child stems/value. Use stems * unitPrice for each visible row when printed line total conflicts.
+Keep separate lineItems when boxType, totalPieces, unitPrice, or base product changes; do not merge HB and QB physical rows together.
+When child rows print stems for genuinely mixed products, preserve the breakdown as compact varieties like ROSAS:125 and RUSCUS:25.
 Backend makes the final MIXTAS decision. Your priority is preserving every printed child product description with its stems/value so no composition data is lost.
 Before adding child stems/value, test whether keeping the parent printed stems/value already matches the document subtotal/footer.
 Add child stems/value only when parent totals do not already include them; otherwise do not double-count.
@@ -195,6 +208,9 @@ Never return the child rows as independent lineItems with totalPieces=0.
 ${COMMON_EXTRACTION_RULES}
 Format focus: FBE and bunch price.
 Infer boxType from FBE / Boxes when no explicit code is printed.
+When parent/child or repeated FBE rows are the same base flower product and only differ by color, length, MIXTO/ASSORTED wording, grade, or scientific names, normalize productDescription to the base product and leave varieties empty. Example: STOCK MIXTO 70cm and STOCK WHITE 70cm normalize to STOCK.
+Keep separate lineItems when the physical row changes boxType, totalPieces, unitPrice, or printed commercial total; do not merge separate physical rows just because the base product matches.
+For same-base child rows under one physical row, sum stems/value into the parent line and leave varieties empty; use varieties only for genuinely mixed base products.
 If PRICE * bunch count equals TOTAL, printed price is per bunch; output unitPrice per stem as totalValue / totalStems.
 Use recap totals when present.
 Use parent Boxes and FBE as source of truth for pieces/EQ. Child lines like "1,760 Stems" provide stem count, not extra boxes.
@@ -229,8 +245,17 @@ Format focus: TESSA Commercial Invoice Print customer template.
 Use this category when the table shows columns like *PIECE TYPE, TOTAL PIECES, EQ-FULL BOXES, PRODUCT DESCRIPTION, HTS, NANDINA, TOTAL-UNT STEMS, UNIT-PRICE PER/STEM and TOTAL VALUE-USD.
 If product/stems/price/value appear on the same row as piece/type/EQ, extract that row directly.
 If QB/HB/etc rows have piece/type/EQ while one shared financial line contains product, HTS, NANDINA, stems, unit price and value, treat the shared line as the product/financial summary, not as an extra lineItem.
-If a TESSA row has blank piece/type/EQ but positive TOTAL-UNT STEMS or VALUE, it is composition of the previous physical row. Preserve PRODUCT:stems in varieties or output it as an immediate totalPieces=0 child row for backend merge.
+If a TESSA parent row has pieces/type/EQ and a productDescription like Assorted, Combo Box, Mix Box, Mixed Box, Bouquet, or similar, and following rows have blank pieces/type/EQ with positive TOTAL-UNT STEMS or VALUE, treat those following rows as the child composition of that parent. Return one parent lineItem using the parent's physical pieces/type/EQ and productDescription.
+For those Assorted/Combo Box-style composition parents:
+- totalStems = sum of child TOTAL-UNT STEMS.
+- totalValue = sum of child total prices.
+- varieties = child commercial product/variety descriptions as PRODUCT:stems.
+- Use the child unit price only when all child prices match; otherwise unitPrice = totalValue / totalStems.
+- Do not include the parent row's ScientificName, MARK, ATPA, HTS/NANDINA-only metadata as a variety unless the parent row also has its own positive stems/value.
+- Keep child HTS/NANDINA when consistent; if child tax codes differ, keep productDescription as Combo Box/Assorted and preserve all child details in varieties.
+If a TESSA row has blank piece/type/EQ but positive TOTAL-UNT STEMS or VALUE and the previous physical row is not an Assorted/Combo Box-style composition parent, it is composition of the previous physical row. Preserve PRODUCT:stems in varieties or output it as an immediate totalPieces=0 child row for backend merge.
 For TESSA composition boxes, one parent row may be followed by one or more blank piece/type child rows. Preserve every child row's product, stems, price and value; backend will merge those rows and decide whether the parent becomes MIXTAS.
+If a TESSA parent row has pieces/type/EQ but no positive stems/value and no following child financial rows, keep it only if required to preserve physical totals and flag the ambiguity in confidenceReasons; do not silently create a commercial zero-value product line.
 For a shared ROSES summary, assign QB rows using 100 stems per QB piece first, then put the remaining stems on HB/larger-EQ rows so row stems sum exactly to the printed TOTAL-UNT STEMS.
 For a single positive box row, keep the printed row stems/value when present and calculate eqFull from piece/type.
 Use the printed footer TOTAL pieces, EQ, stems and value as invoice totals.
@@ -252,4 +277,22 @@ export function isRouterInvoiceCategory(value: unknown): value is RouterInvoiceC
 
 export function getRouterCategoryConfig(category: RouterInvoiceCategory): RouterCategoryConfig {
   return ROUTER_CATEGORY_CONFIGS[category] || ROUTER_CATEGORY_CONFIGS.UNKNOWN_GENERAL;
+}
+
+export function buildRouterExtractorPrompt(
+  agentType: AgentType,
+  category: RouterInvoiceCategory,
+): string {
+  if (category === 'UNKNOWN_GENERAL') {
+    return buildExtractionPrompt(agentType, { profile: 'compact' });
+  }
+
+  const config = getRouterCategoryConfig(category);
+
+  return [
+    'You are a specialist in perishable flower logistics invoice extraction.',
+    `Detected format: ${config.category}. ${config.description}`,
+    config.extractorPrompt,
+    'Return only strict JSON matching the provided response schema.',
+  ].join('\n');
 }

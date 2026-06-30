@@ -218,6 +218,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
 
     menuItems.push({
+      id: AppState.PROMPT_LAB,
+      label: 'Prompt Lab AI',
+      icon: FileWarning,
+      desc: 'Diagnóstico de prompts',
+    });
+
+    menuItems.push({
       id: AppState.AGENCY_CONFIG,
       label: 'Config. Agencias',
       icon: Building,

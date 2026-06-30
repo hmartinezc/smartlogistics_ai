@@ -18,6 +18,7 @@ import DashboardHome from './components/DashboardHome';
 import OperatorPanel from './components/OperatorPanel';
 import AdminDashboard from './components/AdminDashboard';
 import AIReviewDashboard from './components/AIReviewDashboard';
+import PromptLabDashboard from './components/PromptLabDashboard';
 import UserManagement from './components/UserManagement';
 import AgenciesConfiguration from './components/AgenciesConfiguration';
 import IntegrationConfig from './components/IntegrationConfig';
@@ -200,6 +201,7 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
         AppState.DASHBOARD_OPS,
         AppState.DASHBOARD_ADMIN,
         AppState.AI_REVIEW,
+        AppState.PROMPT_LAB,
         AppState.DASHBOARD_PANEL,
         AppState.PENDING_PRODUCT_MATCHES,
         AppState.PRODUCT_MATCHES,
@@ -510,6 +512,9 @@ function App({ isWidgetMode = false, isOpen = true, onClose }: AppProps) {
                 )}
                 {appState === AppState.AI_REVIEW && currentUser?.role === 'ADMIN' && (
                   <AIReviewDashboard agencies={agencies} />
+                )}
+                {appState === AppState.PROMPT_LAB && currentUser?.role === 'ADMIN' && (
+                  <PromptLabDashboard agencies={agencies} />
                 )}
                 {/* TODO: Re-enable when Conciliación y Log is ready */}
                 {/* appState === AppState.DASHBOARD_OPS && currentUser?.role === 'ADMIN' && (

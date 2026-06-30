@@ -8,7 +8,7 @@ import {
   type ExtractionPromptProfile,
 } from '../../services/agentPrompts.js';
 import {
-  getRouterCategoryConfig,
+  buildRouterExtractorPrompt,
   isRouterInvoiceCategory,
   ROUTER_CLASSIFICATION_PROMPT,
   type RouterInvoiceCategory,
@@ -127,21 +127,6 @@ function estimateGeminiCostUsd(input: {
   }
 
   return 0;
-}
-
-function buildRouterExtractorPrompt(agentType: AgentType, category: RouterInvoiceCategory): string {
-  if (category === 'UNKNOWN_GENERAL') {
-    return buildExtractionPrompt(agentType, { profile: 'compact' });
-  }
-
-  const config = getRouterCategoryConfig(category);
-
-  return [
-    'You are a specialist in perishable flower logistics invoice extraction.',
-    `Detected format: ${config.category}. ${config.description}`,
-    config.extractorPrompt,
-    'Return only strict JSON matching the provided response schema.',
-  ].join('\n');
 }
 
 function buildPromptSnapshotFromEvent(event: Row) {

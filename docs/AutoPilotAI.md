@@ -6,6 +6,12 @@ AutoPilot AI es la base de mejora continua del sistema de extracción de factura
 
 La premisa principal es: mejorar precisión y confiabilidad sin disparar costos, y nunca aplicar cambios automáticamente sin aprobación humana.
 
+## Relación con Prompt Lab AI
+
+AutoPilot AI revisa facturas que ya pasaron por el flujo operativo y quedaron en `document_jobs`/`batch_items`. Prompt Lab AI, documentado en `docs/PromptLabAI.md`, sirve para subir una factura manual, diagnosticar si los prompts actuales la cubren y guardar una propuesta V2 de aprendizaje guiado sin crear historial operativo.
+
+Ambas vistas comparten el principio de aprobación humana: ninguna recomendación modifica prompts activos automáticamente.
+
 ## Alcance actual
 
 La versión actual es manual y 100% aditiva.
@@ -28,6 +34,7 @@ La versión actual es manual y 100% aditiva.
 - No corrige resultados extraídos.
 - No crea nuevas categorías de documentos.
 - No ejecuta pruebas de regresión antes de aprobar una recomendación.
+- No reemplaza Prompt Lab AI para validar facturas nuevas subidas manualmente.
 
 ## Modelo usado
 
@@ -77,6 +84,7 @@ La siguiente fase debería convertir AutoPilot AI en un ciclo de aprendizaje má
    - Crear dataset dorado con facturas reales seleccionadas.
    - Ejecutar comparación antes/después para medir precisión, tokens y costo.
    - Bloquear aprobación si sube mucho el costo sin mejora clara.
+   - Reusar casos de Prompt Lab AI como candidatos a golden tests cuando el admin los apruebe.
 
 5. **Prompts dinámicos aprobados**
    - Permitir activar una versión aprobada de prompt sin desplegar código.

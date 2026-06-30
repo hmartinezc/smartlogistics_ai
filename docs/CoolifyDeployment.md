@@ -73,6 +73,7 @@ Nota:
 | `GEMINI_CACHED_GENERATE_TIMEOUT_MS`             | No                                     | `180000`                       |
 | `GEMINI_MAX_OUTPUT_TOKENS`                      | No                                     | `4096`                         |
 | `GEMINI_AI_REVIEW_MODEL_ID`                     | No                                     | `gemini-3-flash-preview`       |
+| `GEMINI_PROMPT_LAB_REVIEW_MODEL_ID`             | No                                     | `gemini-3-flash-preview`       |
 | `GEMINI_ROUTER_MODEL_ID`                        | No                                     | `gemini-3.1-flash-lite`        |
 | `GEMINI_ROUTER_EXTRACTOR_MODEL_ID`              | No                                     | `gemini-3-flash-preview`       |
 | `GEMINI_ROUTER_CLASSIFIER_CONFIDENCE_THRESHOLD` | No                                     | `0.7`                          |

@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "tsx --watch server/index.ts",
+    "build": "npm run typecheck && vite build",
+    "start": "tsx server/index.ts",
+    "db:seed": "tsx server/seed-cli.ts",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "typecheck": "tsc --noEmit && tsc -p server/tsconfig.json --noEmit",
+    "quality": "node scripts/quality/pre-commit-check.js",
+    "scan-secrets": "node scripts/quality/check-secrets.js --strict",
+    "check": "npm run typecheck && npm run format:check && npm run quality && npm run scan-secrets"
+  }
+}

@@ -36,6 +36,7 @@ import settingsRoutes from './routes/settings.js';
 import plansRoutes from './routes/plans.js';
 import aiRoutes from './routes/ai.js';
 import aiReviewRoutes from './routes/ai-review.js';
+import promptLabRoutes from './routes/prompt-lab.js';
 import auditRoutes from './routes/audit.js';
 import documentsRoutes from './routes/documents.js';
 import integrateRoutes from './routes/integrate.js';
@@ -129,14 +130,12 @@ app.use(
 
 // ── Rate limits de protección para rutas sensibles/no masivas ──
 app.use('/api/auth/login', rateLimit({ keyPrefix: 'auth-login', max: 20, windowMs: 15 * 60_000 }));
+app.use('/api/ai-review/*', rateLimit({ keyPrefix: 'ai-review', max: 30, windowMs: 60 * 60_000 }));
 app.use(
-  '/api/ai-review/*',
-  rateLimit({ keyPrefix: 'ai-review', max: 30, windowMs: 60 * 60_000 }),
+  '/api/prompt-lab/*',
+  rateLimit({ keyPrefix: 'prompt-lab', max: 100, windowMs: 60 * 60_000 }),
 );
-app.use(
-  '/api/integrate/*',
-  rateLimit({ keyPrefix: 'integrate', max: 120, windowMs: 60 * 60_000 }),
-);
+app.use('/api/integrate/*', rateLimit({ keyPrefix: 'integrate', max: 120, windowMs: 60 * 60_000 }));
 
 // ── Montar rutas de API ──
 app.route('/api/auth', authRoutes);
@@ -149,6 +148,7 @@ app.route('/api/settings', settingsRoutes);
 app.route('/api/plans', plansRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/ai-review', aiReviewRoutes);
+app.route('/api/prompt-lab', promptLabRoutes);
 app.route('/api/audit', auditRoutes);
 app.route('/api/documents', documentsRoutes);
 app.route('/api/integrate', integrateRoutes);

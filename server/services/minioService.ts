@@ -27,6 +27,14 @@ export interface BuildAutoPilotReviewObjectKeyInput {
   runId: string;
 }
 
+export interface BuildPromptLabObjectKeyInput {
+  agencyId: string;
+  agencyName?: string;
+  caseId: string;
+  originalFilename: string;
+  now?: Date;
+}
+
 export interface PutDocumentObjectInput {
   objectKey: string;
   buffer: Buffer;
@@ -172,6 +180,20 @@ export function buildAutoPilotReviewObjectKey(input: BuildAutoPilotReviewObjectK
   const safeFilename = sanitizeObjectSegment(input.originalFilename, 'document.pdf');
 
   return `autopilot-ai/${agencySegment}/${year}/${month}/${day}/${runId}/${documentId}-${safeFilename}`;
+}
+
+export function buildPromptLabObjectKey(input: BuildPromptLabObjectKeyInput): string {
+  const now = input.now || new Date();
+  const year = String(now.getUTCFullYear());
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  const agencySegment = input.agencyName
+    ? sanitizeObjectSegment(input.agencyName, 'unknown-agency')
+    : sanitizeObjectSegment(input.agencyId, 'unknown-agency');
+  const caseId = sanitizeObjectSegment(input.caseId, randomUUID());
+  const safeFilename = sanitizeObjectSegment(input.originalFilename, 'document.pdf');
+
+  return `prompt-lab-ai/${agencySegment}/${year}/${month}/${day}/${caseId}-${safeFilename}`;
 }
 
 export async function putDocumentObject(input: PutDocumentObjectInput): Promise<void> {

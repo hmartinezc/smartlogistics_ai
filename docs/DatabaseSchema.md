@@ -31,6 +31,8 @@ subscription_plans ────< agencies ────< agency_emails
                               ├────< document_jobs (PDFs en MinIO, cola async)
                               │       └────< ai_review_items >──── ai_review_runs
                               │
+                              ├────< prompt_lab_cases >────< prompt_lab_analyses
+                              │
                                ├────< integration_delivery_logs
                                │
                                ├────< booked_awb_records
@@ -405,7 +407,66 @@ Guarda diagnósticos y propuestas. No aplica cambios automáticos a prompts ni a
 
 ---
 
-### 17. `app_settings` — Configuración de la App
+### 17. `prompt_lab_cases` — Casos Prompt Lab AI
+
+Casos manuales admin-only para subir una factura, preservar evidencia y diagnosticar si los prompts actuales cubren el formato. No alimenta historial operativo.
+
+| Columna              | Tipo    | Restricción                                        | Descripción                      |
+| -------------------- | ------- | -------------------------------------------------- | -------------------------------- |
+| `id`                 | TEXT    | **PRIMARY KEY**                                    | UUID del caso                    |
+| `agency_id`          | TEXT    | NOT NULL, **FK** → `agencies.id` ON DELETE CASCADE | Agencia propietaria              |
+| `agency_name`        | TEXT    | nullable                                           | Nombre de agencia capturado      |
+| `original_file_name` | TEXT    | NOT NULL                                           | Nombre original del PDF          |
+| `storage_bucket`     | TEXT    | nullable                                           | Bucket MinIO del PDF             |
+| `object_key`         | TEXT    | nullable                                           | Ruta MinIO bajo `prompt-lab-ai/` |
+| `file_size_bytes`    | INTEGER | NOT NULL, DEFAULT 0                                | Tamaño del PDF                   |
+| `mime_type`          | TEXT    | NOT NULL, DEFAULT `application/pdf`                | MIME del archivo                 |
+| `extraction_format`  | TEXT    | NOT NULL, DEFAULT `AGENT_GENERIC_A`                | Agente/formato usado             |
+| `status`             | TEXT    | CHECK(`CREATED`, `ANALYZED`, `ANALYSIS_ERROR`)     | Estado del caso                  |
+| `expected_json`      | TEXT    | nullable                                           | JSON esperado opcional           |
+| `admin_notes`        | TEXT    | nullable                                           | Notas humanas del admin          |
+| `latest_analysis_id` | TEXT    | nullable                                           | Último análisis generado         |
+| `pdf_deleted_at`     | TEXT    | nullable                                           | Fecha en que se eliminó el PDF   |
+| `analysis_error`     | TEXT    | nullable                                           | Error del último análisis        |
+| `created_by_user_id` | TEXT    | **FK** → `users.id` ON DELETE SET NULL             | Admin que creó el caso           |
+| `created_by_email`   | TEXT    | nullable                                           | Email capturado                  |
+| `created_by_name`    | TEXT    | nullable                                           | Nombre capturado                 |
+| `created_at`         | TEXT    | DEFAULT now                                        | Fecha de creación                |
+| `updated_at`         | TEXT    | DEFAULT now                                        | Última actualización             |
+
+**Índices:** `idx_prompt_lab_cases_agency_created`, `idx_prompt_lab_cases_status_created`, `idx_prompt_lab_cases_created_by`
+
+---
+
+### 18. `prompt_lab_analyses` — Análisis Prompt Lab AI
+
+Guarda cada ejecución del validador sobre un caso Prompt Lab. Conserva extracción, métricas, snapshots de prompts, diagnóstico y propuesta V2 sin aplicar cambios.
+
+| Columna                   | Tipo    | Restricción                                      | Descripción                        |
+| ------------------------- | ------- | ------------------------------------------------ | ---------------------------------- |
+| `id`                      | TEXT    | **PRIMARY KEY**                                  | UUID del análisis                  |
+| `case_id`                 | TEXT    | NOT NULL, **FK** → `prompt_lab_cases.id` CASCADE | Caso propietario                   |
+| `reviewer_model`          | TEXT    | NOT NULL                                         | Modelo usado por el validador      |
+| `verdict`                 | TEXT    | NOT NULL                                         | Veredicto del análisis             |
+| `confidence_score`        | INTEGER | nullable                                         | Confianza del validador            |
+| `extraction_json`         | TEXT    | NOT NULL                                         | JSON extraído por el extractor     |
+| `extraction_metrics_json` | TEXT    | NOT NULL                                         | Métricas de clasificador/extractor |
+| `prompt_snapshots_json`   | TEXT    | NOT NULL                                         | Prompts usados en esta ejecución   |
+| `analysis_json`           | TEXT    | NOT NULL                                         | Diagnóstico estructurado           |
+| `patch_proposal_json`     | TEXT    | nullable                                         | Propuesta V2 editable/documentada  |
+| `input_tokens`            | INTEGER | NOT NULL, DEFAULT 0                              | Tokens de entrada totales          |
+| `output_tokens`           | INTEGER | NOT NULL, DEFAULT 0                              | Tokens de salida totales           |
+| `total_tokens`            | INTEGER | NOT NULL, DEFAULT 0                              | Tokens totales                     |
+| `estimated_cost_usd`      | REAL    | NOT NULL, DEFAULT 0                              | Costo estimado total               |
+| `created_by_user_id`      | TEXT    | **FK** → `users.id` ON DELETE SET NULL           | Admin que ejecutó el análisis      |
+| `created_by_email`        | TEXT    | nullable                                         | Email capturado                    |
+| `created_at`              | TEXT    | DEFAULT now                                      | Fecha de creación                  |
+
+**Índice:** `idx_prompt_lab_analyses_case`
+
+---
+
+### 19. `app_settings` — Configuración de la App
 
 Almacén key-value para configuraciones generales.
 
@@ -419,7 +480,7 @@ Almacén key-value para configuraciones generales.
 
 ---
 
-### 18. `integration_delivery_logs` — Logs de Envíos de Integración
+### 20. `integration_delivery_logs` — Logs de Envíos de Integración
 
 Cada registro documenta un envío a un endpoint externo de integración (test o exportación).
 
@@ -542,6 +603,21 @@ Cada registro documenta un envío a un endpoint externo de integración (test o 
 **Respuesta:** `InvoiceData` con `confidenceScore` final; opcionalmente incluye `confidenceReasons[]` y `confidenceAudit` dentro del JSON persistido.
 **Nota:** la API key ya no viaja al navegador; la llamada a Gemini sale desde backend. Por defecto en Docker `GEMINI_EXTRACTION_SDK=genai-router-files` usa el SDK nuevo `@google/genai`, Gemini Files API, clasificador y extractor especializado sin cache. El SDK legacy sigue disponible con `GEMINI_EXTRACTION_SDK=legacy` para rollback y comparación contra el prompt completo anterior. El backend revalida discrepancias matemáticas (`PIECES_TOTAL_MISMATCH`, `EQ_TOTAL_MISMATCH`, `VALUE_TOTAL_MISMATCH`) antes de devolver el score final.
 
+### Prompt Lab AI (`/api/prompt-lab`)
+
+| Método | Ruta                                 | Descripción                                       |
+| ------ | ------------------------------------ | ------------------------------------------------- |
+| GET    | `/api/prompt-lab/cases`              | Listar casos guardados                            |
+| POST   | `/api/prompt-lab/cases`              | Crear caso con PDF, agencia y referencia opcional |
+| GET    | `/api/prompt-lab/cases/:id`          | Obtener caso con análisis                         |
+| GET    | `/api/prompt-lab/cases/:id/pdf`      | Abrir PDF del caso                                |
+| DELETE | `/api/prompt-lab/cases/:id/pdf`      | Eliminar solo el PDF del caso                     |
+| PATCH  | `/api/prompt-lab/cases/:id/expected` | Guardar JSON esperado y notas humanas             |
+| POST   | `/api/prompt-lab/cases/:id/analyze`  | Ejecutar extracción + agente validador            |
+
+**Autorización:** solo `ADMIN`
+**Persistencia:** guarda en `prompt_lab_cases`, `prompt_lab_analyses` y MinIO bajo `prompt-lab-ai/`. No crea `document_jobs`, `batch_items` ni entregas de integración.
+
 ### Planes (`/api/plans`)
 
 | Método | Ruta         | Descripción                  |
@@ -596,6 +672,7 @@ Cada registro documenta un envío a un endpoint externo de integración (test o 
 13. **Carga asíncrona de PDFs** — los archivos se guardan en MinIO y SQLite conserva solo metadatos/estado en `document_jobs`
 14. **Worker de documentos** — procesa jobs `QUEUED` en backend y refleja resultados en `batch_items` para conservar compatibilidad con vistas existentes
 15. **Scoring de confianza** — Gemini puede proponer `confidenceReasons`, pero el backend confirma de forma determinística las discrepancias matemáticas y ajusta el `confidenceScore` final antes de persistirlo
+16. **Prompt Lab AI** — los casos de diagnóstico son admin-only, se guardan separados del historial operativo y nunca aplican cambios automáticos a prompts o extractores
 
 ---
 
@@ -633,6 +710,7 @@ PORT=8080 npm run start
 | `TURSO_AUTH_TOKEN`                            | No        | Token de auth de Turso (si es remoto)                                                                                 |
 | `GEMINI_API_KEY`                              | Sí        | API key de Google Gemini para IA                                                                                      |
 | `GEMINI_MODEL_ID`                             | No        | Modelo Gemini activo (default: `gemini-3-flash-preview`)                                                              |
+| `GEMINI_PROMPT_LAB_REVIEW_MODEL_ID`           | No        | Modelo opcional para el agente validador de Prompt Lab AI; si falta usa `GEMINI_MODEL_ID`                             |
 | `GEMINI_EXTRACTION_SDK`                       | No        | `genai-router-files` por defecto en Docker; `legacy` para baseline/rollback; `genai` para pruebas con SDK nuevo/cache |
 | `GEMINI_EXTRACTION_PROMPT_PROFILE`            | No        | `full` por defecto; `compact` reduce tokens para pruebas de latencia/costo                                            |
 | `GEMINI_GENERATE_TIMEOUT_MS`                  | No        | Timeout de extracción Gemini (default: 180000)                                                                        |

@@ -144,6 +144,49 @@ const AI_REVIEW_ANALYSES_TABLE_SQL = `CREATE TABLE IF NOT EXISTS ai_review_analy
   updated_at               TEXT DEFAULT (datetime('now'))
 )`;
 
+const PROMPT_LAB_CASES_TABLE_SQL = `CREATE TABLE IF NOT EXISTS prompt_lab_cases (
+  id                       TEXT PRIMARY KEY,
+  agency_id                TEXT NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+  agency_name              TEXT,
+  original_file_name       TEXT NOT NULL,
+  storage_bucket           TEXT,
+  object_key               TEXT,
+  file_size_bytes          INTEGER NOT NULL DEFAULT 0,
+  mime_type                TEXT NOT NULL DEFAULT 'application/pdf',
+  extraction_format        TEXT NOT NULL DEFAULT 'AGENT_GENERIC_A',
+  status                   TEXT NOT NULL DEFAULT 'CREATED' CHECK(status IN ('CREATED', 'ANALYZED', 'ANALYSIS_ERROR')),
+  expected_json            TEXT,
+  admin_notes              TEXT,
+  latest_analysis_id       TEXT,
+  pdf_deleted_at           TEXT,
+  analysis_error           TEXT,
+  created_by_user_id       TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_by_email         TEXT,
+  created_by_name          TEXT,
+  created_at               TEXT DEFAULT (datetime('now')),
+  updated_at               TEXT DEFAULT (datetime('now'))
+)`;
+
+const PROMPT_LAB_ANALYSES_TABLE_SQL = `CREATE TABLE IF NOT EXISTS prompt_lab_analyses (
+  id                       TEXT PRIMARY KEY,
+  case_id                  TEXT NOT NULL REFERENCES prompt_lab_cases(id) ON DELETE CASCADE,
+  reviewer_model           TEXT NOT NULL,
+  verdict                  TEXT NOT NULL,
+  confidence_score         INTEGER,
+  extraction_json          TEXT NOT NULL,
+  extraction_metrics_json  TEXT NOT NULL,
+  prompt_snapshots_json    TEXT NOT NULL,
+  analysis_json            TEXT NOT NULL,
+  patch_proposal_json      TEXT,
+  input_tokens             INTEGER NOT NULL DEFAULT 0,
+  output_tokens            INTEGER NOT NULL DEFAULT 0,
+  total_tokens             INTEGER NOT NULL DEFAULT 0,
+  estimated_cost_usd       REAL NOT NULL DEFAULT 0,
+  created_by_user_id       TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_by_email         TEXT,
+  created_at               TEXT DEFAULT (datetime('now'))
+)`;
+
 const AI_REVIEW_INDEX_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_ai_prompt_snapshots_hash ON ai_prompt_snapshots(prompt_hash)`,
   `CREATE INDEX IF NOT EXISTS idx_ai_review_runs_date ON ai_review_runs(review_date DESC, created_at DESC)`,
@@ -152,6 +195,13 @@ const AI_REVIEW_INDEX_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_ai_review_items_document ON ai_review_items(document_job_id)`,
   `CREATE INDEX IF NOT EXISTS idx_ai_review_items_review_object ON ai_review_items(review_object_key)`,
   `CREATE INDEX IF NOT EXISTS idx_ai_review_analyses_item ON ai_review_analyses(item_id, created_at DESC)`,
+];
+
+const PROMPT_LAB_INDEX_STATEMENTS = [
+  `CREATE INDEX IF NOT EXISTS idx_prompt_lab_cases_agency_created ON prompt_lab_cases(agency_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_prompt_lab_cases_status_created ON prompt_lab_cases(status, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_prompt_lab_cases_created_by ON prompt_lab_cases(created_by_user_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_prompt_lab_analyses_case ON prompt_lab_analyses(case_id, created_at DESC)`,
 ];
 
 /**
@@ -364,6 +414,10 @@ const SCHEMA_STATEMENTS: string[] = [
   AI_REVIEW_ITEMS_TABLE_SQL,
   AI_REVIEW_ANALYSES_TABLE_SQL,
 
+  // ── Prompt Lab AI (laboratorio guardado, no operativo) ──
+  PROMPT_LAB_CASES_TABLE_SQL,
+  PROMPT_LAB_ANALYSES_TABLE_SQL,
+
   // ── Configuración General (key-value) ──
   `CREATE TABLE IF NOT EXISTS app_settings (
     key            TEXT PRIMARY KEY,
@@ -419,6 +473,8 @@ export async function runMigrations(db: Client): Promise<void> {
   await ensureTableExists(db, 'ai_review_runs', AI_REVIEW_RUNS_TABLE_SQL);
   await ensureTableExists(db, 'ai_review_items', AI_REVIEW_ITEMS_TABLE_SQL);
   await ensureTableExists(db, 'ai_review_analyses', AI_REVIEW_ANALYSES_TABLE_SQL);
+  await ensureTableExists(db, 'prompt_lab_cases', PROMPT_LAB_CASES_TABLE_SQL);
+  await ensureTableExists(db, 'prompt_lab_analyses', PROMPT_LAB_ANALYSES_TABLE_SQL);
   await migrateAiReviewItemsForPersistentArtifacts(db);
   await ensureColumn(db, 'ai_review_items', 'review_storage_bucket', 'TEXT');
   await ensureColumn(db, 'ai_review_items', 'review_object_key', 'TEXT');
@@ -435,6 +491,12 @@ export async function runMigrations(db: Client): Promise<void> {
     }
   }
   for (const indexStatement of AI_REVIEW_INDEX_STATEMENTS) {
+    const match = indexStatement.match(/CREATE INDEX IF NOT EXISTS\s+(\S+)/i);
+    if (match) {
+      await ensureIndexExists(db, match[1], indexStatement);
+    }
+  }
+  for (const indexStatement of PROMPT_LAB_INDEX_STATEMENTS) {
     const match = indexStatement.match(/CREATE INDEX IF NOT EXISTS\s+(\S+)/i);
     if (match) {
       await ensureIndexExists(db, match[1], indexStatement);

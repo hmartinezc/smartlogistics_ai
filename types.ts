@@ -420,6 +420,128 @@ export interface AiReviewAnalyzeResponse {
   detail: AiReviewDetail;
 }
 
+export type PromptLabCaseStatus = 'CREATED' | 'ANALYZED' | 'ANALYSIS_ERROR' | string;
+
+export type PromptLabVerdict =
+  | 'OK'
+  | 'REVIEW_NEEDED'
+  | 'PROMPT_IMPROVEMENT_SUGGESTED'
+  | 'NEW_CATEGORY_SUGGESTED'
+  | string;
+
+export type PromptLabPatchProposalType =
+  | 'CLASSIFIER_PROMPT_ADJUSTMENT'
+  | 'EXTRACTOR_PROMPT_ADJUSTMENT'
+  | 'NEW_ROUTER_CATEGORY'
+  | 'SCHEMA_CHANGE'
+  | 'DETERMINISTIC_RULE_CHANGE'
+  | 'NONE'
+  | string;
+
+export interface PromptLabPatchProposal {
+  type?: PromptLabPatchProposalType;
+  target?: string;
+  rationale?: string;
+  proposedDiff?: string;
+  risk?: string;
+  requiresDeveloperWork?: boolean;
+}
+
+export interface PromptLabRecommendation {
+  area?: string;
+  category?: string;
+  recommendation?: string;
+  expectedImpact?: string;
+  costImpact?: 'LOWER' | 'NEUTRAL' | 'HIGHER' | string;
+}
+
+export interface PromptLabFieldFinding {
+  field?: string;
+  actual?: string;
+  expected?: string;
+  reason?: string;
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+}
+
+export interface PromptLabNewCategoryRecommendation {
+  needed?: boolean;
+  suggestedName?: string | null;
+  visualSignals?: string[];
+  extractorPromptDraft?: string | null;
+  testCases?: string[];
+}
+
+export interface PromptLabAnalysisPayload {
+  verdict?: PromptLabVerdict;
+  confidenceScore?: number;
+  summary?: string;
+  fieldFindings?: PromptLabFieldFinding[];
+  classifierRecommendations?: PromptLabRecommendation[];
+  extractorRecommendations?: PromptLabRecommendation[];
+  newCategoryRecommendation?: PromptLabNewCategoryRecommendation | null;
+  schemaOrCodeRecommendations?: string[];
+  deterministicRuleRecommendations?: string[];
+  costNotes?: string[];
+  validationPlan?: string[];
+  patchProposal?: PromptLabPatchProposal;
+}
+
+export interface PromptLabCase {
+  id: string;
+  agencyId: string;
+  agencyName: string | null;
+  originalFileName: string;
+  storageBucket: string | null;
+  objectKey: string | null;
+  fileSizeBytes: number;
+  mimeType: string;
+  extractionFormat: string;
+  status: PromptLabCaseStatus;
+  expectedJson: string | null;
+  adminNotes: string | null;
+  latestAnalysisId: string | null;
+  pdfDeletedAt: string | null;
+  analysisError: string | null;
+  createdBy: {
+    id: string | null;
+    email: string | null;
+    name: string | null;
+  };
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PromptLabAnalysis {
+  id: string;
+  caseId: string;
+  reviewerModel: string;
+  verdict: PromptLabVerdict;
+  confidenceScore: number | null;
+  extraction: InvoiceData | null;
+  extractionMetrics: Record<string, unknown> | null;
+  promptSnapshots: AiPromptSnapshot[];
+  analysis: PromptLabAnalysisPayload | null;
+  patchProposal: PromptLabPatchProposal | null;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  createdBy: {
+    id: string | null;
+    email: string | null;
+  };
+  createdAt: string | null;
+}
+
+export interface PromptLabCaseListResponse {
+  cases: PromptLabCase[];
+}
+
+export interface PromptLabDetailResponse {
+  case: PromptLabCase;
+  analyses: PromptLabAnalysis[];
+}
+
 export type DocumentJobStatus =
   | 'UPLOADED'
   | 'QUEUED'
@@ -645,6 +767,7 @@ export enum AppState {
   DASHBOARD_PANEL = 'DASHBOARD_PANEL', // Panel Facturado (Operación)
   DASHBOARD_ADMIN = 'DASHBOARD_ADMIN', // Panel Admin (Solo Admin)
   AI_REVIEW = 'AI_REVIEW', // AutoPilot AI: revisión y mejora continua (Solo Admin)
+  PROMPT_LAB = 'PROMPT_LAB', // Prompt Lab AI: diagnóstico guardado de prompts (Solo Admin)
   AGENCY_CONFIG = 'AGENCY_CONFIG', // Configuración Agencias (Solo Admin)
   INTEGRATION_CONFIG = 'INTEGRATION_CONFIG', // Integración por agencia (Solo Admin)
   PENDING_PRODUCT_MATCHES = 'PENDING_PRODUCT_MATCHES', // Productos extraídos sin equivalencia

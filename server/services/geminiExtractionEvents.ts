@@ -18,7 +18,7 @@ export interface GeminiExtractionTelemetryContext {
   batchId?: string;
   documentJobId?: string;
   originalFileName?: string;
-  source?: 'document-worker' | 'api-extract' | 'api-compare' | 'cache' | 'unknown';
+  source?: 'document-worker' | 'api-extract' | 'api-compare' | 'prompt-lab' | 'cache' | 'unknown';
   userEmail?: string;
   userId?: string;
   userName?: string;
