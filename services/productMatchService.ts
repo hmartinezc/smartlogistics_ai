@@ -29,6 +29,8 @@ const EMPTY_MATCH: ProductMatchExport = {
   htsMatch: '',
 };
 
+const COMPACT_VARIETY_PATTERN = /^(.*?)\s*:\s*(-?\d+(?:[.,]\d+)?)\s*$/;
+
 export function normalizeProductMatchKey(value: string | null | undefined): string {
   return (value || '').trim().toLowerCase();
 }
@@ -48,6 +50,42 @@ function buildAgencyLookup(items: ProductMatchCatalogItem[]): Map<string, Produc
   return lookup;
 }
 
+function getMatchedClientProductCode(
+  matchRecord: ProductMatchCatalogItem | undefined,
+): string | null {
+  if (!matchRecord) {
+    return null;
+  }
+
+  return matchRecord.clientProductCode || null;
+}
+
+function enrichCompactVarietyWithMatch(
+  value: string,
+  lookup?: Map<string, ProductMatchCatalogItem>,
+): { value: string; missingMatch: boolean } {
+  const match = value.match(COMPACT_VARIETY_PATTERN);
+  if (!match) {
+    return { value, missingMatch: false };
+  }
+
+  const product = match[1].trim();
+  if (!product) {
+    return { value, missingMatch: false };
+  }
+
+  const matchRecord = lookup?.get(normalizeProductMatchKey(product));
+  const clientProductCode = getMatchedClientProductCode(matchRecord);
+  if (!clientProductCode) {
+    return { value, missingMatch: true };
+  }
+
+  return {
+    value: `${clientProductCode}:${match[2]}`,
+    missingMatch: false,
+  };
+}
+
 export function enrichInvoiceDataWithMatches(
   invoiceData: InvoiceData,
   lookup?: Map<string, ProductMatchCatalogItem>,
@@ -60,8 +98,18 @@ export function enrichInvoiceDataWithMatches(
       missingMatches += 1;
     }
 
+    const enrichedVarieties = lineItem.varieties?.map((variety) => {
+      const enriched = enrichCompactVarietyWithMatch(variety, lookup);
+      if (enriched.missingMatch) {
+        missingMatches += 1;
+      }
+
+      return enriched.value;
+    });
+
     return {
       ...lineItem,
+      ...(enrichedVarieties ? { varieties: enrichedVarieties } : {}),
       match: matchRecord
         ? {
             clientProductCode: matchRecord.clientProductCode,

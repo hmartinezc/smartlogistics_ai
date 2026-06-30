@@ -158,6 +158,11 @@ function clampText(value: string, maxLength: number): string {
   return value.slice(0, maxLength);
 }
 
+function getCompactVarietyProduct(value: string): string {
+  const match = value.match(/^(.*?)\s*:\s*-?\d+(?:[.,]\d+)?\s*$/);
+  return match ? match[1].trim() : '';
+}
+
 function buildPendingProductMatches(
   rows: Record<string, unknown>[],
   matchedKeys: Set<string>,
@@ -199,63 +204,73 @@ function buildPendingProductMatches(
         continue;
       }
 
-      const rawProductDescription = asText(rawLineItem.productDescription);
-      if (!rawProductDescription) {
-        continue;
-      }
-
-      if (exceedsMaxLength(rawProductDescription, MAX_PENDING_PRODUCT_LENGTH)) {
-        truncated = true;
-        continue;
-      }
-
-      const normalizedKey = normalizeProductKey(rawProductDescription);
-      if (!normalizedKey || matchedKeys.has(normalizedKey)) {
-        continue;
-      }
-
-      const productDescription = clampText(rawProductDescription, MAX_PENDING_DISPLAY_TEXT_LENGTH);
       const hts = clampText(asText(rawLineItem.hts), MAX_PENDING_HTS_LENGTH);
-      let pendingItem = pendingByKey.get(normalizedKey);
+      const addPendingProduct = (rawProduct: string, rawExampleText = rawProduct) => {
+        if (!rawProduct) {
+          return;
+        }
 
-      if (!pendingItem) {
-        pendingItem = {
-          key: normalizedKey,
-          product: rawProductDescription,
-          occurrenceCount: 0,
-          invoiceIds: new Set<string>(),
-          htsCounts: new Map<string, number>(),
-          latestProcessedAt: processedAt,
-          latestTimestamp: processedTimestamp,
-          examples: [],
-        };
-        pendingByKey.set(normalizedKey, pendingItem);
-      }
+        if (exceedsMaxLength(rawProduct, MAX_PENDING_PRODUCT_LENGTH)) {
+          truncated = true;
+          return;
+        }
 
-      pendingItem.occurrenceCount += 1;
-      if (batchItemId) {
-        pendingItem.invoiceIds.add(batchItemId);
-      }
+        const normalizedKey = normalizeProductKey(rawProduct);
+        if (!normalizedKey || matchedKeys.has(normalizedKey)) {
+          return;
+        }
 
-      if (hts) {
-        pendingItem.htsCounts.set(hts, (pendingItem.htsCounts.get(hts) || 0) + 1);
-      }
+        const productDescription = clampText(rawExampleText, MAX_PENDING_DISPLAY_TEXT_LENGTH);
+        let pendingItem = pendingByKey.get(normalizedKey);
 
-      if (processedTimestamp > pendingItem.latestTimestamp) {
-        pendingItem.latestTimestamp = processedTimestamp;
-        pendingItem.latestProcessedAt = processedAt;
-        pendingItem.product = rawProductDescription;
-      }
+        if (!pendingItem) {
+          pendingItem = {
+            key: normalizedKey,
+            product: rawProduct,
+            occurrenceCount: 0,
+            invoiceIds: new Set<string>(),
+            htsCounts: new Map<string, number>(),
+            latestProcessedAt: processedAt,
+            latestTimestamp: processedTimestamp,
+            examples: [],
+          };
+          pendingByKey.set(normalizedKey, pendingItem);
+        }
 
-      if (pendingItem.examples.length < MAX_PENDING_PRODUCT_EXAMPLES) {
-        pendingItem.examples.push({
-          batchItemId,
-          fileName,
-          invoiceNumber: invoiceNumber || undefined,
-          hawb: hawb || undefined,
-          productDescription,
-          hts: hts || undefined,
-        });
+        pendingItem.occurrenceCount += 1;
+        if (batchItemId) {
+          pendingItem.invoiceIds.add(batchItemId);
+        }
+
+        if (hts) {
+          pendingItem.htsCounts.set(hts, (pendingItem.htsCounts.get(hts) || 0) + 1);
+        }
+
+        if (processedTimestamp > pendingItem.latestTimestamp) {
+          pendingItem.latestTimestamp = processedTimestamp;
+          pendingItem.latestProcessedAt = processedAt;
+          pendingItem.product = rawProduct;
+        }
+
+        if (pendingItem.examples.length < MAX_PENDING_PRODUCT_EXAMPLES) {
+          pendingItem.examples.push({
+            batchItemId,
+            fileName,
+            invoiceNumber: invoiceNumber || undefined,
+            hawb: hawb || undefined,
+            productDescription,
+            hts: hts || undefined,
+          });
+        }
+      };
+
+      addPendingProduct(asText(rawLineItem.productDescription));
+
+      if (Array.isArray(rawLineItem.varieties)) {
+        for (const rawVariety of rawLineItem.varieties) {
+          const varietyText = asText(rawVariety);
+          addPendingProduct(getCompactVarietyProduct(varietyText), varietyText);
+        }
       }
     }
   }

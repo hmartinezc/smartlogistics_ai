@@ -18,7 +18,7 @@
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
     "quality": "node scripts/quality/pre-commit-check.js",
     "scan-secrets": "node scripts/quality/check-secrets.js",
-    "test:integration": "node --import tsx --test shared/integrationConfig.test.ts services/integrationExportService.test.ts",
+    "test:integration": "node --import tsx --test shared/integrationConfig.test.ts services/integrationExportService.test.ts services/productMatchService.test.ts",
     "test:router": "node --import tsx --test server/services/documentExtractionService.router.test.ts",
     "check": "npm run typecheck && npm run format:check && npm run quality",
     "docker:up": "docker compose -f docker-compose.yml up -d --build",
